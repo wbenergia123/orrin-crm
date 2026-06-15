@@ -83,7 +83,8 @@ CREATE POLICY "tenant_isolation" ON configuracoes
 
 -- Policy em organizacoes: usuário vê só a sua, super_admin vê todas
 CREATE POLICY "org_self_read" ON organizacoes
-  USING (id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin');
+  USING      (id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin')
+  WITH CHECK ((auth.jwt() ->> 'role') = 'super_admin');
 
 -- ============================================================
 -- AUDIT LOG (somente super_admin)
@@ -96,6 +97,9 @@ CREATE TABLE admin_audit_log (
   metadata   JSONB,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE INDEX idx_audit_log_created  ON admin_audit_log(created_at DESC);
+CREATE INDEX idx_audit_log_admin    ON admin_audit_log(admin_id, created_at DESC);
 
 ALTER TABLE admin_audit_log ENABLE ROW LEVEL SECURITY;
 
@@ -116,6 +120,11 @@ BEGIN
   SELECT tenant_id, role INTO user_row
   FROM public.usuarios WHERE id = (event->>'user_id')::uuid;
 
+  -- If user not found in public.usuarios yet, return event unchanged
+  IF NOT FOUND THEN
+    RETURN event;
+  END IF;
+
   claims := event->'claims';
   claims := jsonb_set(claims, '{tenant_id}', to_jsonb(user_row.tenant_id::text));
   claims := jsonb_set(claims, '{role}',      to_jsonb(user_row.role));
@@ -130,15 +139,17 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  IF NEW.raw_user_meta_data ? 'tenant_id' OR (NEW.raw_user_meta_data->>'role') = 'super_admin' THEN
-    INSERT INTO public.usuarios (id, email, tenant_id, role)
-    VALUES (
-      NEW.id,
-      NEW.email,
-      NULLIF(NEW.raw_user_meta_data->>'tenant_id', '')::uuid,
-      COALESCE(NEW.raw_user_meta_data->>'role', 'vendedor')
-    );
-  END IF;
+  -- Always insert into public.usuarios
+  -- Super admin has NULL tenant_id (nullable column)
+  -- Regular users must supply tenant_id in metadata
+  INSERT INTO public.usuarios (id, email, tenant_id, role)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    NULLIF(NEW.raw_user_meta_data->>'tenant_id', '')::uuid,
+    COALESCE(NEW.raw_user_meta_data->>'role', 'vendedor')
+  )
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
