@@ -2,11 +2,21 @@
 
 export type StatusCliente = 'novo' | 'contato_feito' | 'reuniao_agendada' | 'cliente' | 'perdido'
 export type StatusReuniао = 'agendada' | 'confirmada' | 'cancelada' | 'realizada'
-export type RoleUsuario = 'admin' | 'vendedor'
+export type RoleUsuario = 'admin' | 'vendedor' | 'super_admin'
 export type TipoRemetente = 'agente' | 'humano'
+
+export interface Organizacao {
+  id: string
+  slug: string
+  nome: string
+  ativo: boolean
+  deleted_at: string | null
+  created_at: string
+}
 
 export interface Cliente {
   id: string
+  tenant_id: string
   telefone: string
   nome: string | null
   empresa: string | null
@@ -19,6 +29,7 @@ export interface Cliente {
 
 export interface Reuniao {
   id: string
+  tenant_id: string
   cliente_id: string
   data_hora: string
   status: StatusReuniао
@@ -31,6 +42,7 @@ export interface Reuniao {
 
 export interface Conversa {
   id: string
+  tenant_id: string
   cliente_id: string
   mensagem_cliente: string | null
   mensagem_agente: string | null
@@ -41,6 +53,7 @@ export interface Conversa {
 
 export interface Usuario {
   id: string
+  tenant_id: string | null
   email: string
   role: RoleUsuario
 }
@@ -49,9 +62,11 @@ export interface JWTPayload {
   sub: string
   email: string
   role: RoleUsuario
+  tenant_id: string | null
 }
 
 export interface ConfiguracaoOrrin {
+  tenant_id: string
   empresa_nome: string
   email_contato: string
   telefone: string | null
