@@ -1,5 +1,5 @@
 // frontend/src/pages/SuperAdminApp.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import api from '../lib/api'
@@ -14,9 +14,15 @@ export default function SuperAdminApp() {
   const [formSuccess, setFormSuccess] = useState('')
   const queryClient = useQueryClient()
 
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    if (session) setSession(session)
-  })
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setSession(session)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setSession(session)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
