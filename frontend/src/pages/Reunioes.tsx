@@ -20,7 +20,7 @@ interface Reuniao {
   clientes?: Cliente;
 }
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   agendada: "bg-yellow-100 text-yellow-700",
   confirmada: "bg-blue-100 text-blue-700",
   cancelada: "bg-red-100 text-red-700",

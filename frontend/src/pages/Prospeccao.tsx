@@ -10,6 +10,11 @@ interface Cliente {
   created_at: string;
 }
 
+interface ClientePorDia {
+  data: string;
+  clientes: number;
+}
+
 export default function Prospeccao() {
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes"],
@@ -30,20 +35,20 @@ export default function Prospeccao() {
   // Calcular métricas
   const stats = {
     total_leads: clientes.length,
-    contato_feito: clientes.filter((c) => c.status !== "novo").length,
+    contato_feito: clientes.filter((c: Cliente) => c.status !== "novo").length,
     reunioes_agendadas: clientes.filter(
-      (c) => c.status === "reuniao_agendada"
+      (c: Cliente) => c.status === "reuniao_agendada"
     ).length,
-    clientes_convertidos: clientes.filter((c) => c.status === "cliente").length,
+    clientes_convertidos: clientes.filter((c: Cliente) => c.status === "cliente").length,
     taxa_conversao:
       clientes.length > 0
-        ? ((clientes.filter((c) => c.status === "cliente").length /
+        ? ((clientes.filter((c: Cliente) => c.status === "cliente").length /
             clientes.length) *
           100).toFixed(1)
         : "0",
     taxa_resposta:
       clientes.length > 0
-        ? ((clientes.filter((c) => c.status !== "novo").length /
+        ? ((clientes.filter((c: Cliente) => c.status !== "novo").length /
             clientes.length) *
           100).toFixed(1)
         : "0",
@@ -51,7 +56,7 @@ export default function Prospeccao() {
 
   // Dados para gráfico de funil
   const funnelData = [
-    { name: "Novos", value: clientes.filter((c) => c.status === "novo").length },
+    { name: "Novos", value: clientes.filter((c: Cliente) => c.status === "novo").length },
     { name: "Contato", value: stats.contato_feito },
     { name: "Reunião", value: stats.reunioes_agendadas },
     { name: "Cliente", value: stats.clientes_convertidos },
@@ -59,9 +64,9 @@ export default function Prospeccao() {
 
   // Dados para gráfico de conversão por dia
   const clientesPorDia = clientes.reduce(
-    (acc, cliente) => {
+    (acc: ClientePorDia[], cliente: Cliente) => {
       const data = new Date(cliente.created_at).toLocaleDateString("pt-BR");
-      const existing = acc.find((d) => d.data === data);
+      const existing = acc.find((d: ClientePorDia) => d.data === data);
       if (existing) {
         existing.clientes += 1;
       } else {
@@ -158,9 +163,9 @@ export default function Prospeccao() {
           <div className="p-4 bg-green-50 rounded border-l-4 border-green-500">
             <p className="font-semibold text-gray-800">Meta</p>
             <p className="text-gray-600 mt-1">
-              {stats.taxa_conversao >= 10
+              {parseFloat(stats.taxa_conversao) >= 10
                 ? "🎯 Meta de conversão atingida!"
-                : `📈 ${(10 - parseFloat(stats.taxa_conversao as string)).toFixed(1)}% até meta`}
+                : `📈 ${(10 - parseFloat(stats.taxa_conversao)).toFixed(1)}% até meta`}
             </p>
           </div>
         </div>

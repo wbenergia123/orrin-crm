@@ -14,7 +14,7 @@ interface Cliente {
   created_at: string;
 }
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   novo: "bg-gray-100 text-gray-700",
   contato_feito: "bg-yellow-100 text-yellow-700",
   reuniao_agendada: "bg-green-100 text-green-700",
@@ -41,7 +41,7 @@ export default function Clientes() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (cliente) => {
+    mutationFn: async (cliente: typeof novoCliente) => {
       return await axios.post("/api/clientes", cliente);
     },
     onSuccess: () => {
