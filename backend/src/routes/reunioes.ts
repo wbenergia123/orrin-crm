@@ -1,87 +1,65 @@
 // backend/src/routes/reunioes.ts
+import { Router, Request, Response } from 'express'
+import { supabaseAdmin } from '../services/supabase'
 
-import { Router, Request, Response } from "express";
-import { supabase } from "../services/supabase";
-import { Reuniao } from "../types";
+const router = Router()
 
-const router = Router();
+router.get('/', async (req: Request, res: Response) => {
+  const { data, error } = await supabaseAdmin
+    .from('reunioes')
+    .select('*, clientes(*)')
+    .eq('tenant_id', req.user!.tenant_id)
+    .order('data_hora', { ascending: true })
 
-// Listar reuniões
-router.get("/", async (req: Request, res: Response) => {
-  const { data, error } = await supabase
-    .from("reunioes")
-    .select("*, clientes(*)")
-    .order("data_hora", { ascending: true });
+  if (error) return res.status(400).json({ error: error.message })
+  res.json(data)
+})
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-});
-
-// Buscar reunião por ID
-router.get("/:id", async (req: Request, res: Response) => {
-  const { data, error } = await supabase
-    .from("reunioes")
-    .select("*, clientes(*)")
-    .eq("id", req.params.id)
-    .single();
-
-  if (error) return res.status(404).json({ error: "Reunião não encontrada" });
-  res.json(data);
-});
-
-// Agendar reunião
-router.post("/", async (req: Request, res: Response) => {
-  const { cliente_id, data_hora } = req.body;
-
+router.post('/', async (req: Request, res: Response) => {
+  const { cliente_id, data_hora } = req.body
   if (!cliente_id || !data_hora) {
-    return res
-      .status(400)
-      .json({ error: "cliente_id e data_hora são obrigatórios" });
+    return res.status(400).json({ error: 'cliente_id e data_hora são obrigatórios' })
   }
 
-  const { data, error } = await supabase
-    .from("reunioes")
-    .insert({
-      cliente_id,
-      data_hora,
-      status: "agendada",
-    })
+  const { data, error } = await supabaseAdmin
+    .from('reunioes')
+    .insert({ cliente_id, data_hora, status: 'agendada', tenant_id: req.user!.tenant_id })
     .select()
-    .single();
+    .single()
 
-  if (error) return res.status(400).json({ error: error.message });
+  if (error) return res.status(400).json({ error: error.message })
 
-  // Atualizar status do cliente para reuniao_agendada
-  await supabase
-    .from("clientes")
-    .update({ status: "reuniao_agendada" })
-    .eq("id", cliente_id);
+  await supabaseAdmin
+    .from('clientes')
+    .update({ status: 'reuniao_agendada' })
+    .eq('id', cliente_id)
+    .eq('tenant_id', req.user!.tenant_id)
 
-  res.status(201).json(data);
-});
+  res.status(201).json(data)
+})
 
-// Atualizar reunião
-router.patch("/:id", async (req: Request, res: Response) => {
-  const { data, error } = await supabase
-    .from("reunioes")
+router.patch('/:id', async (req: Request, res: Response) => {
+  const { data, error } = await supabaseAdmin
+    .from('reunioes')
     .update(req.body)
-    .eq("id", req.params.id)
+    .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
     .select()
-    .single();
+    .single()
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json(data);
-});
+  if (error) return res.status(400).json({ error: error.message })
+  res.json(data)
+})
 
-// Deletar reunião
-router.delete("/:id", async (req: Request, res: Response) => {
-  const { error } = await supabase
-    .from("reunioes")
+router.delete('/:id', async (req: Request, res: Response) => {
+  const { error } = await supabaseAdmin
+    .from('reunioes')
     .delete()
-    .eq("id", req.params.id);
+    .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
 
-  if (error) return res.status(400).json({ error: error.message });
-  res.json({ message: "Reunião deletada" });
-});
+  if (error) return res.status(400).json({ error: error.message })
+  res.json({ message: 'Reunião deletada' })
+})
 
-export default router;
+export default router

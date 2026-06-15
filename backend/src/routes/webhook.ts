@@ -1,90 +1,70 @@
 // backend/src/routes/webhook.ts
+import { Router, Request, Response } from 'express'
+import { supabaseAdmin } from '../services/supabase'
+import { processarMensagemCliente, detectarIntencaoReuniao } from '../agents/pedro'
 
-import { Router, Request, Response } from "express";
-import { supabase } from "../services/supabase";
-import { processarMensagemCliente, detectarIntencaoReuniao } from "../agents/pedro";
+const router = Router()
 
-const router = Router();
-
-router.post("/whatsapp", async (req: Request, res: Response) => {
+// URL: POST /api/webhook/whatsapp/:tenantSlug
+// Each UAZAPI instance points to this URL with the tenant's slug
+router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
   try {
-    const { data } = req.body;
+    const { tenantSlug } = req.params
+    const { data: msg } = req.body
 
-    // Validar estrutura esperada
-    if (!data?.message?.text?.body) {
-      return res.json({ result: "ok" });
-    }
+    if (!msg?.message?.text?.body) return res.json({ result: 'ok' })
 
-    const telefone = data.from;
-    const mensagem = data.message.text.body;
+    const { data: org } = await supabaseAdmin
+      .from('organizacoes')
+      .select('id, ativo')
+      .eq('slug', tenantSlug.toLowerCase())
+      .is('deleted_at', null)
+      .single()
 
-    // Buscar ou criar cliente
-    let { data: cliente } = await supabase
-      .from("clientes")
-      .select("*")
-      .eq("telefone", telefone)
-      .single();
+    if (!org || !org.ativo) return res.status(404).json({ error: 'Org não encontrada' })
+
+    const telefone = msg.from
+    const mensagem = msg.message.text.body
+    const tenantId = org.id
+
+    let { data: cliente } = await supabaseAdmin
+      .from('clientes')
+      .select('*')
+      .eq('telefone', telefone)
+      .eq('tenant_id', tenantId)
+      .single()
 
     if (!cliente) {
-      const { data: novoCliente } = await supabase
-        .from("clientes")
-        .insert({ telefone, status: "novo" })
+      const { data: novo } = await supabaseAdmin
+        .from('clientes')
+        .insert({ telefone, status: 'novo', tenant_id: tenantId })
         .select()
-        .single();
-      cliente = novoCliente;
+        .single()
+      cliente = novo
     }
 
-    // Processar mensagem com Pedro
-    const resposta = await processarMensagemCliente(cliente.id, mensagem);
+    const resposta = await processarMensagemCliente(cliente.id, mensagem)
 
-    // Enviar resposta via UAZAPI
-    await enviarViaUAZAPI(telefone, resposta);
+    await fetch(`${process.env.UAZAPI_URL}/send-message`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.UAZAPI_TOKEN}`,
+      },
+      body: JSON.stringify({ phone: telefone, message: resposta }),
+    })
 
-    // Se detectou intenção de reunião, pode registrar para follow-up
     if (detectarIntencaoReuniao(mensagem)) {
-      // Log para possível automação futura
-      console.log(`[INTENÇÃO] Cliente ${cliente.id} quer agendar reunião`);
+      console.log(`[INTENÇÃO REUNIÃO] cliente ${cliente.id} tenant ${tenantId}`)
     }
 
-    res.json({ result: "ok" });
-  } catch (error) {
-    console.error("Erro no webhook WhatsApp:", error);
-    res.status(500).json({ error: "Erro ao processar mensagem" });
+    res.json({ result: 'ok' })
+  } catch (err) {
+    console.error('Erro webhook:', err)
+    res.status(500).json({ error: 'Erro interno' })
   }
-});
+})
 
-// Health check
-router.get("/health", (req: Request, res: Response) => {
-  res.json({ status: "ok" });
-});
+router.get('/health', (_req, res) => res.json({ status: 'ok' }))
 
-// Função auxiliar para enviar via UAZAPI
-async function enviarViaUAZAPI(
-  telefone: string,
-  mensagem: string
-): Promise<void> {
-  try {
-    const response = await fetch(
-      `${process.env.UAZAPI_URL}/send-message`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.UAZAPI_TOKEN}`,
-        },
-        body: JSON.stringify({
-          phone: telefone,
-          message: mensagem,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      console.error("Erro ao enviar mensagem UAZAPI:", response.statusText);
-    }
-  } catch (error) {
-    console.error("Erro de conexão UAZAPI:", error);
-  }
-}
-
-export default router;
+export default router
