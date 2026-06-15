@@ -63,7 +63,7 @@ CREATE INDEX idx_usuarios_tenant     ON usuarios(tenant_id);
 
 -- Compostos (queries mais comuns)
 CREATE INDEX idx_clientes_tenant_telefone ON clientes(tenant_id, telefone);
-CREATE INDEX idx_reunioes_tenant_data     ON reunioes(tenant_id, data_hora);
+CREATE INDEX idx_reunioes_tenant_data     ON reunioes(tenant_id, data_hora);  -- coluna confirmada: data_hora
 ```
 
 ### RLS: função + policies
@@ -122,12 +122,13 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  IF NEW.raw_user_meta_data ? 'tenant_id' THEN
+  -- Cria registro para usuário normal (tem tenant_id) E super_admin (sem tenant_id)
+  IF NEW.raw_user_meta_data ? 'tenant_id' OR (NEW.raw_user_meta_data->>'role') = 'super_admin' THEN
     INSERT INTO public.usuarios (id, email, tenant_id, role)
     VALUES (
       NEW.id,
       NEW.email,
-      (NEW.raw_user_meta_data->>'tenant_id')::uuid,
+      NULLIF(NEW.raw_user_meta_data->>'tenant_id', '')::uuid,  -- NULL para super_admin
       COALESCE(NEW.raw_user_meta_data->>'role', 'vendedor')
     );
   END IF;
@@ -151,6 +152,26 @@ CREATE TABLE admin_audit_log (
   metadata   JSONB,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- RLS: somente super_admin lê e escreve no audit log
+ALTER TABLE admin_audit_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "audit_super_admin_only" ON admin_audit_log
+  USING      ((auth.jwt() ->> 'role') = 'super_admin')
+  WITH CHECK ((auth.jwt() ->> 'role') = 'super_admin');
+```
+
+### RLS em `organizacoes`
+
+```sql
+-- Usuário normal lê apenas sua própria org; super_admin lê todas
+ALTER TABLE organizacoes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "org_self_read" ON organizacoes
+  USING (
+    id = auth.tenant_id()
+    OR (auth.jwt() ->> 'role') = 'super_admin'
+  );
 ```
 
 ---
@@ -168,6 +189,26 @@ CREATE TABLE admin_audit_log (
 5. Todas as chamadas API usam Bearer token
 ```
 
+### Rota pública `GET /api/orgs/by-slug/:slug`
+
+Chamada antes do login — sem JWT. Usa `SERVICE_ROLE_KEY` no backend (bypassa RLS) e retorna **apenas campos públicos**, sem dados sensíveis:
+
+```typescript
+// Retorno permitido: { id, nome, ativo, slug }
+// NUNCA expor: prompt_pedro, configuracoes, tenant_id de outras tabelas
+router.get('/orgs/by-slug/:slug', async (req, res) => {
+  const { data } = await supabaseAdmin  // service role key
+    .from('organizacoes')
+    .select('id, nome, ativo, slug')
+    .eq('slug', req.params.slug)
+    .is('deleted_at', null)
+    .single()
+
+  if (!data || !data.ativo) return res.status(404).json({ error: 'Organização não encontrada' })
+  res.json(data)
+})
+```
+
 ### Middleware `requireAuth`
 
 ```typescript
@@ -176,7 +217,8 @@ export async function requireAuth(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1]
   if (!token) return res.status(401).json({ error: 'Token ausente' })
 
-  const payload = verifySupabaseJWT(token)  // valida assinatura + exp
+  // jwt.verify valida assinatura + expiração com SUPABASE_JWT_SECRET
+  const payload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET) as any
 
   // Validar slug do subdomínio === tenant_id do JWT (anti cross-tenant)
   const hostname = req.headers.host
@@ -405,6 +447,7 @@ orrin.com          ← raiz
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_ANON_KEY=
+SUPABASE_JWT_SECRET=        # Settings → API → JWT Secret no painel Supabase
 ANTHROPIC_API_KEY=
 UAZAPI_URL=
 UAZAPI_TOKEN=
@@ -418,18 +461,22 @@ UAZAPI_TOKEN=
 - [ ] Tabela `organizacoes` com slug CITEXT + soft delete
 - [ ] `tenant_id` em todas as tabelas com FK
 - [ ] Unique composto `(tenant_id, telefone)` em clientes
-- [ ] ENABLE ROW LEVEL SECURITY em todas as tabelas
-- [ ] Indexes simples e compostos em tenant_id
-- [ ] Policy `tenant_isolation` com WITH CHECK + bypass super_admin
+- [ ] ENABLE ROW LEVEL SECURITY em todas as tabelas (incluindo `organizacoes` e `admin_audit_log`)
+- [ ] Indexes simples e compostos em tenant_id (coluna `data_hora` confirmada em reunioes)
+- [ ] Policy `tenant_isolation` com WITH CHECK + bypass super_admin em tabelas de negócio
+- [ ] Policy `org_self_read` em `organizacoes`
+- [ ] Policy `audit_super_admin_only` em `admin_audit_log`
 - [ ] Função `auth.tenant_id()`
 - [ ] Auth Hook: injeta `tenant_id` + `role` no JWT
-- [ ] Trigger: sincroniza auth.users → public.usuarios
+- [ ] Trigger: `handle_new_user` contempla super_admin (tenant_id NULL via NULLIF)
 - [ ] Tabela `admin_audit_log`
 
 ### Auth
+- [ ] `jwt.verify(token, SUPABASE_JWT_SECRET)` no middleware (não pseudocódigo)
+- [ ] `SUPABASE_JWT_SECRET` nas variáveis de ambiente
 - [ ] Middleware `requireAuth` com validação slug ↔ tenant_id
 - [ ] Middleware `requireSuperAdmin` com audit log automático
-- [ ] Rota pública `GET /api/orgs/by-slug/:slug`
+- [ ] Rota pública `GET /api/orgs/by-slug/:slug` via service role, retorna apenas `{id, nome, ativo, slug}`
 
 ### Frontend
 - [ ] `getTenantSlug()` robusto (RESERVED + regex + null)
