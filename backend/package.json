@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Backend API for Orrin CRM with AI agent Pedro",
   "main": "src/index.ts",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
