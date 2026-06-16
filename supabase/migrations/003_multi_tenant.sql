@@ -51,39 +51,33 @@ ALTER TABLE configuracoes  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE organizacoes   ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
--- FUNÇÃO: extrai tenant_id do JWT
--- ============================================================
-CREATE OR REPLACE FUNCTION auth.tenant_id()
-RETURNS UUID AS $$
-  SELECT (auth.jwt() ->> 'tenant_id')::UUID
-$$ LANGUAGE sql STABLE;
-
--- ============================================================
 -- POLICIES em tabelas de negócio
+-- Nota: auth.tenant_id() não pode ser criada via SQL Editor (permissão negada)
+-- Solução: inline (auth.jwt() ->> 'tenant_id')::UUID diretamente nas policies
 -- ============================================================
 CREATE POLICY "tenant_isolation" ON clientes
-  USING      (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin')
-  WITH CHECK (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin');
+  USING      (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin')
+  WITH CHECK (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin');
 
 CREATE POLICY "tenant_isolation" ON reunioes
-  USING      (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin')
-  WITH CHECK (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin');
+  USING      (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin')
+  WITH CHECK (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin');
 
 CREATE POLICY "tenant_isolation" ON conversas
-  USING      (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin')
-  WITH CHECK (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin');
+  USING      (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin')
+  WITH CHECK (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin');
 
 CREATE POLICY "tenant_isolation" ON usuarios
-  USING      (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin')
-  WITH CHECK (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin');
+  USING      (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin')
+  WITH CHECK (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin');
 
 CREATE POLICY "tenant_isolation" ON configuracoes
-  USING      (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin')
-  WITH CHECK (tenant_id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin');
+  USING      (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin')
+  WITH CHECK (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin');
 
 -- Policy em organizacoes: usuário vê só a sua, super_admin vê todas
 CREATE POLICY "org_self_read" ON organizacoes
-  USING      (id = auth.tenant_id() OR (auth.jwt() ->> 'role') = 'super_admin')
+  USING      (id = (auth.jwt() ->> 'tenant_id')::UUID OR (auth.jwt() ->> 'role') = 'super_admin')
   WITH CHECK ((auth.jwt() ->> 'role') = 'super_admin');
 
 -- ============================================================
