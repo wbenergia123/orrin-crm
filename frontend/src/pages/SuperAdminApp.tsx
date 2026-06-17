@@ -18,7 +18,8 @@ export default function SuperAdminApp() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setSession(session)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[auth]', event, session?.user?.email)
       setSession(session)
     })
     return () => subscription.unsubscribe()
@@ -27,6 +28,7 @@ export default function SuperAdminApp() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    console.log('[login]', { error, session: data.session?.user?.email })
     if (error) { setLoginError('Credenciais inválidas'); return }
     setSession(data.session)
   }
