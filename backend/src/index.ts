@@ -19,7 +19,7 @@ app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true)
     const ok =
-      /^https:\/\/([a-z0-9-]+\.)?orrin\.com$/.test(origin) ||
+      /^https:\/\/([a-z0-9-]+\.)?orrin\.com\.br$/.test(origin) ||
       /^http:\/\/localhost(:\d+)?$/.test(origin)
     cb(ok ? null : new Error('CORS bloqueado'), ok)
   },
