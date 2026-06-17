@@ -1,6 +1,6 @@
 // frontend/src/lib/tenant.ts
 
-const ROOT_DOMAIN = 'orrin.com'
+const ROOT_DOMAIN = 'orrin.com.br'
 const RESERVED = [
   'www', 'admin', 'api', 'app', 'mail', 'blog', 'docs',
   'status', 'cdn', 'static', 'help', 'support'

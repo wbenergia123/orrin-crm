@@ -42,7 +42,7 @@ export default function SuperAdminApp() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-tenants'] })
       setNovaOrg({ slug: '', nome: '', admin_email: '' })
-      setFormSuccess(`✅ Criado! URL: ${data.url} — Invite enviado para ${novaOrg.admin_email}`)
+      setFormSuccess(`✅ Criado! URL: https://${data.slug}.orrin.com.br — Invite enviado para ${novaOrg.admin_email}`)
       setFormError('')
     },
     onError: (err: any) => {
@@ -176,12 +176,12 @@ export default function SuperAdminApp() {
                     </td>
                     <td className="p-4">
                       <a
-                        href={`https://${t.slug}.orrin.com`}
+                        href={`https://${t.slug}.orrin.com.br`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-600 hover:underline text-sm"
                       >
-                        {t.slug}.orrin.com
+                        {t.slug}.orrin.com.br
                       </a>
                     </td>
                     <td className="p-4">

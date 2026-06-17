@@ -48,7 +48,7 @@ router.post('/tenants', async (req: Request, res: Response) => {
       admin_email,
       {
         data: { tenant_id: org.id, role: 'admin' },
-        redirectTo: `https://${slug}.orrin.com/set-password`,
+        redirectTo: `https://${slug}.orrin.com.br/set-password`,
       }
     )
     if (inviteError) throw inviteError
@@ -61,7 +61,7 @@ router.post('/tenants', async (req: Request, res: Response) => {
 
   res.status(201).json({
     org: { id: org.id, slug: org.slug, nome: org.nome },
-    url: `https://${slug}.orrin.com`,
+    url: `https://${slug}.orrin.com.br`,
     invite_enviado: true,
   })
 })
