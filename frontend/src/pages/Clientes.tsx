@@ -1,186 +1,254 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import api from "../lib/api"
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { UserPlus, Phone, Mail, Building2 } from "lucide-react"
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+import { Search, UserPlus, ChevronRight, Phone, CreditCard, ArrowUpDown } from 'lucide-react'
+import { api } from '../api/client'
+import type { Paciente } from '../types'
+import { StatusBadge } from '../components/StatusBadge'
+import { NovoPacienteModal } from '../components/NovoPacienteModal'
 
-interface Cliente {
-  id: string
-  telefone: string
-  nome: string | null
-  empresa: string | null
-  email: string | null
-  status: string
-  created_at: string
+const GRADIENTS = [
+  ['#7c3aed', '#a855f7'], ['#2563eb', '#60a5fa'], ['#059669', '#34d399'],
+  ['#dc2626', '#f87171'], ['#d97706', '#fbbf24'], ['#0891b2', '#22d3ee'],
+  ['#be185d', '#f472b6'], ['#4f46e5', '#818cf8'],
+]
+function avatarGradient(seed: string) {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = seed.charCodeAt(i) + ((h << 5) - h)
+  const [a, b] = GRADIENTS[Math.abs(h) % GRADIENTS.length]
+  return `linear-gradient(135deg, ${a}, ${b})`
 }
-
-const statusConfig: Record<string, { label: string; className: string }> = {
-  novo: { label: "Novo", className: "bg-gray-100 text-gray-600" },
-  contato_feito: { label: "Contato feito", className: "bg-yellow-100 text-yellow-700" },
-  reuniao_agendada: { label: "Reunião agendada", className: "bg-blue-100 text-blue-700" },
-  cliente: { label: "Cliente", className: "bg-emerald-100 text-emerald-700" },
-  perdido: { label: "Perdido", className: "bg-red-100 text-red-600" },
-}
-
-export default function Clientes() {
-  const queryClient = useQueryClient()
-  const [form, setForm] = useState({ telefone: "", nome: "", empresa: "", email: "" })
-  const [formOpen, setFormOpen] = useState(false)
-  const [error, setError] = useState("")
-
-  const { data: clientes = [], isLoading } = useQuery({
-    queryKey: ["clientes"],
-    queryFn: async () => {
-      const res = await api.get("/api/clientes")
-      return res.data
-    },
-  })
-
-  const createMutation = useMutation({
-    mutationFn: async (cliente: typeof form) => {
-      return await api.post("/api/clientes", cliente)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clientes"] })
-      setForm({ telefone: "", nome: "", empresa: "", email: "" })
-      setFormOpen(false)
-      setError("")
-    },
-    onError: () => setError("Erro ao adicionar cliente"),
-  })
-
-  const handleAdd = () => {
-    if (!form.telefone) { setError("Telefone é obrigatório"); return }
-    createMutation.mutate(form)
+function getInitials(nome: string | null, telefone: string) {
+  if (nome) {
+    const parts = nome.trim().split(/\s+/)
+    return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].substring(0, 2).toUpperCase()
   }
+  return telefone.replace(/\D/g, '').slice(-2)
+}
+
+function formatCpf(cpf: string) {
+  const d = cpf.replace(/\D/g, '')
+  if (d.length !== 11) return cpf
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`
+}
+
+type Ordenacao = 'az' | 'za' | 'recentes' | 'antigos' | 'status'
+
+const ORDENACAO_LABELS: Record<Ordenacao, string> = {
+  az: 'A → Z',
+  za: 'Z → A',
+  recentes: 'Mais recentes',
+  antigos: 'Mais antigos',
+  status: 'Status',
+}
+
+const statusOrder: Record<string, number> = {
+  cliente: 0, consulta_agendada: 1, em_conversa: 2, novo: 3, frio: 4,
+}
+
+function ordenar(lista: Paciente[], ord: Ordenacao): Paciente[] {
+  return [...lista].sort((a, b) => {
+    switch (ord) {
+      case 'az': return (a.nome ?? a.telefone).localeCompare(b.nome ?? b.telefone, 'pt-BR')
+      case 'za': return (b.nome ?? b.telefone).localeCompare(a.nome ?? a.telefone, 'pt-BR')
+      case 'recentes': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'antigos': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'status': return (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
+    }
+  })
+}
+
+export function Clientes() {
+  const navigate = useNavigate()
+  const [busca, setBusca] = useState('')
+  const [buscaAtiva, setBuscaAtiva] = useState('')
+  const [novoOpen, setNovoOpen] = useState(false)
+  const [ordenacao, setOrdenacao] = useState<Ordenacao>('recentes')
+  const [dropdownOrdem, setDropdownOrdem] = useState(false)
+
+  const { data: pacientes = [], isLoading } = useQuery<Paciente[]>({
+    queryKey: ['clientes', buscaAtiva],
+    queryFn: async () => {
+      const params = buscaAtiva.trim() ? `?busca=${encodeURIComponent(buscaAtiva.trim())}` : ''
+      return (await api.get(`/pacientes${params}`)).data
+    },
+  })
+
+  const handleBusca = (v: string) => {
+    setBusca(v)
+    setBuscaAtiva(v)
+  }
+
+  const sorted = ordenar(pacientes, ordenacao)
 
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-800">Clientes</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800">Clientes</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{pacientes.length} pacientes cadastrados</p>
+        </div>
         <button
-          onClick={() => setFormOpen(!formOpen)}
-          className="flex items-center gap-2 bg-violet-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-violet-700 transition-colors"
+          onClick={() => setNovoOpen(true)}
+          className="flex items-center gap-1.5 bg-violet-600 text-white px-3.5 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors"
         >
-          <UserPlus size={16} />
-          Novo Cliente
+          <UserPlus size={15} /> Novo paciente
         </button>
       </div>
 
-      {formOpen && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold text-gray-800">Novo Cliente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <div className="mb-3 p-2.5 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-              <input
-                type="text"
-                placeholder="Telefone (obrigatório)"
-                value={form.telefone}
-                onChange={(e) => setForm({ ...form, telefone: e.target.value })}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-              />
-              <input
-                type="text"
-                placeholder="Nome"
-                value={form.nome}
-                onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-              />
-              <input
-                type="text"
-                placeholder="Empresa"
-                value={form.empresa}
-                onChange={(e) => setForm({ ...form, empresa: e.target.value })}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleAdd}
-                disabled={createMutation.isPending}
-                className="bg-violet-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
-              >
-                {createMutation.isPending ? "Salvando..." : "Salvar"}
-              </button>
-              <button
-                onClick={() => { setFormOpen(false); setError("") }}
-                className="bg-gray-100 text-gray-600 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Search + sort */}
+      <div className="flex gap-2">
+      <div className="relative flex-1">
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          value={busca}
+          onChange={(e) => handleBusca(e.target.value)}
+          placeholder="Buscar por nome, CPF ou telefone..."
+          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent bg-white"
+        />
+      </div>
 
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-gray-800">
-              {clientes.length} {clientes.length === 1 ? "cliente" : "clientes"}
-            </CardTitle>
+      {/* Sort dropdown */}
+      <div className="relative">
+        <button
+          onClick={() => setDropdownOrdem((v) => !v)}
+          className="flex items-center gap-2 border border-gray-200 bg-white px-3.5 py-2.5 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap"
+        >
+          <ArrowUpDown size={14} />
+          {ORDENACAO_LABELS[ordenacao]}
+        </button>
+        {dropdownOrdem && (
+          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-lg z-20 py-1 min-w-[160px]">
+            {(Object.keys(ORDENACAO_LABELS) as Ordenacao[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => { setOrdenacao(key); setDropdownOrdem(false) }}
+                className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                  ordenacao === key ? 'text-violet-600 font-semibold bg-violet-50' : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {ORDENACAO_LABELS[key]}
+              </button>
+            ))}
           </div>
-        </CardHeader>
-        <CardContent className="px-0 pb-0">
-          {isLoading ? (
-            <div className="px-5 pb-5 text-sm text-gray-400">Carregando...</div>
-          ) : clientes.length === 0 ? (
-            <div className="px-5 pb-8 text-center text-sm text-gray-400">
-              Nenhum cliente ainda. Adicione o primeiro!
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-50">
-              {clientes.map((cliente: Cliente) => {
-                const status = statusConfig[cliente.status] ?? statusConfig.novo
-                return (
-                  <div key={cliente.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
-                        <p className="text-sm font-medium text-gray-800 truncate">
-                          {cliente.nome || "Sem nome"}
-                        </p>
-                        <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${status.className}`}>
-                          {status.label}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-400">
-                        {cliente.empresa && (
-                          <span className="flex items-center gap-1">
-                            <Building2 size={11} />
-                            {cliente.empresa}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Phone size={11} />
-                          {cliente.telefone}
-                        </span>
-                        {cliente.email && (
-                          <span className="flex items-center gap-1">
-                            <Mail size={11} />
-                            {cliente.email}
-                          </span>
-                        )}
-                      </div>
+        )}
+      </div>
+
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Table header */}
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Paciente</span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Telefone</span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">CPF</span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cadastro</span>
+        </div>
+
+        {isLoading ? (
+          <div className="divide-y divide-gray-50">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3.5 animate-pulse">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-gray-100 shrink-0" />
+                  <div className="h-4 w-32 bg-gray-100 rounded" />
+                </div>
+                <div className="h-4 w-28 bg-gray-100 rounded self-center" />
+                <div className="h-4 w-24 bg-gray-100 rounded self-center" />
+                <div className="h-5 w-20 bg-gray-100 rounded-full self-center" />
+                <div className="h-4 w-16 bg-gray-100 rounded self-center" />
+              </div>
+            ))}
+          </div>
+        ) : sorted.length === 0 ? (
+          <div className="py-16 flex flex-col items-center gap-2 text-gray-400">
+            <Search size={28} className="opacity-40" />
+            <p className="text-sm">Nenhum paciente encontrado</p>
+            {buscaAtiva && (
+              <button
+                onClick={() => handleBusca('')}
+                className="text-violet-600 text-sm font-medium hover:underline"
+              >
+                Limpar busca
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {sorted.map((p) => {
+              const seed = p.nome ?? p.telefone
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => navigate(`/pacientes/${p.id}`)}
+                  className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left items-center group"
+                >
+                  {/* Nome + avatar */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0"
+                      style={{ background: avatarGradient(seed) }}
+                    >
+                      {getInitials(p.nome, p.telefone)}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">
+                        {p.nome ?? <span className="text-gray-400 italic">Sem nome</span>}
+                      </p>
+                      {p.email && (
+                        <p className="text-xs text-gray-400 truncate">{p.email}</p>
+                      )}
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+                  {/* Telefone */}
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                    <Phone size={13} className="text-gray-400 shrink-0" />
+                    {p.telefone}
+                  </div>
+
+                  {/* CPF */}
+                  <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                    {p.cpf ? (
+                      <>
+                        <CreditCard size={13} className="text-gray-400 shrink-0" />
+                        {formatCpf(p.cpf)}
+                      </>
+                    ) : (
+                      <span className="text-gray-300 text-xs">—</span>
+                    )}
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <StatusBadge status={p.status} />
+                  </div>
+
+                  {/* Data + seta */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">
+                      {format(new Date(p.created_at), 'd MMM yy', { locale: ptBR })}
+                    </span>
+                    <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      <NovoPacienteModal
+        open={novoOpen}
+        onClose={() => setNovoOpen(false)}
+        onSuccess={() => setNovoOpen(false)}
+      />
     </div>
   )
 }

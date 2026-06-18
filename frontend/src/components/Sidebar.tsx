@@ -1,20 +1,37 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, Calendar, LogOut } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import {
+  LayoutDashboard,
+  Kanban,
+  Users,
+  Scissors,
+  CalendarDays,
+  MessageSquare,
+  UserCog,
+  LogOut,
+  Settings,
+} from 'lucide-react'
+import { useAuth } from '../hooks/useAuth'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/clientes', icon: Users, label: 'Clientes' },
-  { to: '/reunioes', icon: Calendar, label: 'Reuniões' },
+  { to: '/pacientes', icon: Kanban, label: 'Pipeline' },
+  { to: '/clientes', icon: Users, label: 'Pacientes' },
+  { to: '/servicos', icon: Scissors, label: 'Serviços' },
+  { to: '/profissionais', icon: UserCog, label: 'Profissionais' },
+  { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
+  { to: '/atendimentos', icon: MessageSquare, label: 'Atendimentos' },
+  { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ]
 
 export function Sidebar() {
+  const { logout } = useAuth()
+
   return (
-    <aside className="w-16 md:w-56 flex flex-col h-full bg-white border-r border-gray-100 py-6 px-2 md:px-4 shrink-0">
+    <aside className="w-16 md:w-56 flex flex-col h-full bg-white border-r border-gray-100 py-6 px-2 md:px-4">
       <div className="mb-8 px-2 hidden md:block">
         <span className="font-bold text-gray-800 text-sm tracking-wide uppercase">
-          Orrin CRM
+          Clínica
         </span>
       </div>
 
@@ -39,10 +56,10 @@ export function Sidebar() {
       </nav>
 
       <button
-        onClick={() => supabase.auth.signOut()}
+        onClick={logout}
         className="flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors mt-4"
       >
-        <LogOut size={18} className="shrink-0" />
+        <LogOut size={18} />
         <span className="hidden md:inline">Sair</span>
       </button>
     </aside>

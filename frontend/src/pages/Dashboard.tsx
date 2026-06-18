@@ -1,0 +1,306 @@
+import { useQuery } from '@tanstack/react-query'
+import { api } from '../api/client'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { TrendingUp, Calendar, UserPlus, TrendingDown } from 'lucide-react'
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie,
+} from 'recharts'
+import { format } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
+
+interface Metricas {
+  faturamentoMes: number
+  agendamentosMes: number
+  leadsNovos: number
+  taxaConversao: number
+  deltas: { faturamento: number | null; agendamentos: number | null; leads: number | null }
+}
+
+interface PontoDiario { data: string; agendamentos: number; mensagens: number }
+interface StatusItem { status: string; nome: string; count: number; percentual: number; cor: string }
+interface StatusData { total: number; itens: StatusItem[] }
+interface PontoDia { dia: string; agendamentos: number }
+
+const formatDay = (iso: string) =>
+  format(new Date(iso + 'T12:00:00'), 'd MMM', { locale: ptBR })
+
+function Delta({ value }: { value: number | null }) {
+  if (value === null) return null
+  const up = value >= 0
+  return (
+    <span className={`flex items-center gap-0.5 text-xs font-semibold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+      {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+      {up ? '+' : ''}{value}%
+    </span>
+  )
+}
+
+function SparkTooltip({ active, payload }: { active?: boolean; payload?: { value: number }[] }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-white border border-gray-100 rounded-md shadow px-2 py-1 text-xs font-medium text-gray-700">
+      {payload[0].value}
+    </div>
+  )
+}
+
+function MainTooltip({ active, payload, label }: { active?: boolean; payload?: { color: string; name: string; value: number }[]; label?: string }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl shadow-lg px-4 py-3 text-sm">
+      <p className="font-semibold text-gray-800 mb-2">{label ? formatDay(label) : ''}</p>
+      {payload.map((p) => (
+        <div key={p.name} className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+          <span className="text-gray-500">{p.name}:</span>
+          <span className="font-semibold text-gray-800">{p.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function Dashboard() {
+  const { data, isLoading } = useQuery<Metricas>({
+    queryKey: ['dashboard-metricas'],
+    queryFn: async () => (await api.get('/dashboard/metricas')).data,
+    refetchInterval: 30_000,
+  })
+
+  const { data: grafico = [] } = useQuery<PontoDiario[]>({
+    queryKey: ['dashboard-grafico'],
+    queryFn: async () => (await api.get('/dashboard/grafico')).data,
+    refetchInterval: 60_000,
+  })
+
+  const { data: statusData } = useQuery<StatusData>({
+    queryKey: ['dashboard-status'],
+    queryFn: async () => (await api.get('/dashboard/status-pacientes')).data,
+    refetchInterval: 60_000,
+  })
+
+  const { data: semana = [] } = useQuery<PontoDia[]>({
+    queryKey: ['dashboard-semana'],
+    queryFn: async () => (await api.get('/dashboard/agendamentos-semana')).data,
+    refetchInterval: 60_000,
+  })
+
+  const sparkline = grafico.slice(-14)
+  const tickIndexes = new Set([0, 4, 9, 14, 19, 24, 29])
+
+  const cards = [
+    {
+      title: 'Faturamento do Mês',
+      value: data
+        ? `R$ ${Number(data.faturamentoMes).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        : '—',
+      delta: data?.deltas.faturamento ?? null,
+      icon: TrendingUp,
+      color: '#7c3aed',
+      spark: sparkline.map((d) => ({ v: d.agendamentos })),
+    },
+    {
+      title: 'Agendamentos',
+      value: data ? String(data.agendamentosMes) : '—',
+      delta: data?.deltas.agendamentos ?? null,
+      icon: Calendar,
+      color: '#0891b2',
+      spark: sparkline.map((d) => ({ v: d.agendamentos })),
+    },
+    {
+      title: 'Pacientes Novos',
+      value: data ? String(data.leadsNovos) : '—',
+      delta: data?.deltas.leads ?? null,
+      icon: UserPlus,
+      color: '#059669',
+      spark: sparkline.map((d) => ({ v: d.mensagens })),
+    },
+  ]
+
+  // Top 2 status for the donut center
+  const topStatus = statusData?.itens[0]
+
+  return (
+    <div className="space-y-5">
+      <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
+
+      {/* ── Metric cards with sparkline ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {cards.map((card) => (
+          <Card key={card.title} className="border-0 shadow-sm overflow-hidden">
+            <CardHeader className="pb-1 pt-4 px-5">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                  {card.title}
+                </CardTitle>
+                <Delta value={card.delta} />
+              </div>
+            </CardHeader>
+            <CardContent className="px-5 pb-0">
+              <p className="text-2xl font-bold text-gray-900 mb-3">
+                {isLoading
+                  ? <span className="inline-block w-24 h-7 bg-gray-100 animate-pulse rounded" />
+                  : card.value}
+              </p>
+            </CardContent>
+            <div className="h-16">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={card.spark} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={`sg-${card.title}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={card.color} stopOpacity={0.2} />
+                      <stop offset="100%" stopColor={card.color} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip content={<SparkTooltip />} />
+                  <Area type="monotone" dataKey="v" stroke={card.color} strokeWidth={2}
+                    fill={`url(#sg-${card.title})`} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* ── Main chart ── */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-1 pt-4 px-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-semibold text-gray-800">Atividade</CardTitle>
+              <p className="text-xs text-gray-400 mt-0.5">Últimos 30 dias</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5 text-gray-500">
+                <span className="w-3 h-0.5 rounded-full bg-[#7c3aed] inline-block" />
+                Agendamentos
+              </span>
+              <span className="flex items-center gap-1.5 text-gray-500">
+                <span className="w-3 h-0.5 rounded-full bg-[#0891b2] inline-block" />
+                Mensagens
+              </span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="px-2 pb-4">
+          <ResponsiveContainer width="100%" height={240}>
+            <AreaChart data={grafico} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gAgend" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#7c3aed" stopOpacity={0.2} />
+                  <stop offset="100%" stopColor="#7c3aed" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gMsg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#0891b2" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="#0891b2" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+              <XAxis
+                dataKey="data"
+                tickFormatter={(v, i) => tickIndexes.has(i) ? formatDay(v) : ''}
+                tick={{ fontSize: 11, fill: '#9ca3af' }}
+                axisLine={false} tickLine={false}
+              />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <Tooltip content={<MainTooltip />} />
+              <Area type="monotone" dataKey="agendamentos" name="Agendamentos"
+                stroke="#7c3aed" strokeWidth={2.5} fill="url(#gAgend)" dot={false}
+                activeDot={{ r: 5, fill: '#7c3aed', strokeWidth: 0 }} />
+              <Area type="monotone" dataKey="mensagens" name="Mensagens"
+                stroke="#0891b2" strokeWidth={2.5} fill="url(#gMsg)" dot={false}
+                activeDot={{ r: 5, fill: '#0891b2', strokeWidth: 0 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* ── Bottom row: donut + bar ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        {/* Donut — pacientes por status */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-1 pt-4 px-5">
+            <CardTitle className="text-sm font-semibold text-gray-800">Pacientes por Status</CardTitle>
+            <p className="text-xs text-gray-400">{statusData?.total ?? 0} pacientes total</p>
+          </CardHeader>
+          <CardContent className="px-5 pb-4">
+            <div className="flex items-center gap-6">
+              <div className="relative shrink-0" style={{ width: 130, height: 130 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusData?.itens ?? []}
+                      cx="50%" cy="50%"
+                      innerRadius={42} outerRadius={58}
+                      dataKey="count" paddingAngle={3}
+                    >
+                      {(statusData?.itens ?? []).map((item) => (
+                        <Cell key={item.status} fill={item.cor} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                {topStatus && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-lg font-bold text-gray-900">{topStatus.percentual}%</span>
+                    <span className="text-[10px] text-gray-400 text-center leading-tight">{topStatus.nome}</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                {(statusData?.itens ?? []).map((item) => (
+                  <div key={item.status} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: item.cor }} />
+                      <span className="text-xs text-gray-600">{item.nome}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-gray-800">{item.count}</span>
+                      <span className="text-[10px] text-gray-400 w-7 text-right">{item.percentual}%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bar — agendamentos por dia da semana */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-1 pt-4 px-5">
+            <CardTitle className="text-sm font-semibold text-gray-800">Agendamentos por Dia</CardTitle>
+            <p className="text-xs text-gray-400">Distribuição semanal histórica</p>
+          </CardHeader>
+          <CardContent className="px-3 pb-4">
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={semana} margin={{ top: 4, right: 8, left: -20, bottom: 0 }} barCategoryGap="35%">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="dia" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip
+                  cursor={{ fill: '#f5f3ff' }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    return (
+                      <div className="bg-white border border-gray-100 rounded-lg shadow px-3 py-2 text-xs">
+                        <span className="font-semibold text-gray-800">{payload[0].value} agendamentos</span>
+                      </div>
+                    )
+                  }}
+                />
+                <Bar dataKey="agendamentos" radius={[6, 6, 0, 0]}>
+                  {semana.map((_, i) => (
+                    <Cell key={i} fill={i === 0 || i === 6 ? '#e9d5ff' : '#7c3aed'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+      </div>
+    </div>
+  )
+}
