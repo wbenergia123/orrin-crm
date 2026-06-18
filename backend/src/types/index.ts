@@ -1,50 +1,53 @@
-// backend/src/types/index.ts
-
-export type StatusCliente = 'novo' | 'contato_feito' | 'reuniao_agendada' | 'cliente' | 'perdido'
-export type StatusReuniао = 'agendada' | 'confirmada' | 'cancelada' | 'realizada'
-export type RoleUsuario = 'admin' | 'vendedor' | 'super_admin'
+export type StatusPaciente = 'novo' | 'em_conversa' | 'consulta_agendada' | 'cliente' | 'frio'
+export type StatusAgendamento = 'agendado' | 'confirmado' | 'cancelado' | 'concluido'
+export type RoleUsuario = 'admin' | 'secretaria'
 export type TipoRemetente = 'agente' | 'humano'
 
-export interface Organizacao {
+export interface Paciente {
   id: string
-  slug: string
-  nome: string
-  ativo: boolean
-  deleted_at: string | null
-  created_at: string
-}
-
-export interface Cliente {
-  id: string
-  tenant_id: string
   telefone: string
   nome: string | null
-  empresa: string | null
   email: string | null
-  status: StatusCliente
+  status: StatusPaciente
   ultimo_contato_at: string | null
   created_at: string
   updated_at: string
 }
 
-export interface Reuniao {
+export interface Servico {
   id: string
-  tenant_id: string
-  cliente_id: string
+  nome: string
+  preco: number
+  duracao_minutos: number
+  ativo: boolean
+  created_at: string
+}
+
+export interface Profissional {
+  id: string
+  nome: string
+  ativo: boolean
+}
+
+export interface Agendamento {
+  id: string
+  paciente_id: string
+  servico_id: string
+  profissional_id: string
   data_hora: string
-  status: StatusReuniао
+  status: StatusAgendamento
   notas: string | null
-  link_reuniao?: string
   created_at: string
   updated_at: string
-  cliente?: Cliente
+  paciente?: Paciente
+  servico?: Servico
+  profissional?: Profissional
 }
 
 export interface Conversa {
   id: string
-  tenant_id: string
-  cliente_id: string
-  mensagem_cliente: string | null
+  paciente_id: string
+  mensagem_paciente: string | null
   mensagem_agente: string | null
   tipo_remetente: TipoRemetente
   modo_humano: boolean
@@ -53,7 +56,6 @@ export interface Conversa {
 
 export interface Usuario {
   id: string
-  tenant_id: string | null
   email: string
   role: RoleUsuario
 }
@@ -62,14 +64,4 @@ export interface JWTPayload {
   sub: string
   email: string
   role: RoleUsuario
-  tenant_id: string | null
-}
-
-export interface ConfiguracaoOrrin {
-  tenant_id: string
-  empresa_nome: string
-  email_contato: string
-  telefone: string | null
-  prompt_pedro: string
-  timezone: string
 }
