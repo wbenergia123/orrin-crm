@@ -44,14 +44,21 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'Token inválido ou expirado' })
   }
 
-  // Extrai claims customizados (tenant_id, role) do payload do JWT
-  const payload = jwt.decode(token) as JWTPayload & { sub: string }
-  if (!payload) {
-    return res.status(401).json({ error: 'Token inválido' })
-  }
+  // Busca role e tenant_id direto do banco (mais confiável que JWT claims com ECC)
+  const { data: userData } = await supabaseAdmin
+    .from('usuarios')
+    .select('role, tenant_id')
+    .eq('id', user.id)
+    .single()
+
+  const payload = {
+    sub: user.id,
+    role: userData?.role || 'vendedor',
+    tenant_id: userData?.tenant_id || null,
+  } as JWTPayload & { sub: string }
 
   if (payload.role === 'super_admin') {
-    req.user = { id: payload.sub, ...payload }
+    req.user = { id: user.id, ...payload }
     return next()
   }
 
