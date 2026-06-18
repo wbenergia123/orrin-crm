@@ -1,7 +1,7 @@
 // frontend/src/pages/Reunioes.tsx
 
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
+import api from "../lib/api";
 
 interface Cliente {
   id: string;
@@ -31,7 +31,7 @@ export default function Reunioes() {
   const { data: reunioes = [], isLoading } = useQuery({
     queryKey: ["reunioes"],
     queryFn: async () => {
-      const res = await axios.get("/api/reunioes");
+      const res = await api.get("/api/reunioes");
       return res.data;
     },
   });

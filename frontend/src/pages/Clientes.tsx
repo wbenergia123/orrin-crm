@@ -1,7 +1,7 @@
 // frontend/src/pages/Clientes.tsx
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import axios from "axios";
+import api from "../lib/api";
 import { useState } from "react";
 
 interface Cliente {
@@ -35,14 +35,14 @@ export default function Clientes() {
   const { data: clientes = [], isLoading } = useQuery({
     queryKey: ["clientes"],
     queryFn: async () => {
-      const res = await axios.get("/api/clientes");
+      const res = await api.get("/api/clientes");
       return res.data;
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (cliente: typeof novoCliente) => {
-      return await axios.post("/api/clientes", cliente);
+      return await api.post("/api/clientes", cliente);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });

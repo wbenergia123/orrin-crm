@@ -1,7 +1,7 @@
 // frontend/src/pages/Prospeccao.tsx
 
 import { useQuery } from "@tanstack/react-query";
-import axios from "axios";
+import api from "../lib/api";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 
 interface Cliente {
@@ -19,7 +19,7 @@ export default function Prospeccao() {
   const { data: clientes = [] } = useQuery({
     queryKey: ["clientes"],
     queryFn: async () => {
-      const res = await axios.get("/api/clientes");
+      const res = await api.get("/api/clientes");
       return res.data;
     },
   });
@@ -27,7 +27,7 @@ export default function Prospeccao() {
   const { data: reunioes = [] } = useQuery({
     queryKey: ["reunioes"],
     queryFn: async () => {
-      const res = await axios.get("/api/reunioes");
+      const res = await api.get("/api/reunioes");
       return res.data;
     },
   });
