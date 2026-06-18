@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { format, formatDistanceToNow } from 'date-fns'
+import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Bot, User, Send } from 'lucide-react'
 import { api } from '../api/client'
