@@ -18,8 +18,7 @@ export default function SuperAdminApp() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setSession(session)
     })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[auth]', event, session?.user?.email)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       setSession(session)
     })
     return () => subscription.unsubscribe()
@@ -28,7 +27,6 @@ export default function SuperAdminApp() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    console.log('[login]', { error, session: data.session?.user?.email })
     if (error) { setLoginError('Credenciais inválidas'); return }
     setSession(data.session)
   }
@@ -44,7 +42,7 @@ export default function SuperAdminApp() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-tenants'] })
       setNovaOrg({ slug: '', nome: '', admin_email: '' })
-      setFormSuccess(`✅ Criado! URL: https://${data.slug}.orrin.com.br — Invite enviado para ${novaOrg.admin_email}`)
+      setFormSuccess(`✅ Criado! URL: https://${data.org.slug}.orrin.com.br — Invite enviado para ${novaOrg.admin_email}`)
       setFormError('')
     },
     onError: (err: any) => {
