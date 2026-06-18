@@ -38,11 +38,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'Token ausente' })
   }
 
-  let payload: JWTPayload & { sub: string }
-  try {
-    payload = jwt.verify(token, process.env.SUPABASE_JWT_SECRET!) as any
-  } catch {
+  // Verifica token via Supabase (suporta ECC e HS256)
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
+  if (error || !user) {
     return res.status(401).json({ error: 'Token inválido ou expirado' })
+  }
+
+  // Extrai claims customizados (tenant_id, role) do payload do JWT
+  const payload = jwt.decode(token) as JWTPayload & { sub: string }
+  if (!payload) {
+    return res.status(401).json({ error: 'Token inválido' })
   }
 
   if (payload.role === 'super_admin') {
