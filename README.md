@@ -145,9 +145,28 @@ Veja em tempo real:
 
 ## 📚 Documentação
 
+### Docs técnicos (para IA e desenvolvedores)
+
+| Arquivo | Conteúdo |
+|---|---|
+| [docs/PRD.md](docs/PRD.md) | Produto, features implementadas, roadmap, pipeline de status |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack, infra, auth ECC JWT, CORS, env vars, deploy |
+| [docs/API.md](docs/API.md) | Todos os endpoints REST com exemplos de request/response |
+| [docs/DATABASE.md](docs/DATABASE.md) | Schema completo, tipos, SQL aplicados |
+| [docs/FRONTEND.md](docs/FRONTEND.md) | Estrutura, roteamento, api client, design system |
+
+### Outros
 - [ONBOARDING.md](./ONBOARDING.md) — Setup passo a passo
 - [backend/README.md](./backend/README.md) — Documentação backend
 - [frontend/README.md](./frontend/README.md) — Documentação frontend
+
+### URLs de produção
+| Ambiente | URL |
+|---|---|
+| Landing | `https://orrin.com.br` |
+| Super Admin | `https://admin.orrin.com.br` |
+| API Backend | `https://orrin-crm.onrender.com` |
+| Tenant exemplo | `https://teste.orrin.com.br` |
 
 ---
 
