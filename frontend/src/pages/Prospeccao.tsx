@@ -1,175 +1,184 @@
-// frontend/src/pages/Prospeccao.tsx
-
-import { useQuery } from "@tanstack/react-query";
-import api from "../lib/api";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
+import { useQuery } from "@tanstack/react-query"
+import api from "../lib/api"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Users, Phone, Calendar, TrendingUp, TrendingDown } from "lucide-react"
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, BarChart, Bar,
+} from "recharts"
 
 interface Cliente {
-  id: string;
-  status: string;
-  created_at: string;
+  id: string
+  status: string
+  created_at: string
 }
 
-interface ClientePorDia {
-  data: string;
-  clientes: number;
+interface PontoDia {
+  data: string
+  leads: number
+}
+
+function Delta({ value }: { value: number | null }) {
+  if (value === null) return null
+  const up = value >= 0
+  return (
+    <span className={`flex items-center gap-0.5 text-xs font-semibold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+      {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+      {up ? '+' : ''}{value}%
+    </span>
+  )
+}
+
+function SparkTooltip({ active, payload }: { active?: boolean; payload?: { value: number }[] }) {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="bg-white border border-gray-100 rounded-md shadow px-2 py-1 text-xs font-medium text-gray-700">
+      {payload[0].value}
+    </div>
+  )
 }
 
 export default function Prospeccao() {
-  const { data: clientes = [] } = useQuery({
+  const { data: clientes = [], isLoading } = useQuery({
     queryKey: ["clientes"],
     queryFn: async () => {
-      const res = await api.get("/api/clientes");
-      return res.data;
+      const res = await api.get("/api/clientes")
+      return res.data
     },
-  });
+  })
 
   const { data: reunioes = [] } = useQuery({
     queryKey: ["reunioes"],
     queryFn: async () => {
-      const res = await api.get("/api/reunioes");
-      return res.data;
+      const res = await api.get("/api/reunioes")
+      return res.data
     },
-  });
+  })
 
-  // Calcular métricas
-  const stats = {
-    total_leads: clientes.length,
-    contato_feito: clientes.filter((c: Cliente) => c.status !== "novo").length,
-    reunioes_agendadas: clientes.filter(
-      (c: Cliente) => c.status === "reuniao_agendada"
-    ).length,
-    clientes_convertidos: clientes.filter((c: Cliente) => c.status === "cliente").length,
-    taxa_conversao:
-      clientes.length > 0
-        ? ((clientes.filter((c: Cliente) => c.status === "cliente").length /
-            clientes.length) *
-          100).toFixed(1)
-        : "0",
-    taxa_resposta:
-      clientes.length > 0
-        ? ((clientes.filter((c: Cliente) => c.status !== "novo").length /
-            clientes.length) *
-          100).toFixed(1)
-        : "0",
-  };
+  const total = clientes.length
+  const contatados = clientes.filter((c: Cliente) => c.status !== "novo").length
+  const emReuniao = clientes.filter((c: Cliente) => c.status === "reuniao_agendada").length
+  const convertidos = clientes.filter((c: Cliente) => c.status === "cliente").length
+  const taxaConversao = total > 0 ? Math.round((convertidos / total) * 100) : 0
 
-  // Dados para gráfico de funil
+  const leadsPorDia: PontoDia[] = clientes.reduce((acc: PontoDia[], c: Cliente) => {
+    const data = new Date(c.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+    const existing = acc.find((d) => d.data === data)
+    if (existing) { existing.leads += 1 } else { acc.push({ data, leads: 1 }) }
+    return acc
+  }, []).slice(-14)
+
   const funnelData = [
-    { name: "Novos", value: clientes.filter((c: Cliente) => c.status === "novo").length },
-    { name: "Contato", value: stats.contato_feito },
-    { name: "Reunião", value: stats.reunioes_agendadas },
-    { name: "Cliente", value: stats.clientes_convertidos },
-  ];
+    { name: "Leads", value: total },
+    { name: "Contatados", value: contatados },
+    { name: "Reuniões", value: emReuniao },
+    { name: "Clientes", value: convertidos },
+  ]
 
-  // Dados para gráfico de conversão por dia
-  const clientesPorDia = clientes.reduce(
-    (acc: ClientePorDia[], cliente: Cliente) => {
-      const data = new Date(cliente.created_at).toLocaleDateString("pt-BR");
-      const existing = acc.find((d: ClientePorDia) => d.data === data);
-      if (existing) {
-        existing.clientes += 1;
-      } else {
-        acc.push({ data, clientes: 1 });
-      }
-      return acc;
-    },
-    [] as { data: string; clientes: number }[]
-  );
+  const cards = [
+    { title: "Total de Leads", value: total, icon: Users, color: "#7c3aed", delta: null },
+    { title: "Contatados", value: contatados, icon: Phone, color: "#0891b2", delta: null },
+    { title: "Reuniões Agendadas", value: reunioes.length, icon: Calendar, color: "#059669", delta: null },
+    { title: "Taxa de Conversão", value: `${taxaConversao}%`, icon: TrendingUp, color: "#d97706", delta: null },
+  ]
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      <h1 className="text-4xl font-bold mb-8 text-gray-800">Dashboard de Prospecção</h1>
+    <div className="space-y-5">
+      <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
 
-      {/* Métricas principais */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200 shadow-sm">
-          <p className="text-gray-600 text-sm font-medium">Total de Leads</p>
-          <p className="text-4xl font-bold text-blue-700 mt-2">{stats.total_leads}</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 p-6 rounded-lg border border-yellow-200 shadow-sm">
-          <p className="text-gray-600 text-sm font-medium">Contatos Feitos</p>
-          <p className="text-4xl font-bold text-yellow-700 mt-2">{stats.contato_feito}</p>
-          <p className="text-xs text-gray-500 mt-1">{stats.taxa_resposta}% de resposta</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border border-green-200 shadow-sm">
-          <p className="text-gray-600 text-sm font-medium">Reuniões Agendadas</p>
-          <p className="text-4xl font-bold text-green-700 mt-2">{stats.reunioes_agendadas}</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200 shadow-sm">
-          <p className="text-gray-600 text-sm font-medium">Clientes Convertidos</p>
-          <p className="text-4xl font-bold text-purple-700 mt-2">{stats.clientes_convertidos}</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-pink-50 to-pink-100 p-6 rounded-lg border border-pink-200 shadow-sm">
-          <p className="text-gray-600 text-sm font-medium">Taxa de Conversão</p>
-          <p className="text-4xl font-bold text-pink-700 mt-2">{stats.taxa_conversao}%</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-6 rounded-lg border border-indigo-200 shadow-sm">
-          <p className="text-gray-600 text-sm font-medium">Reuniões Totais</p>
-          <p className="text-4xl font-bold text-indigo-700 mt-2">{reunioes.length}</p>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map((card) => (
+          <Card key={card.title} className="border-0 shadow-sm overflow-hidden">
+            <CardHeader className="pb-1 pt-4 px-5">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                  {card.title}
+                </CardTitle>
+                <Delta value={card.delta} />
+              </div>
+            </CardHeader>
+            <CardContent className="px-5 pb-0">
+              <p className="text-2xl font-bold text-gray-900 mb-3">
+                {isLoading
+                  ? <span className="inline-block w-16 h-7 bg-gray-100 animate-pulse rounded" />
+                  : card.value}
+              </p>
+            </CardContent>
+            <div className="h-14">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={leadsPorDia} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={`sg-${card.title}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={card.color} stopOpacity={0.2} />
+                      <stop offset="100%" stopColor={card.color} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip content={<SparkTooltip />} />
+                  <Area type="monotone" dataKey="leads" stroke={card.color} strokeWidth={2}
+                    fill={`url(#sg-${card.title})`} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        ))}
       </div>
 
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Funil de Vendas */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <h2 className="text-xl font-bold mb-4 text-gray-800">Funil de Vendas</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={funnelData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="#3b82f6" name="Quantidade" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-1 pt-4 px-5">
+            <div>
+              <CardTitle className="text-sm font-semibold text-gray-800">Leads por Dia</CardTitle>
+              <p className="text-xs text-gray-400 mt-0.5">Últimos 14 dias</p>
+            </div>
+          </CardHeader>
+          <CardContent className="px-2 pb-4">
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={leadsPorDia} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gLeads" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7c3aed" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="#7c3aed" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="data" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip content={<SparkTooltip />} />
+                <Area type="monotone" dataKey="leads" name="Leads" stroke="#7c3aed" strokeWidth={2.5}
+                  fill="url(#gLeads)" dot={false} activeDot={{ r: 5, fill: '#7c3aed', strokeWidth: 0 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-        {/* Gráfico de Clientes por Dia */}
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-          <h2 className="text-xl font-bold mb-4 text-gray-800">Leads por Dia</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={clientesPorDia}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="data" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="clientes" stroke="#10b981" name="Novos Leads" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Resumo de Ações */}
-      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">Resumo</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div className="p-4 bg-blue-50 rounded border-l-4 border-blue-500">
-            <p className="font-semibold text-gray-800">Próximos Passos</p>
-            <p className="text-gray-600 mt-1">
-              {stats.contato_feito === stats.total_leads
-                ? "✅ Todos os leads contatados!"
-                : `📞 ${stats.total_leads - stats.contato_feito} leads para contatar`}
-            </p>
-          </div>
-
-          <div className="p-4 bg-green-50 rounded border-l-4 border-green-500">
-            <p className="font-semibold text-gray-800">Meta</p>
-            <p className="text-gray-600 mt-1">
-              {parseFloat(stats.taxa_conversao) >= 10
-                ? "🎯 Meta de conversão atingida!"
-                : `📈 ${(10 - parseFloat(stats.taxa_conversao)).toFixed(1)}% até meta`}
-            </p>
-          </div>
-        </div>
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-1 pt-4 px-5">
+            <CardTitle className="text-sm font-semibold text-gray-800">Funil de Vendas</CardTitle>
+            <p className="text-xs text-gray-400">{total} leads no total</p>
+          </CardHeader>
+          <CardContent className="px-3 pb-4">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={funnelData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }} barCategoryGap="35%">
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip
+                  cursor={{ fill: '#f5f3ff' }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    return (
+                      <div className="bg-white border border-gray-100 rounded-lg shadow px-3 py-2 text-xs">
+                        <span className="font-semibold text-gray-800">{payload[0].value} leads</span>
+                      </div>
+                    )
+                  }}
+                />
+                <Bar dataKey="value" radius={[6, 6, 0, 0]} fill="#7c3aed" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
     </div>
-  );
+  )
 }
