@@ -1,0 +1,185 @@
+// frontend/src/components/marcacao/BeforeAfterSlider.tsx
+import { useState, useRef, useCallback } from 'react'
+import { ImageOff } from 'lucide-react'
+import type { FotoPaciente } from '../../types'
+
+interface BeforeAfterSliderProps {
+  fotos: FotoPaciente[]
+  antesId?: string
+  depoisId?: string
+  onSetAntes?: (id: string) => void
+  onSetDepois?: (id: string) => void
+}
+
+export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetDepois }: BeforeAfterSliderProps) {
+  const [sliderPos, setSliderPos] = useState(50)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const isDragging = useRef(false)
+
+  const fotoAntes = fotos.find((f) => f.id === antesId)
+  const fotoDepois = fotos.find((f) => f.id === depoisId)
+
+  const handleMouseMove = useCallback((e: React.MouseEvent | MouseEvent) => {
+    if (!isDragging.current || !containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * 100
+    setSliderPos(Math.max(0, Math.min(100, x)))
+  }, [])
+
+  const handleMouseDown = () => {
+    isDragging.current = true
+  }
+
+  const handleMouseUp = () => {
+    isDragging.current = false
+  }
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    const x = ((e.touches[0].clientX - rect.left) / rect.width) * 100
+    setSliderPos(Math.max(0, Math.min(100, x)))
+  }, [])
+
+  if (!fotoAntes || !fotoDepois) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <h3 className="text-sm font-semibold text-gray-800 mb-4">Comparador Antes / Depois</h3>
+        <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
+          <div className="text-center">
+            <ImageOff size={32} className="mx-auto mb-2 opacity-40" />
+            Selecione uma foto "antes" e uma "depois" abaixo para comparar.
+          </div>
+        </div>
+        {/* Seletores de foto */}
+        {fotos.length > 0 && (
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <PhotoSelector
+              label="Antes"
+              fotos={fotos}
+              selectedId={antesId}
+              onSelect={onSetAntes}
+            />
+            <PhotoSelector
+              label="Depois"
+              fotos={fotos}
+              selectedId={depoisId}
+              onSelect={onSetDepois}
+            />
+          </div>
+        )}
+        {fotos.length === 0 && (
+          <p className="text-center text-xs text-gray-400 mt-4">
+            Nenhuma foto cadastrada para este paciente.
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-6">
+      <h3 className="text-sm font-semibold text-gray-800 mb-4">Comparador Antes / Depois</h3>
+
+      {/* Slider */}
+      <div
+        ref={containerRef}
+        className="relative w-full aspect-[4/3] rounded-lg overflow-hidden cursor-ew-resize select-none bg-gray-100"
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchMove={handleTouchMove}
+      >
+        {/* Foto "depois" (fundo) */}
+        <img
+          src={fotoDepois.url}
+          alt="Depois"
+          className="absolute inset-0 w-full h-full object-cover"
+          draggable={false}
+        />
+        <span className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+          Depois
+        </span>
+
+        {/* Foto "antes" (recortada pelo slider) */}
+        <div
+          className="absolute inset-0 overflow-hidden"
+          style={{ width: `${sliderPos}%` }}
+        >
+          <img
+            src={fotoAntes.url}
+            alt="Antes"
+            className="absolute inset-0 h-full object-cover"
+            style={{ width: containerRef.current?.clientWidth ?? '100%', maxWidth: 'none' }}
+            draggable={false}
+          />
+          <span className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+            Antes
+          </span>
+        </div>
+
+        {/* Linha do slider */}
+        <div
+          className="absolute top-0 bottom-0 w-0.5 bg-white shadow-md cursor-ew-resize"
+          style={{ left: `${sliderPos}%` }}
+          onMouseDown={handleMouseDown}
+          onTouchStart={() => { isDragging.current = true }}
+        >
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white rounded-full shadow-md flex items-center justify-center">
+            <div className="flex gap-0.5">
+              <span className="text-gray-600 text-xs">◀</span>
+              <span className="text-gray-600 text-xs">▶</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Seletores de foto */}
+      <div className="grid grid-cols-2 gap-4 mt-4">
+        <PhotoSelector
+          label="Antes"
+          fotos={fotos}
+          selectedId={antesId}
+          onSelect={onSetAntes}
+        />
+        <PhotoSelector
+          label="Depois"
+          fotos={fotos}
+          selectedId={depoisId}
+          onSelect={onSetDepois}
+        />
+      </div>
+    </div>
+  )
+}
+
+function PhotoSelector({
+  label,
+  fotos,
+  selectedId,
+  onSelect,
+}: {
+  label: string
+  fotos: FotoPaciente[]
+  selectedId?: string
+  onSelect?: (id: string) => void
+}) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <select
+        value={selectedId ?? ''}
+        onChange={(e) => onSelect?.(e.target.value)}
+        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+      >
+        <option value="">Selecionar foto...</option>
+        {fotos.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.tipo === 'antes' ? '📸 ' : f.tipo === 'depois' ? '✨ ' : '🖼️ '}
+            {f.legenda ?? `${f.tipo} — ${new Date(f.created_at).toLocaleDateString('pt-BR')}`}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}

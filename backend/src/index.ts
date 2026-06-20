@@ -7,6 +7,8 @@ import reunioesRouter from './routes/reunioes'
 import webhookRouter from './routes/webhook'
 import orgsRouter from './routes/orgs'
 import adminRouter from './routes/admin'
+import injetaveisRouter from './routes/injetaveis'
+import marcacoesRouter from './routes/marcacoes'
 import { requireAuth, requireSuperAdmin } from './middleware/auth'
 
 dotenv.config()
@@ -35,6 +37,8 @@ app.use('/api/webhook', webhookRouter)
 // Rotas de tenant (requerem auth + tenant válido)
 app.use('/api/clientes', requireAuth, clientesRouter)
 app.use('/api/reunioes', requireAuth, reunioesRouter)
+app.use('/api/injetaveis', requireAuth, injetaveisRouter)
+app.use('/api/marcacoes', requireAuth, marcacoesRouter)
 
 // Rotas super admin
 app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)

@@ -1,12 +1,21 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, MessageCircle, Calendar, Phone, Mail, TrendingUp, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { ArrowLeft, MessageCircle, Calendar, Phone, Mail, TrendingUp, CheckCircle2, Clock, XCircle, LayoutDashboard, Syringe } from 'lucide-react'
 import { api } from '../api/client'
 import type { Paciente, Agendamento, Conversa } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { StatusStepper } from '../components/StatusStepper'
+import { MarcacaoDigital } from '../components/marcacao/MarcacaoDigital'
+
+type Aba = 'visao_geral' | 'marcacao_digital'
+
+const ABAS: { id: Aba; label: string; icon: React.ElementType }[] = [
+  { id: 'visao_geral', label: 'Visão Geral', icon: LayoutDashboard },
+  { id: 'marcacao_digital', label: 'Marcação Digital', icon: Syringe },
+]
 
 const GRADIENTS = [
   ['#7c3aed', '#a855f7'], ['#2563eb', '#60a5fa'], ['#059669', '#34d399'],
@@ -37,6 +46,7 @@ const STATUS_AG: Record<string, { label: string; color: string; icon: React.Elem
 export function FichaPaciente() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [aba, setAba] = useState<Aba>('visao_geral')
 
   const { data: paciente, isLoading } = useQuery<Paciente>({
     queryKey: ['paciente', id],
@@ -178,6 +188,33 @@ export function FichaPaciente() {
         ))}
       </div>
 
+      {/* ── Tab bar ── */}
+      <div className="bg-white rounded-xl border border-gray-100 p-1 flex gap-1">
+        {ABAS.map((tab) => {
+          const Icon = tab.icon
+          const isActive = aba === tab.id
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setAba(tab.id)}
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isActive
+                  ? 'bg-amber-50 text-amber-600'
+                  : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <Icon size={15} />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── Conteúdo por aba ── */}
+      {aba === 'marcacao_digital' && id ? (
+        <MarcacaoDigital pacienteId={id} />
+      ) : (
+        <div className="contents">
       {/* ── Agendamentos ── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-sm font-semibold text-gray-800 mb-4">
@@ -285,6 +322,8 @@ export function FichaPaciente() {
           </p>
         )}
       </div>
+        </div>
+      )}
 
     </div>
   )

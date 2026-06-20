@@ -73,3 +73,64 @@ export interface ConfiguracaoOrrin {
   prompt_pedro: string
   timezone: string
 }
+
+// ── Marcação Digital ──
+
+export type CategoriaInjetavel =
+  | 'botox' | 'filler' | 'pdo_wire' | 'bioestimulador'
+  | 'bioremodelador' | 'skinbooster' | 'outro'
+
+export type ViewType =
+  | 'face_front' | 'face_left' | 'face_right'
+  | 'body_front' | 'body_back'
+
+export interface Injetavel {
+  id: string
+  tenant_id: string
+  nome: string
+  categoria: CategoriaInjetavel
+  cor_hex: string
+  unidade: string
+  ativo: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface Atendimento {
+  id: string
+  tenant_id: string
+  paciente_id: string
+  reuniao_id: string | null
+  profissional_id: string | null
+  data_atendimento: string
+  status: 'em_andamento' | 'concluido' | 'cancelado'
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface InjectionMarking {
+  id: string
+  tenant_id: string
+  paciente_id: string
+  visit_id: string
+  view_type: ViewType
+  x: number
+  y: number
+  product_id: string
+  quantity: number
+  unit: string
+  lot_id: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface FotoPaciente {
+  id: string
+  tenant_id: string
+  paciente_id: string
+  url: string
+  tipo: 'antes' | 'depois' | 'geral'
+  legenda: string | null
+  created_at: string
+}
