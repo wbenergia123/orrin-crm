@@ -10,7 +10,6 @@ import { Servicos } from './pages/Servicos'
 import { Profissionais } from './pages/Profissionais'
 import { Agenda } from './pages/Agenda'
 import { Atendimentos } from './pages/Atendimentos'
-import { Configuracoes } from './pages/Configuracoes'
 import { Clientes } from './pages/Clientes'
 
 const queryClient = new QueryClient()
@@ -32,7 +31,6 @@ export default function App() {
               <Route path="/agenda" element={<Agenda />} />
               <Route path="/atendimentos" element={<Atendimentos />} />
               <Route path="/clientes" element={<Clientes />} />
-              <Route path="/configuracoes" element={<Configuracoes />} />
             </Route>
           </Route>
         </Routes>
