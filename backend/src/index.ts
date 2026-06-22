@@ -7,6 +7,7 @@ import reunioesRouter from './routes/reunioes'
 import webhookRouter from './routes/webhook'
 import orgsRouter from './routes/orgs'
 import adminRouter from './routes/admin'
+import authRouter from './routes/auth'
 import injetaveisRouter from './routes/injetaveis'
 import marcacoesRouter from './routes/marcacoes'
 import { requireAuth, requireSuperAdmin } from './middleware/auth'
@@ -30,6 +31,7 @@ app.use(cors({
 
 // Rotas públicas (sem auth)
 app.use('/api/orgs', orgsRouter)
+app.use('/api/auth', authRouter)
 
 // Webhook do WhatsApp — autenticado via tenantSlug na URL
 app.use('/api/webhook', webhookRouter)
