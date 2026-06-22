@@ -8,6 +8,7 @@ import {
   MessageSquare,
   UserCog,
   LogOut,
+  Settings,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -20,6 +21,7 @@ const navItems = [
   { to: '/profissionais', icon: UserCog, label: 'Profissionais' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/atendimentos', icon: MessageSquare, label: 'Atendimentos' },
+  { to: '/configuracoes', icon: Settings, label: 'Configurações' },
 ]
 
 export function Sidebar() {
