@@ -16,6 +16,7 @@ import profissionaisRouter from './routes/profissionais'
 import agendamentosRouter from './routes/agendamentos'
 import atendimentosRouter from './routes/atendimentos'
 import dashboardRouter from './routes/dashboard'
+import whatsappRouter from './routes/whatsapp'
 import { requireAuth, requireSuperAdmin } from './middleware/auth'
 
 dotenv.config()
@@ -59,6 +60,7 @@ app.use('/api/profissionais', requireAuth, profissionaisRouter)
 app.use('/api/agendamentos', requireAuth, agendamentosRouter)
 app.use('/api/atendimentos', requireAuth, atendimentosRouter)
 app.use('/api/dashboard', requireAuth, dashboardRouter)
+app.use('/api/whatsapp', requireAuth, whatsappRouter)
 
 // Rotas super admin
 app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)
