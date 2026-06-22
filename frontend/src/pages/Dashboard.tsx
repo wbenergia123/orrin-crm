@@ -145,7 +145,7 @@ export function Dashboard() {
                   : card.value}
               </p>
             </CardContent>
-            <div className="h-16">
+            <div className="h-16 relative">
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={card.spark} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <defs>
@@ -184,7 +184,7 @@ export function Dashboard() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="px-2 pb-4">
+        <CardContent className="px-2 pb-4 relative">
           <ResponsiveContainer width="100%" height={240} minWidth={0}>
             <AreaChart data={grafico} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
               <defs>
@@ -275,7 +275,7 @@ export function Dashboard() {
             <CardTitle className="text-sm font-semibold text-gray-800">Agendamentos por Dia</CardTitle>
             <p className="text-xs text-gray-400">Distribuição semanal histórica</p>
           </CardHeader>
-          <CardContent className="px-3 pb-4">
+          <CardContent className="px-3 pb-4 relative">
             <ResponsiveContainer width="100%" height={160} minWidth={0}>
               <BarChart data={semana} margin={{ top: 4, right: 8, left: -20, bottom: 0 }} barCategoryGap="35%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
