@@ -66,7 +66,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return next()
   }
 
-  const host = req.headers.host || ''
+  // Vercel rewrites externas não preservam o Host original; elas enviam X-Forwarded-Host.
+  const host = (req.headers['x-forwarded-host'] as string | undefined) || req.headers.host || ''
   const slug = host.split('.')[0]
 
   if (!slug || slug === 'admin') {
