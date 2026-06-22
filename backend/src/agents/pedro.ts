@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { supabase } from "../services/supabase";
+import { supabaseAdmin } from "../services/supabase";
 
 const client = new Anthropic();
 
@@ -8,7 +8,7 @@ export async function processarMensagemCliente(
   mensagemCliente: string
 ): Promise<string> {
   // Buscar histórico de conversas
-  const { data: conversas } = await supabase
+  const { data: conversas } = await supabaseAdmin
     .from("conversas")
     .select("*")
     .eq("cliente_id", clienteId)
@@ -16,14 +16,14 @@ export async function processarMensagemCliente(
     .limit(10);
 
   // Buscar dados do cliente
-  const { data: cliente } = await supabase
+  const { data: cliente } = await supabaseAdmin
     .from("clientes")
     .select("*")
     .eq("id", clienteId)
     .single();
 
   // Buscar configuração de prompt
-  const { data: config } = await supabase
+  const { data: config } = await supabaseAdmin
     .from("configuracoes")
     .select("prompt_pedro")
     .single();
@@ -53,7 +53,7 @@ export async function processarMensagemCliente(
     response.content[0].type === "text" ? response.content[0].text : "";
 
   // Salvar conversa
-  await supabase.from("conversas").insert({
+  await supabaseAdmin.from("conversas").insert({
     cliente_id: clienteId,
     mensagem_cliente: mensagemCliente,
     mensagem_agente: respostaAgente,
@@ -62,7 +62,7 @@ export async function processarMensagemCliente(
   });
 
   // Atualizar status do cliente
-  await supabase
+  await supabaseAdmin
     .from("clientes")
     .update({
       status: "contato_feito",
