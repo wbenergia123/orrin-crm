@@ -75,7 +75,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
       (await api.post('/marcacoes', data)).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['markings', currentVisitId] })
-      queryClient.invalidateQueries({ queryKey: ['all-markings', pacienteId] })
+      queryClient.invalidateQueries({ queryKey: ['atendimentos', pacienteId] })
     },
   })
 
@@ -106,10 +106,21 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
   }, [])
 
   const handleSaveMarking = useCallback(
-    (data: { product_id: string; quantity: number; unit: string; lot_id?: string }) => {
-      if (!currentVisitId) return
+    async (data: { product_id: string; quantity: number; unit: string; lot_id?: string }) => {
+      // Auto-cria atendimento se não existir
+      let visitId = currentVisitId
+      if (!visitId) {
+        try {
+          const resp = await api.post('/marcacoes/atendimentos', { paciente_id: pacienteId })
+          visitId = resp.data.id
+          queryClient.invalidateQueries({ queryKey: ['atendimentos', pacienteId] })
+        } catch (e) {
+          console.error('Erro ao criar atendimento:', e)
+          return
+        }
+      }
       addMarking.mutate({
-        visit_id: currentVisitId,
+        visit_id: visitId,
         paciente_id: pacienteId,
         view_type: viewType,
         x: pendingPos!.x,
@@ -118,7 +129,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
       })
       setPendingPos(null)
     },
-    [currentVisitId, pacienteId, viewType, pendingPos, addMarking]
+    [currentVisitId, pacienteId, viewType, pendingPos, addMarking, queryClient]
   )
 
   const handleModoChange = (newModo: 'face' | 'corpo') => {

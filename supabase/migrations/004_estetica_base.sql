@@ -9,7 +9,7 @@ CREATE TABLE atendimentos (
   tenant_id       UUID NOT NULL REFERENCES organizacoes(id),
   paciente_id     UUID NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
   reuniao_id      UUID REFERENCES reunioes(id) ON DELETE SET NULL,
-  profissional_id UUID REFERENCES profissionais(id),
+  profissional_id UUID, -- FK pra profissionais quando/se a tabela existir
   data_atendimento TIMESTAMP DEFAULT NOW(),
   status          VARCHAR(50) DEFAULT 'em_andamento' CHECK (status IN ('em_andamento', 'concluido', 'cancelado')),
   notas           TEXT,
@@ -41,15 +41,9 @@ CREATE TABLE injetaveis (
 CREATE INDEX idx_injetaveis_tenant ON injetaveis(tenant_id);
 CREATE INDEX idx_injetaveis_ativo  ON injetaveis(tenant_id, ativo);
 
--- Cor padrão por categoria (usada no mapa de marcação)
-INSERT INTO injetaveis (tenant_id, nome, categoria, cor_hex, unidade) VALUES
-  ('00000000-0000-0000-0000-000000000000', 'Botox',           'botox',          '#3b82f6', 'UI'),
-  ('00000000-0000-0000-0000-000000000000', 'Ácido Hialurônico','filler',         '#ec4899', 'ml'),
-  ('00000000-0000-0000-0000-000000000000', 'PDO Wires',       'pdo_wire',       '#8b5cf6', 'un'),
-  ('00000000-0000-0000-0000-000000000000', 'Bioestimulador',  'bioestimulador', '#10b981', 'ml'),
-  ('00000000-0000-0000-0000-000000000000', 'Bioremodelador',  'bioremodelador', '#f59e0b', 'ml'),
-  ('00000000-0000-0000-0000-000000000000', 'Skinbooster',     'skinbooster',    '#06b6d4', 'ml')
-ON CONFLICT DO NOTHING;
+-- Seed padrão de injetáveis: inserido por tenant ao criar a organização
+-- (não inserimos aqui pois precisaria de tenant_id real)
+-- Os injetáveis são criados via UI em Configurações > Injetáveis
 
 -- ============================================================
 -- TABELA: fotos_paciente (anexos de fotos do prontuário)
