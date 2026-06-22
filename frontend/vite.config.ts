@@ -8,7 +8,7 @@ export default defineConfig({
     alias: { '@': path.resolve(__dirname, './src') },
   },
   build: {
-    cssMinify: 'esbuild',
+    cssMinify: false,
   },
   server: {
     proxy: {
