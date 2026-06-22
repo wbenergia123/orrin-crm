@@ -38,27 +38,31 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({ error: 'Token ausente' })
   }
 
-  // Verifica token via Supabase (suporta ECC e HS256)
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
-  if (error || !user) {
+  // Verifica o JWT gerado pela rota /api/auth/login
+  let payload: JWTPayload & { sub: string }
+  try {
+    payload = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload & { sub: string }
+  } catch {
     return res.status(401).json({ error: 'Token inválido ou expirado' })
   }
 
-  // Busca role e tenant_id direto do banco (mais confiável que JWT claims com ECC)
+  // Busca role e tenant_id atualizados no banco
   const { data: userData } = await supabaseAdmin
     .from('usuarios')
     .select('role, tenant_id')
-    .eq('id', user.id)
+    .eq('id', payload.sub)
     .single()
 
-  const payload = {
-    sub: user.id,
-    role: userData?.role || 'vendedor',
-    tenant_id: userData?.tenant_id || null,
-  } as JWTPayload & { sub: string }
+  const user = {
+    id: payload.sub,
+    sub: payload.sub,
+    email: payload.email,
+    role: userData?.role || payload.role,
+    tenant_id: userData?.tenant_id ?? payload.tenant_id,
+  }
 
-  if (payload.role === 'super_admin') {
-    req.user = { id: user.id, ...payload }
+  if (user.role === 'super_admin') {
+    req.user = user
     return next()
   }
 
@@ -73,11 +77,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   if (!org || !org.ativo) {
     return res.status(403).json({ error: 'Organização não disponível' })
   }
-  if (org.id !== payload.tenant_id) {
+  if (org.id !== user.tenant_id) {
     return res.status(403).json({ error: 'Token inválido para este domínio' })
   }
 
-  req.user = { id: payload.sub, ...payload }
+  req.user = user
   next()
 }
 
