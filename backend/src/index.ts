@@ -10,6 +10,12 @@ import adminRouter from './routes/admin'
 import authRouter from './routes/auth'
 import injetaveisRouter from './routes/injetaveis'
 import marcacoesRouter from './routes/marcacoes'
+import pacientesRouter from './routes/pacientes'
+import servicosRouter from './routes/servicos'
+import profissionaisRouter from './routes/profissionais'
+import agendamentosRouter from './routes/agendamentos'
+import atendimentosRouter from './routes/atendimentos'
+import dashboardRouter from './routes/dashboard'
 import { requireAuth, requireSuperAdmin } from './middleware/auth'
 
 dotenv.config()
@@ -45,6 +51,14 @@ app.use('/api/clientes', requireAuth, clientesRouter)
 app.use('/api/reunioes', requireAuth, reunioesRouter)
 app.use('/api/injetaveis', requireAuth, injetaveisRouter)
 app.use('/api/marcacoes', requireAuth, marcacoesRouter)
+
+// Rotas da clínica
+app.use('/api/pacientes', requireAuth, pacientesRouter)
+app.use('/api/servicos', requireAuth, servicosRouter)
+app.use('/api/profissionais', requireAuth, profissionaisRouter)
+app.use('/api/agendamentos', requireAuth, agendamentosRouter)
+app.use('/api/atendimentos', requireAuth, atendimentosRouter)
+app.use('/api/dashboard', requireAuth, dashboardRouter)
 
 // Rotas super admin
 app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)

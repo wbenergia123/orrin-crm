@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { supabase } from '../db/supabase'
+import { supabaseAdmin } from '../services/supabase'
 import { enviarMensagemViaUAZAPI } from '../lib/uazapi-client'
 
 const router = Router()
@@ -15,12 +15,13 @@ function isValidUUID(id: string): boolean {
 router.get('/resumo', async (req, res) => {
   const busca = typeof req.query.busca === 'string' ? req.query.busca : undefined
 
-  let query = supabase
+  let query = supabaseAdmin
     .from('pacientes')
     .select(`
       id, nome, telefone, status,
-      conversas(mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, created_at)
+      conversas_pacientes(mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, created_at)
     `)
+    .eq('tenant_id', req.user!.tenant_id)
     .not('ultimo_contato_at', 'is', null)
     .order('ultimo_contato_at', { ascending: false })
     .limit(50)
@@ -46,7 +47,7 @@ router.get('/resumo', async (req, res) => {
   }
 
   const resumos = (data ?? []).map((p) => {
-    const convs = (p.conversas as ConvRow[]).sort(
+    const convs = (p.conversas_pacientes as ConvRow[]).sort(
       (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
 
@@ -58,14 +59,11 @@ router.get('/resumo', async (req, res) => {
 
     const preview = ultimaMsgPaciente?.mensagem_paciente?.substring(0, 60) ?? ''
 
-    // Badge clears when operator clicks Assumir (HANDOFF row becomes latest, has mensagem_agente set).
-    // Full per-message read receipts are v2 scope.
     const naoLidas =
       modoHumano &&
       ultimaConversa?.mensagem_paciente != null &&
       ultimaConversa?.mensagem_agente == null
 
-    // Count patient messages without agent response (unread messages)
     const unreadCount = convs.filter(
       (c) => c.mensagem_paciente != null && c.mensagem_agente == null
     ).length
@@ -93,16 +91,17 @@ router.get('/resumo', async (req, res) => {
   res.json(resumos)
 })
 
-// ─── GET /:id/conversas ───────────────────────────────────────────────────────
+// ─── GET /:paciente_id/conversas ──────────────────────────────────────────────
 
 router.get('/:paciente_id/conversas', async (req, res) => {
   if (!isValidUUID(req.params.paciente_id)) {
     res.status(400).json({ error: 'paciente_id inválido' })
     return
   }
-  const { data, error } = await supabase
-    .from('conversas')
+  const { data, error } = await supabaseAdmin
+    .from('conversas_pacientes')
     .select('id, mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, created_at')
+    .eq('tenant_id', req.user!.tenant_id)
     .eq('paciente_id', req.params.paciente_id)
     .order('created_at', { ascending: true })
     .limit(100)
@@ -111,7 +110,7 @@ router.get('/:paciente_id/conversas', async (req, res) => {
   res.json(data ?? [])
 })
 
-// ─── PATCH /:id/handoff ───────────────────────────────────────────────────────
+// ─── PATCH /:paciente_id/handoff ──────────────────────────────────────────────
 
 router.patch('/:paciente_id/handoff', async (req, res) => {
   if (!isValidUUID(req.params.paciente_id)) {
@@ -124,9 +123,10 @@ router.patch('/:paciente_id/handoff', async (req, res) => {
     return
   }
 
-  const { data, error } = await supabase
-    .from('conversas')
+  const { data, error } = await supabaseAdmin
+    .from('conversas_pacientes')
     .insert({
+      tenant_id: req.user!.tenant_id,
       paciente_id: req.params.paciente_id,
       tipo_remetente: 'humano',
       modo_humano,
@@ -139,7 +139,7 @@ router.patch('/:paciente_id/handoff', async (req, res) => {
   res.json(data)
 })
 
-// ─── POST /:id/mensagem ───────────────────────────────────────────────────────
+// ─── POST /:paciente_id/mensagem ──────────────────────────────────────────────
 
 router.post('/:paciente_id/mensagem', async (req, res) => {
   if (!isValidUUID(req.params.paciente_id)) {
@@ -154,10 +154,11 @@ router.post('/:paciente_id/mensagem', async (req, res) => {
     return
   }
 
-  const { data: paciente, error: pacienteError } = await supabase
+  const { data: paciente, error: pacienteError } = await supabaseAdmin
     .from('pacientes')
     .select('telefone')
     .eq('id', paciente_id)
+    .eq('tenant_id', req.user!.tenant_id)
     .single()
 
   if (pacienteError || !paciente) {
@@ -165,9 +166,10 @@ router.post('/:paciente_id/mensagem', async (req, res) => {
     return
   }
 
-  const { data: ultimaConversa } = await supabase
-    .from('conversas')
+  const { data: ultimaConversa } = await supabaseAdmin
+    .from('conversas_pacientes')
     .select('modo_humano')
+    .eq('tenant_id', req.user!.tenant_id)
     .eq('paciente_id', paciente_id)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -178,9 +180,10 @@ router.post('/:paciente_id/mensagem', async (req, res) => {
     return
   }
 
-  const { data, error } = await supabase
-    .from('conversas')
+  const { data, error } = await supabaseAdmin
+    .from('conversas_pacientes')
     .insert({
+      tenant_id: req.user!.tenant_id,
       paciente_id,
       mensagem_agente: texto.trim(),
       tipo_remetente: 'humano',

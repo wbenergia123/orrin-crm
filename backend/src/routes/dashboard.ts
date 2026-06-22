@@ -1,9 +1,9 @@
 import { Router } from 'express'
-import { supabase } from '../db/supabase'
+import { supabaseAdmin } from '../services/supabase'
 
 const router = Router()
 
-router.get('/metricas', async (_req, res) => {
+router.get('/metricas', async (req, res) => {
   const now = new Date()
   const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
@@ -20,20 +20,26 @@ router.get('/metricas', async (_req, res) => {
     { count: totalPacientes },
     { count: clientesTotal },
   ] = await Promise.all([
-    supabase.from('agendamentos').select('*', { count: 'exact', head: true })
+    supabaseAdmin.from('agendamentos').select('*', { count: 'exact', head: true })
+      .eq('tenant_id', req.user!.tenant_id)
       .gte('data_hora', inicioMes).lte('data_hora', fimMes),
-    supabase.from('agendamentos').select('*', { count: 'exact', head: true })
+    supabaseAdmin.from('agendamentos').select('*', { count: 'exact', head: true })
+      .eq('tenant_id', req.user!.tenant_id)
       .gte('data_hora', inicioMesAnt).lte('data_hora', fimMesAnt),
-    supabase.from('pacientes').select('*', { count: 'exact', head: true })
+    supabaseAdmin.from('pacientes').select('*', { count: 'exact', head: true })
+      .eq('tenant_id', req.user!.tenant_id)
       .gte('created_at', inicioMes).eq('status', 'novo'),
-    supabase.from('pacientes').select('*', { count: 'exact', head: true })
+    supabaseAdmin.from('pacientes').select('*', { count: 'exact', head: true })
+      .eq('tenant_id', req.user!.tenant_id)
       .gte('created_at', inicioMesAnt).lte('created_at', fimMesAnt).eq('status', 'novo'),
-    supabase.from('agendamentos').select('servico_id, servicos(preco)').eq('status', 'concluido')
+    supabaseAdmin.from('agendamentos').select('servico_id, servicos(preco)').eq('status', 'concluido')
+      .eq('tenant_id', req.user!.tenant_id)
       .gte('data_hora', inicioMes).lte('data_hora', fimMes),
-    supabase.from('agendamentos').select('servico_id, servicos(preco)').eq('status', 'concluido')
+    supabaseAdmin.from('agendamentos').select('servico_id, servicos(preco)').eq('status', 'concluido')
+      .eq('tenant_id', req.user!.tenant_id)
       .gte('data_hora', inicioMesAnt).lte('data_hora', fimMesAnt),
-    supabase.from('pacientes').select('*', { count: 'exact', head: true }),
-    supabase.from('pacientes').select('*', { count: 'exact', head: true }).eq('status', 'cliente'),
+    supabaseAdmin.from('pacientes').select('*', { count: 'exact', head: true }).eq('tenant_id', req.user!.tenant_id),
+    supabaseAdmin.from('pacientes').select('*', { count: 'exact', head: true }).eq('tenant_id', req.user!.tenant_id).eq('status', 'cliente'),
   ])
 
   type FaturamentoRow = { servicos: { preco: number }[] | null }
@@ -64,17 +70,21 @@ router.get('/metricas', async (_req, res) => {
   })
 })
 
-router.get('/grafico', async (_req, res) => {
+router.get('/grafico', async (req, res) => {
   const hoje = new Date()
   const inicio = new Date(hoje)
   inicio.setDate(hoje.getDate() - 29)
   inicio.setHours(0, 0, 0, 0)
 
-  const { data: agendamentos } = await supabase
-    .from('agendamentos').select('data_hora').gte('data_hora', inicio.toISOString()).neq('status', 'cancelado')
+  const { data: agendamentos } = await supabaseAdmin
+    .from('agendamentos').select('data_hora')
+    .eq('tenant_id', req.user!.tenant_id)
+    .gte('data_hora', inicio.toISOString()).neq('status', 'cancelado')
 
-  const { data: conversas } = await supabase
-    .from('conversas').select('created_at').gte('created_at', inicio.toISOString()).not('mensagem_paciente', 'is', null)
+  const { data: conversas } = await supabaseAdmin
+    .from('conversas_pacientes').select('created_at')
+    .eq('tenant_id', req.user!.tenant_id)
+    .gte('created_at', inicio.toISOString()).not('mensagem_paciente', 'is', null)
 
   const dias: Record<string, { data: string; agendamentos: number; mensagens: number }> = {}
   for (let i = 0; i < 30; i++) {
@@ -95,8 +105,11 @@ router.get('/grafico', async (_req, res) => {
   res.json(Object.values(dias))
 })
 
-router.get('/status-pacientes', async (_req, res) => {
-  const { data } = await supabase.from('pacientes').select('status')
+router.get('/status-pacientes', async (req, res) => {
+  const { data } = await supabaseAdmin
+    .from('pacientes')
+    .select('status')
+    .eq('tenant_id', req.user!.tenant_id)
 
   const counts: Record<string, number> = {}
   for (const p of data ?? []) {
@@ -130,10 +143,11 @@ router.get('/status-pacientes', async (_req, res) => {
   res.json({ total, itens: resultado })
 })
 
-router.get('/agendamentos-semana', async (_req, res) => {
-  const { data } = await supabase
+router.get('/agendamentos-semana', async (req, res) => {
+  const { data } = await supabaseAdmin
     .from('agendamentos')
     .select('data_hora')
+    .eq('tenant_id', req.user!.tenant_id)
     .neq('status', 'cancelado')
 
   const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']

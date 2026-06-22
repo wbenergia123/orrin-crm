@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { supabase } from '../db/supabase'
+import { supabaseAdmin } from '../services/supabase'
 
 const router = Router()
 
@@ -37,9 +37,10 @@ router.get('/slots-disponiveis', async (req, res) => {
   const inicioDia = new Date(`${dataStr}T00:00:00`).toISOString()
   const fimDia = new Date(`${dataStr}T23:59:59`).toISOString()
 
-  const { data: ocupados } = await supabase
+  const { data: ocupados } = await supabaseAdmin
     .from('agendamentos')
     .select('data_hora')
+    .eq('tenant_id', req.user!.tenant_id)
     .eq('profissional_id', profissional_id)
     .neq('status', 'cancelado')
     .gte('data_hora', inicioDia)
@@ -59,9 +60,10 @@ router.get('/slots-disponiveis', async (req, res) => {
 })
 
 router.get('/', async (req, res) => {
-  let query = supabase
+  let query = supabaseAdmin
     .from('agendamentos')
     .select('*, paciente:pacientes(id, nome, telefone), servico:servicos(id, nome, preco), profissional:profissionais(id, nome)')
+    .eq('tenant_id', req.user!.tenant_id)
     .order('data_hora', { ascending: true })
 
   if (req.query.data_inicio) query = query.gte('data_hora', req.query.data_inicio as string)
@@ -93,9 +95,10 @@ router.post('/', async (req, res) => {
   }
 
   const fim = new Date(dataHora.getTime() + DURACAO_MIN * 60 * 1000)
-  const { data: conflito } = await supabase
+  const { data: conflito } = await supabaseAdmin
     .from('agendamentos')
     .select('id')
+    .eq('tenant_id', req.user!.tenant_id)
     .eq('profissional_id', parsed.data.profissional_id)
     .neq('status', 'cancelado')
     .gte('data_hora', dataHora.toISOString())
@@ -107,10 +110,18 @@ router.post('/', async (req, res) => {
     return
   }
 
-  const { data, error } = await supabase.from('agendamentos').insert(parsed.data).select().single()
+  const { data, error } = await supabaseAdmin
+    .from('agendamentos')
+    .insert({ ...parsed.data, tenant_id: req.user!.tenant_id })
+    .select()
+    .single()
   if (error) { res.status(400).json({ error: error.message }); return }
 
-  await supabase.from('pacientes').update({ status: 'consulta_agendada' }).eq('id', parsed.data.paciente_id)
+  await supabaseAdmin
+    .from('pacientes')
+    .update({ status: 'consulta_agendada' })
+    .eq('id', parsed.data.paciente_id)
+    .eq('tenant_id', req.user!.tenant_id)
 
   res.status(201).json(data)
 })
@@ -119,7 +130,7 @@ router.post('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const { id } = req.params
 
-  const { data: ag, error } = await supabase
+  const { data: ag, error } = await supabaseAdmin
     .from('agendamentos')
     .select(`
       *,
@@ -128,6 +139,7 @@ router.get('/:id', async (req, res) => {
       paciente:pacientes(id, nome, telefone)
     `)
     .eq('id', id)
+    .eq('tenant_id', req.user!.tenant_id)
     .single()
 
   if (error || !ag) {
@@ -135,10 +147,10 @@ router.get('/:id', async (req, res) => {
     return
   }
 
-  // Histórico: conta confirmado+concluido do mesmo paciente, exclui o atual
-  const { data: anteriores } = await supabase
+  const { data: anteriores } = await supabaseAdmin
     .from('agendamentos')
     .select('data_hora')
+    .eq('tenant_id', req.user!.tenant_id)
     .eq('paciente_id', (ag as { paciente_id: string }).paciente_id)
     .in('status', ['confirmado', 'concluido'])
     .neq('id', id)
@@ -167,8 +179,13 @@ router.patch('/:id', async (req, res) => {
     }
   }
 
-  const { data, error } = await supabase
-    .from('agendamentos').update(parsed.data).eq('id', req.params.id).select().single()
+  const { data, error } = await supabaseAdmin
+    .from('agendamentos')
+    .update(parsed.data)
+    .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
+    .select()
+    .single()
   if (error) { res.status(400).json({ error: error.message }); return }
   res.json(data)
 })

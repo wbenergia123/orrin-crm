@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { z } from 'zod'
-import { supabase } from '../db/supabase'
+import { supabaseAdmin } from '../services/supabase'
 import { StatusPaciente } from '../types'
 
 const router = Router()
@@ -8,7 +8,11 @@ const router = Router()
 const statusValidos: StatusPaciente[] = ['novo', 'em_conversa', 'consulta_agendada', 'cliente', 'frio']
 
 router.get('/', async (req, res) => {
-  let query = supabase.from('pacientes').select('*').order('created_at', { ascending: false })
+  let query = supabaseAdmin
+    .from('pacientes')
+    .select('*')
+    .eq('tenant_id', req.user!.tenant_id)
+    .order('created_at', { ascending: false })
 
   if (req.query.status && statusValidos.includes(req.query.status as StatusPaciente)) {
     query = query.eq('status', req.query.status)
@@ -25,10 +29,11 @@ router.get('/', async (req, res) => {
 })
 
 router.get('/:id', async (req, res) => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('pacientes')
     .select('*')
     .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
     .single()
   if (error) { res.status(404).json({ error: 'Paciente não encontrado' }); return }
   res.json(data)
@@ -46,7 +51,11 @@ router.post('/', async (req, res) => {
   const parsed = createSchema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
 
-  const { data, error } = await supabase.from('pacientes').insert(parsed.data).select().single()
+  const { data, error } = await supabaseAdmin
+    .from('pacientes')
+    .insert({ ...parsed.data, tenant_id: req.user!.tenant_id })
+    .select()
+    .single()
   if (error) { res.status(400).json({ error: error.message }); return }
   res.status(201).json(data)
 })
@@ -60,8 +69,13 @@ router.patch('/:id', async (req, res) => {
   const parsed = updateSchema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
 
-  const { data, error } = await supabase
-    .from('pacientes').update(parsed.data).eq('id', req.params.id).select().single()
+  const { data, error } = await supabaseAdmin
+    .from('pacientes')
+    .update(parsed.data)
+    .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
+    .select()
+    .single()
   if (error) { res.status(400).json({ error: error.message }); return }
   res.json(data)
 })
@@ -73,8 +87,13 @@ router.patch('/:id/status', async (req, res) => {
   const parsed = schema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
 
-  const { data, error } = await supabase
-    .from('pacientes').update({ status: parsed.data.status }).eq('id', req.params.id).select().single()
+  const { data, error } = await supabaseAdmin
+    .from('pacientes')
+    .update({ status: parsed.data.status })
+    .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
+    .select()
+    .single()
   if (error) { res.status(400).json({ error: error.message }); return }
   res.json(data)
 })
