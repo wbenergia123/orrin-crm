@@ -18,42 +18,52 @@
 | Tamanho máximo | 5MB |
 | Remover foto | Botão para voltar ao avatar gerado automaticamente (`foto_url = null`) |
 | Limpeza de storage | Fora de escopo — fotos antigas substituídas não são apagadas do bucket (custo de storage irrelevante neste estágio) |
-| Pré-requisito | Suite de testes do backend está quebrada (ver Seção 0) — corrigida como parte deste trabalho, pois é necessária para testar a feature |
+| Pré-requisito | Suite de testes do backend está quebrada (ver Seção 0) — corrigida como parte deste trabalho, pois é necessária para testar a feature. Inclui 1 migration aplicada manualmente pelo usuário no Supabase Studio antes da Task 1 |
 
 ---
 
 ## Seção 0: Pré-requisito — corrigir a suite de testes do backend
 
-A migration mais recente (`feat: implementa backend da clínica`) adicionou `backend/tests/*.test.ts`, `vitest.config.ts` e referências a `supertest`, mas:
+Validado empiricamente (instalei as deps, extraí o app, roda a suíte real contra o Supabase do `.env`). Três problemas, em camadas — cada um só aparece depois do anterior ser corrigido:
 
-- `vitest`, `supertest` e `@types/supertest` **não estão em `package.json`** (nem em `dependencies` nem em `devDependencies`).
-- Não existe script `"test"` em `package.json`.
-- Todos os testes importam `import { createApp } from '../src/app'`, mas **`backend/src/app.ts` não existe** — só `backend/src/index.ts`, que monta o `express()` e já chama `app.listen(...)` diretamente.
+### 0.1 — Dependências e script de teste ausentes
 
-Resultado: `npm test` falha (script nem existe) e `npx vitest run` falha ao carregar a config (módulo `vitest/config` não resolvido). A suite nunca foi executada com sucesso.
+`vitest`, `supertest`, `@types/supertest` não estavam em `package.json`, e não havia script `"test"`. `npx vitest run` falhava só carregando a config (`Cannot find module 'vitest/config'`).
 
-Como este spec exige testar a nova rota de upload, a correção mínima é parte do trabalho:
+### 0.2 — `backend/src/app.ts` não existe
 
-1. **Extrair `backend/src/app.ts`**: mover todo o conteúdo de `index.ts` para uma função `createApp()` que monta e retorna o `express()` configurado (todos os `app.use(...)`, CORS, rotas, 404 handler) — **sem** chamar `app.listen`.
-2. **`backend/src/index.ts`** passa a ser:
-   ```ts
-   import { createApp } from './app'
+Todos os testes importam `import { createApp } from '../src/app'`, mas só existe `backend/src/index.ts`, que monta o `express()` e já chama `app.listen(...)` diretamente — sem uma função exportável para o `supertest` montar sem abrir uma porta de rede.
 
-   const app = createApp()
-   const PORT = process.env.PORT || 3001
-   app.listen(PORT, () => {
-     console.log(`Backend rodando em http://localhost:${PORT}`)
-   })
+### 0.3 — Dois bugs reais (não só de teste), confirmados contra o Supabase de produção
+
+1. **Client Supabase "anon" quebrava o boot inteiro do backend.** `backend/src/services/supabase.ts` exportava um client `supabase = createClient(url, process.env.SUPABASE_ANON_KEY!)`, mas `SUPABASE_ANON_KEY` nunca foi definida em nenhum `.env`/`.env.example`. Isso lança `Error: supabaseKey is required` na carga do módulo, e como `app.ts` importa todas as rotas (e uma delas, `webhook.ts` → `agents/pedro.ts`, usava esse client), **toda a aplicação falhava ao montar**, não só os testes. Único consumidor real: `agents/pedro.ts` (agente legado de prospecção B2B), que já podia usar `supabaseAdmin` como 100% do resto do código faz (confirmado por grep: nenhuma outra rota usa o client anon).
+2. **Constraint do banco bloqueia o papel `'secretaria'`.** Confirmado via teste direto contra o Supabase real (upsert em `usuarios` com `role: 'secretaria'`):
    ```
-3. **`backend/package.json`**: adicionar `devDependencies`: `vitest`, `supertest`, `@types/supertest` (versões mais recentes compatíveis) e o script `"test": "vitest run"`.
+   code: '23514'
+   message: 'new row for relation "usuarios" violates check constraint "usuarios_role_check"'
+   ```
+   A constraint (`supabase/migrations/001_schema_orrin.sql`) só permite `'admin'` e `'vendedor'` — papéis do projeto antigo (Pedro/prospecção B2B). Toda a área de clínica (`backend/tests/*.test.ts`, e presumivelmente o uso real do app) assume o papel `'secretaria'`, que nunca foi adicionado à constraint nem ao type `RoleUsuario` em `backend/src/types/index.ts` (hoje `'admin' | 'vendedor' | 'super_admin'`). **Isso bloqueia hoje, em produção, a criação de qualquer usuário com papel `'secretaria'`** — não é um problema só dos testes.
 
-Não faz parte deste trabalho corrigir a lógica interna dos 14 arquivos de teste já existentes — só destravar a execução. Se algum teste pré-existente falhar por motivo não relacionado a este spec, isso é reportado separadamente, não bloqueia esta feature.
+### Correções (parte deste trabalho)
+
+1. **Extrair `backend/src/app.ts`**: mover todo o conteúdo de `index.ts` para uma função `createApp()` que monta e retorna o `express()` configurado (todos os `app.use(...)`, CORS, rotas, 404 handler) — **sem** chamar `app.listen`. `index.ts` fica só com a chamada de `app.listen`.
+2. **`backend/src/services/supabase.ts`**: remover o client anon morto. **`backend/src/agents/pedro.ts`**: trocar os 5 usos de `supabase` por `supabaseAdmin`.
+3. **`backend/src/types/index.ts`**: `RoleUsuario` passa a ser `'admin' | 'vendedor' | 'secretaria' | 'super_admin'`.
+4. **Nova migration `supabase/migrations/009_fix_usuarios_role_check.sql`** (aplicada manualmente pelo usuário no SQL Editor do Supabase Studio — decisão dele, sem acesso de CLI/DB direto neste ambiente):
+   ```sql
+   ALTER TABLE usuarios DROP CONSTRAINT usuarios_role_check;
+   ALTER TABLE usuarios ADD CONSTRAINT usuarios_role_check
+     CHECK (role IN ('admin', 'vendedor', 'secretaria', 'super_admin'));
+   ```
+5. **`backend/package.json`**: adicionar `devDependencies`: `vitest@^4.1.9`, `supertest@^7.2.2`, `@types/supertest@^7.2.0` e o script `"test": "vitest run"`.
+
+Não faz parte deste trabalho corrigir a lógica interna dos arquivos de teste já existentes, nem os 2 arquivos de teste que importam um módulo inexistente (`claude-tools.test.ts`, `confirmacao.test.ts` → `../src/lib/claude-tools`, que nunca foi criado) — isso é uma feature separada (ferramentas do agente Claude) não relacionada a este spec. Reportado, não bloqueia esta feature.
 
 ---
 
 ## Seção 1: Database
 
-Nova migration `supabase/migrations/009_foto_profissional.sql`:
+Nova migration `supabase/migrations/010_foto_profissional.sql`:
 
 ```sql
 ALTER TABLE profissionais ADD COLUMN foto_url TEXT;
@@ -64,6 +74,8 @@ ON CONFLICT DO NOTHING;
 ```
 
 Sem policy de RLS em `storage.objects`: todo o acesso de escrita passa pelo backend usando `supabaseAdmin` (service role, ignora RLS). O bucket é `public: true` apenas para permitir leitura direta da URL em `<img>`, que é o mesmo padrão já usado (ainda que não funcional) em `fotos-pacientes` na migration 004.
+
+Assim como a `009_fix_usuarios_role_check.sql` da Seção 0, esta migration também precisa ser colada manualmente no SQL Editor do Supabase Studio pelo usuário — sem acesso de CLI/DB direto neste ambiente.
 
 ---
 
@@ -255,8 +267,11 @@ Frontend: verificação manual no browser (upload, troca, remoção, e confirmar
 ## Checklist Final
 
 - [ ] `app.ts` extraído, `index.ts` simplificado, `npm test` roda
+- [ ] Client anon morto removido de `services/supabase.ts`; `agents/pedro.ts` usando `supabaseAdmin`
+- [ ] `RoleUsuario` inclui `'secretaria'`
 - [ ] `vitest`, `supertest`, `@types/supertest`, `multer`, `@types/multer` instalados
-- [ ] Migration `009_foto_profissional.sql` aplicada no Supabase
+- [ ] Migration `009_fix_usuarios_role_check.sql` aplicada no Supabase (manual, pelo usuário)
+- [ ] Migration `010_foto_profissional.sql` aplicada no Supabase (manual, pelo usuário)
 - [ ] Rotas `POST` / `DELETE` `/api/profissionais/:id/foto`
 - [ ] `Profissional.foto_url` no type compartilhado
 - [ ] `lib/avatar.ts` criado e usado em `Agenda.tsx` e `Profissionais.tsx`
