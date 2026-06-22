@@ -14,6 +14,10 @@ import { requireAuth, requireSuperAdmin } from './middleware/auth'
 
 dotenv.config()
 
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET é obrigatório. Defina a variável no .env ou no painel do host.')
+}
+
 const app = express()
 
 app.use(express.json())
