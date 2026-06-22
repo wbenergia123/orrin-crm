@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -89,7 +90,7 @@ export function Dashboard() {
   const sparkline = grafico.slice(-14)
   const tickIndexes = new Set([0, 4, 9, 14, 19, 24, 29])
 
-  const cards = [
+  const cards = useMemo(() => [
     {
       title: 'Faturamento do Mês',
       value: data
@@ -116,7 +117,7 @@ export function Dashboard() {
       color: '#059669',
       spark: sparkline.map((d) => ({ v: d.mensagens })),
     },
-  ]
+  ], [data, sparkline])
 
   // Top 2 status for the donut center
   const topStatus = statusData?.itens[0]
@@ -155,7 +156,7 @@ export function Dashboard() {
                   </defs>
                   <Tooltip content={<SparkTooltip />} />
                   <Area type="monotone" dataKey="v" stroke={card.color} strokeWidth={2}
-                    fill={`url(#sg-${card.title})`} dot={false} />
+                    fill={`url(#sg-${card.title})`} dot={false} isAnimationActive={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -207,10 +208,10 @@ export function Dashboard() {
               <Tooltip content={<MainTooltip />} />
               <Area type="monotone" dataKey="agendamentos" name="Agendamentos"
                 stroke="#7c3aed" strokeWidth={2.5} fill="url(#gAgend)" dot={false}
-                activeDot={{ r: 5, fill: '#7c3aed', strokeWidth: 0 }} />
+                activeDot={{ r: 5, fill: '#7c3aed', strokeWidth: 0 }} isAnimationActive={false} />
               <Area type="monotone" dataKey="mensagens" name="Mensagens"
                 stroke="#0891b2" strokeWidth={2.5} fill="url(#gMsg)" dot={false}
-                activeDot={{ r: 5, fill: '#0891b2', strokeWidth: 0 }} />
+                activeDot={{ r: 5, fill: '#0891b2', strokeWidth: 0 }} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
         </CardContent>
@@ -235,6 +236,7 @@ export function Dashboard() {
                       cx="50%" cy="50%"
                       innerRadius={42} outerRadius={58}
                       dataKey="count" paddingAngle={3}
+                      isAnimationActive={false}
                     >
                       {(statusData?.itens ?? []).map((item) => (
                         <Cell key={item.status} fill={item.cor} />
@@ -290,7 +292,7 @@ export function Dashboard() {
                     )
                   }}
                 />
-                <Bar dataKey="agendamentos" radius={[6, 6, 0, 0]}>
+                <Bar dataKey="agendamentos" radius={[6, 6, 0, 0]} isAnimationActive={false}>
                   {semana.map((_, i) => (
                     <Cell key={i} fill={i === 0 || i === 6 ? '#e9d5ff' : '#7c3aed'} />
                   ))}
