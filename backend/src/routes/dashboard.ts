@@ -36,8 +36,13 @@ router.get('/metricas', async (_req, res) => {
     supabase.from('pacientes').select('*', { count: 'exact', head: true }).eq('status', 'cliente'),
   ])
 
-  const fat = (agendamentosConc ?? []).reduce((acc: number, a: { servicos: { preco: number } | null }) => acc + (a.servicos?.preco ?? 0), 0)
-  const fatAnt = (agendamentosConcAnt ?? []).reduce((acc: number, a: { servicos: { preco: number } | null }) => acc + (a.servicos?.preco ?? 0), 0)
+  type FaturamentoRow = { servicos: { preco: number }[] | null }
+
+  const somaPreco = (rows: FaturamentoRow[] | null) =>
+    (rows ?? []).reduce((acc, a) => acc + (a.servicos?.[0]?.preco ?? 0), 0)
+
+  const fat = somaPreco(agendamentosConc as FaturamentoRow[] | null)
+  const fatAnt = somaPreco(agendamentosConcAnt as FaturamentoRow[] | null)
 
   const delta = (atual: number, ant: number) =>
     ant === 0 ? null : Math.round(((atual - ant) / ant) * 100)
