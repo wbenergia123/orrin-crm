@@ -146,7 +146,7 @@ export function Dashboard() {
               </p>
             </CardContent>
             <div className="h-16">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <AreaChart data={card.spark} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id={`sg-${card.title}`} x1="0" y1="0" x2="0" y2="1">
@@ -185,7 +185,7 @@ export function Dashboard() {
           </div>
         </CardHeader>
         <CardContent className="px-2 pb-4">
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={240} minWidth={0}>
             <AreaChart data={grafico} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
               <defs>
                 <linearGradient id="gAgend" x1="0" y1="0" x2="0" y2="1">
@@ -229,7 +229,7 @@ export function Dashboard() {
           <CardContent className="px-5 pb-4">
             <div className="flex items-center gap-6">
               <div className="relative shrink-0" style={{ width: 130, height: 130 }}>
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <PieChart>
                     <Pie
                       data={statusData?.itens ?? []}
@@ -276,7 +276,7 @@ export function Dashboard() {
             <p className="text-xs text-gray-400">Distribuição semanal histórica</p>
           </CardHeader>
           <CardContent className="px-3 pb-4">
-            <ResponsiveContainer width="100%" height={160}>
+            <ResponsiveContainer width="100%" height={160} minWidth={0}>
               <BarChart data={semana} margin={{ top: 4, right: 8, left: -20, bottom: 0 }} barCategoryGap="35%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis dataKey="dia" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
