@@ -143,6 +143,38 @@ Veja em tempo real:
 
 ---
 
+
+
+## 🏥 Multi-tenancy (Isolamento entre Clínicas)
+
+Cada clínica acessa o CRM pelo próprio subdomínio (`https://clinica.orrin.com.br`) e só enxerga seus próprios dados.
+
+O isolamento acontece em duas camadas:
+
+1. **Autenticação / domínio:** o middleware `requireAuth` verifica se o `tenant_id` do usuário pertence à organização do subdomínio.
+2. **Queries filtradas:** todas as rotas da clínica filtram os dados por `tenant_id`.
+
+### Cadastrar uma nova clínica
+
+```sql
+-- 1. Criar organização
+INSERT INTO organizacoes (slug, nome)
+VALUES ('novaclinica', 'Nova Clínica');
+
+-- 2. Criar usuário admin vinculado à organização
+INSERT INTO usuarios (email, senha_hash, role, tenant_id)
+VALUES (
+  'admin@novaclinica.com',
+  crypt('senha123', gen_salt('bf')),
+  'admin',
+  (SELECT id FROM organizacoes WHERE slug = 'novaclinica')
+);
+```
+
+Acesse em: `https://novaclinica.orrin.com.br`
+
+---
+
 ## 📚 Documentação
 
 ### Docs técnicos (para IA e desenvolvedores)
