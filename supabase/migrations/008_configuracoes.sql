@@ -16,7 +16,7 @@ ALTER TABLE configuracoes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS configuracoes_tenant ON configuracoes;
 CREATE POLICY configuracoes_tenant ON configuracoes
   FOR ALL
-  USING (tenant_id = auth.jwt() ->> 'tenant_id'::text);
+  USING (tenant_id = (auth.jwt() ->> 'tenant_id')::UUID);
 
 CREATE INDEX IF NOT EXISTS idx_configuracoes_tenant_chave ON configuracoes(tenant_id, chave);
 
