@@ -1,52 +1,49 @@
-import { Router } from 'express'
+// backend/src/routes/auth.ts
+import { Router, Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
-import { z } from 'zod'
-import { supabase } from '../db/supabase'
-import { authMiddleware } from '../middleware/auth'
-import { JWTPayload } from '../types'
+import { supabaseAdmin } from '../services/supabase'
 
 const router = Router()
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  senha: z.string().min(6),
-})
-
-router.post('/login', async (req, res) => {
-  const parsed = loginSchema.safeParse(req.body)
-  if (!parsed.success) {
-    res.status(400).json({ error: 'Email ou senha inválidos' })
-    return
+router.post('/login', async (req: Request, res: Response) => {
+  const { email, senha } = req.body
+  if (!email || !senha) {
+    return res.status(400).json({ error: 'Email e senha são obrigatórios' })
   }
 
-  const { email, senha } = parsed.data
-
-  const { data: usuario, error } = await supabase
+  // Busca usuário pelo email
+  const { data: usuario, error } = await supabaseAdmin
     .from('usuarios')
-    .select('id, email, senha_hash, role')
-    .eq('email', email)
+    .select('id, email, senha_hash, role, tenant_id')
+    .eq('email', email.toLowerCase().trim())
     .single()
 
   if (error || !usuario) {
-    res.status(401).json({ error: 'Credenciais inválidas' })
-    return
+    return res.status(401).json({ error: 'Email ou senha inválidos' })
   }
 
+  // Verifica a senha
   const senhaValida = await bcrypt.compare(senha, usuario.senha_hash)
   if (!senhaValida) {
-    res.status(401).json({ error: 'Credenciais inválidas' })
-    return
+    return res.status(401).json({ error: 'Email ou senha inválidos' })
   }
 
-  const payload: JWTPayload = { sub: usuario.id, email: usuario.email, role: usuario.role }
-  const token = jwt.sign(payload, process.env.JWT_SECRET!, { expiresIn: '8h' })
+  // Gera JWT
+  const token = jwt.sign(
+    { sub: usuario.id, email: usuario.email, role: usuario.role, tenant_id: usuario.tenant_id },
+    process.env.JWT_SECRET!,
+    { expiresIn: '7d' }
+  )
 
-  res.json({ token, usuario: { id: usuario.id, email: usuario.email, role: usuario.role } })
+  res.json({
+    token,
+    usuario: { id: usuario.id, email: usuario.email, role: usuario.role },
+  })
 })
 
-router.get('/me', authMiddleware, (req, res) => {
-  res.json({ usuario: req.user })
+router.post('/register', async (req: Request, res: Response) => {
+  res.status(501).json({ error: 'Registro via API desativado. Use o painel admin.' })
 })
 
 export default router
