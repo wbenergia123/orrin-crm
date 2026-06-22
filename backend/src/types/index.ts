@@ -2,7 +2,7 @@
 
 export type StatusCliente = 'novo' | 'contato_feito' | 'reuniao_agendada' | 'cliente' | 'perdido'
 export type StatusReuniао = 'agendada' | 'confirmada' | 'cancelada' | 'realizada'
-export type RoleUsuario = 'admin' | 'vendedor' | 'super_admin'
+export type RoleUsuario = 'admin' | 'vendedor' | 'secretaria' | 'super_admin'
 export type TipoRemetente = 'agente' | 'humano'
 
 export interface Organizacao {
