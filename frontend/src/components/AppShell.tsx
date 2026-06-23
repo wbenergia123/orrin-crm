@@ -10,7 +10,10 @@ export function AppShell() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         {impersonatingOrg && (
-          <div className="bg-amber-500 text-white text-sm px-4 py-2 flex items-center justify-between shrink-0">
+          <div
+            role="status"
+            className="bg-amber-500 text-amber-950 text-sm px-4 py-2 flex items-center justify-between shrink-0"
+          >
             <span>
               Visualizando <strong>{impersonatingOrg.nome}</strong> · somente leitura
             </span>
