@@ -77,6 +77,7 @@ export function Admin() {
       })
       window.location.href = `https://${data.org.slug}.orrin.com.br/impersonar?${params}`
     },
+    onError: () => alert('Não foi possível entrar como essa clínica. Tente novamente.'),
   })
 
   if (usuario?.role !== 'super_admin') {
@@ -218,7 +219,7 @@ export function Admin() {
                               disabled={impersonando}
                               className="text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
                             >
-                              Entrar como
+                              {impersonando ? 'Entrando...' : 'Entrar como'}
                             </button>
                             <button
                               onClick={() => { setConfirmandoId(t.id); setConfirmTexto('') }}
