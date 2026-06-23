@@ -196,3 +196,27 @@ export interface FotoPaciente {
   legenda: string | null
   created_at: string
 }
+
+export interface FollowupRegra {
+  id: string
+  tenant_id: string
+  nome: string
+  gatilho: 'nao_respondeu' | 'lembrete_agendamento' | 'no_show'
+  delay_minutos: number | null
+  horario_fixo: string | null
+  template: string
+  ativo: boolean
+  ordem_prioridade: number
+  created_at: string
+  updated_at: string
+}
+
+export interface FollowupEnvio {
+  id: string
+  tenant_id: string
+  paciente_id: string
+  regra_id: string
+  agendamento_id: string | null
+  mensagem: string
+  enviado_em: string
+}

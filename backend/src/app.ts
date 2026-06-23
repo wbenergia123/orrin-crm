@@ -18,6 +18,7 @@ import atendimentosRouter from './routes/atendimentos'
 import dashboardRouter from './routes/dashboard'
 import whatsappRouter from './routes/whatsapp'
 import configuracoesRouter from './routes/configuracoes'
+import followupRouter from './routes/followup'
 import { requireAuth, requireTenant, requireSuperAdmin, blockWritesWhenImpersonating } from './middleware/auth'
 
 if (!process.env.JWT_SECRET) {
@@ -62,6 +63,7 @@ export function createApp() {
   app.use('/api/dashboard', requireAuth, blockWritesWhenImpersonating, dashboardRouter)
   app.use('/api/whatsapp', requireAuth, blockWritesWhenImpersonating, whatsappRouter)
   app.use('/api/configuracoes', requireAuth, blockWritesWhenImpersonating, configuracoesRouter)
+  app.use('/api/followup', requireAuth, blockWritesWhenImpersonating, requireTenant, followupRouter)
 
   // Rotas super admin
   app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)

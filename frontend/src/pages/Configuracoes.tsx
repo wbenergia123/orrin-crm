@@ -2,12 +2,22 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 
-type Aba = 'prompt' | 'whatsapp' | 'clinica'
+type Aba = 'prompt' | 'whatsapp' | 'clinica' | 'followup'
 
 interface Configuracao {
   chave: string
   valor: string
   updated_at: string
+}
+
+interface FollowupRegra {
+  id: string
+  nome: string
+  gatilho: string
+  delay_minutos: number | null
+  template: string
+  ativo: boolean
+  ordem_prioridade: number
 }
 
 interface WhatsappStatus {
@@ -37,6 +47,13 @@ function useWhatsappStatus() {
     queryKey: ['whatsapp-status'],
     queryFn: async () => (await api.get('/whatsapp/status')).data,
     refetchInterval: 10_000,
+  })
+}
+
+function useFollowupRegras() {
+  return useQuery<FollowupRegra[]>({
+    queryKey: ['followup-regras'],
+    queryFn: async () => (await api.get('/followup/regras')).data,
   })
 }
 
@@ -95,6 +112,27 @@ export function Configuracoes() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['configuracoes'] }),
   })
 
+  // Aba Follow-up
+  const { data: regras = [], isLoading: carregandoRegras } = useFollowupRegras()
+  const [regrasEditadas, setRegrasEditadas] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    const map: Record<string, string> = {}
+    regras.forEach((r) => { map[r.id] = r.template })
+    setRegrasEditadas(map)
+  }, [regras])
+
+  const salvarRegra = useMutation({
+    mutationFn: ({ id, template, ativo }: { id: string; template: string; ativo: boolean }) =>
+      api.patch(`/followup/regras/${id}`, { template, ativo }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['followup-regras'] }),
+  })
+
+  const toggleFollowupAtivo = useMutation({
+    mutationFn: (ativo: boolean) => api.patch('/configuracoes/followup_ativo', { valor: String(ativo) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['configuracoes'] }),
+  })
+
   // Aba WhatsApp
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [qrExpirado, setQrExpirado] = useState(false)
@@ -134,6 +172,7 @@ export function Configuracoes() {
           <button className={tabClass('prompt')} onClick={() => setAba('prompt')}>Prompt da Ana</button>
           <button className={tabClass('whatsapp')} onClick={() => setAba('whatsapp')}>WhatsApp</button>
           <button className={tabClass('clinica')} onClick={() => setAba('clinica')}>Clínica</button>
+          <button className={tabClass('followup')} onClick={() => setAba('followup')}>Follow-up</button>
         </div>
 
         <div className="p-6">
@@ -247,6 +286,65 @@ export function Configuracoes() {
               </button>
               {salvarClinica.isSuccess && (
                 <p className="text-xs text-green-600">Dados salvos com sucesso.</p>
+              )}
+            </div>
+          )}
+
+          {aba === 'followup' && (
+            <div className="space-y-6 max-w-2xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">Follow-up automático</p>
+                  <p className="text-xs text-gray-400">Dispara mensagens automáticas para pacientes</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={getValor(configs, 'followup_ativo') !== 'false'}
+                    onChange={(e) => toggleFollowupAtivo.mutate(e.target.checked)}
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600" />
+                </label>
+              </div>
+
+              {carregandoRegras ? (
+                <p className="text-sm text-gray-400">Carregando regras...</p>
+              ) : (
+                <div className="space-y-4">
+                  {regras.map((regra) => (
+                    <div key={regra.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-gray-800">{regra.nome}</p>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="sr-only peer"
+                            checked={regra.ativo}
+                            onChange={(e) => salvarRegra.mutate({ id: regra.id, template: regrasEditadas[regra.id] ?? regra.template, ativo: e.target.checked })}
+                          />
+                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600" />
+                        </label>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-1">Mensagem</p>
+                        <textarea
+                          className="w-full border border-gray-200 rounded-lg p-3 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-violet-500"
+                          rows={3}
+                          value={regrasEditadas[regra.id] ?? regra.template}
+                          onChange={(e) => setRegrasEditadas((prev) => ({ ...prev, [regra.id]: e.target.value }))}
+                        />
+                      </div>
+                      <button
+                        onClick={() => salvarRegra.mutate({ id: regra.id, template: regrasEditadas[regra.id] ?? regra.template, ativo: regra.ativo })}
+                        disabled={salvarRegra.isPending}
+                        className="bg-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                      >
+                        {salvarRegra.isPending ? 'Salvando...' : 'Salvar'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

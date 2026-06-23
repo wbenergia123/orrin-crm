@@ -43,6 +43,25 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       cliente = novo
     }
 
+    // Atualiza ou cria paciente da clínica (usado pelo follow-up automático)
+    const { data: pacienteExistente } = await supabaseAdmin
+      .from('pacientes')
+      .select('id')
+      .eq('telefone', telefone)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (pacienteExistente) {
+      await supabaseAdmin
+        .from('pacientes')
+        .update({ ultimo_contato_at: new Date().toISOString() })
+        .eq('id', pacienteExistente.id)
+    } else {
+      await supabaseAdmin
+        .from('pacientes')
+        .insert({ telefone, status: 'novo', tenant_id: tenantId, ultimo_contato_at: new Date().toISOString() })
+    }
+
     const resposta = await processarMensagemCliente(cliente.id, mensagem)
 
     await fetch(`${process.env.UAZAPI_URL}/send-message`, {
