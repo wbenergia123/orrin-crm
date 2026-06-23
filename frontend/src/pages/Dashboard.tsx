@@ -146,19 +146,23 @@ export function Dashboard() {
               </p>
             </CardContent>
             <div className="h-16 relative">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <AreaChart data={card.spark} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id={`sg-${card.title}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={card.color} stopOpacity={0.2} />
-                      <stop offset="100%" stopColor={card.color} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip content={<SparkTooltip />} />
-                  <Area type="monotone" dataKey="v" stroke={card.color} strokeWidth={2}
-                    fill={`url(#sg-${card.title})`} dot={false} isAnimationActive={false} />
-                </AreaChart>
-              </ResponsiveContainer>
+              {card.spark.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                  <AreaChart data={card.spark} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id={`sg-${card.title}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={card.color} stopOpacity={0.2} />
+                        <stop offset="100%" stopColor={card.color} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <Tooltip content={<SparkTooltip />} />
+                    <Area type="monotone" dataKey="v" stroke={card.color} strokeWidth={2}
+                      fill={`url(#sg-${card.title})`} dot={false} isAnimationActive={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full w-full bg-gray-50 rounded" />
+              )}
             </div>
           </Card>
         ))}
@@ -185,8 +189,9 @@ export function Dashboard() {
           </div>
         </CardHeader>
         <CardContent className="px-2 pb-4 relative">
-          <ResponsiveContainer width="100%" height={240} minWidth={0}>
-            <AreaChart data={grafico} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+          {grafico.length > 0 ? (
+            <ResponsiveContainer width="100%" height={240} minWidth={0}>
+              <AreaChart data={grafico} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
               <defs>
                 <linearGradient id="gAgend" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#7c3aed" stopOpacity={0.2} />
@@ -214,6 +219,11 @@ export function Dashboard() {
                 activeDot={{ r: 5, fill: '#0891b2', strokeWidth: 0 }} isAnimationActive={false} />
             </AreaChart>
           </ResponsiveContainer>
+          ) : (
+            <div className="h-[240px] bg-gray-50 rounded flex items-center justify-center text-xs text-gray-400">
+              Sem dados
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -229,21 +239,25 @@ export function Dashboard() {
           <CardContent className="px-5 pb-4">
             <div className="flex items-center gap-6">
               <div className="relative shrink-0" style={{ width: 130, height: 130 }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <PieChart>
-                    <Pie
-                      data={statusData?.itens ?? []}
-                      cx="50%" cy="50%"
-                      innerRadius={42} outerRadius={58}
-                      dataKey="count" paddingAngle={3}
-                      isAnimationActive={false}
-                    >
-                      {(statusData?.itens ?? []).map((item) => (
-                        <Cell key={item.status} fill={item.cor} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+                {(statusData?.itens.length ?? 0) > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                    <PieChart>
+                      <Pie
+                        data={statusData?.itens ?? []}
+                        cx="50%" cy="50%"
+                        innerRadius={42} outerRadius={58}
+                        dataKey="count" paddingAngle={3}
+                        isAnimationActive={false}
+                      >
+                        {(statusData?.itens ?? []).map((item) => (
+                          <Cell key={item.status} fill={item.cor} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full bg-gray-50 rounded-full" />
+                )}
                 {topStatus && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-lg font-bold text-gray-900">{topStatus.percentual}%</span>
@@ -276,8 +290,9 @@ export function Dashboard() {
             <p className="text-xs text-gray-400">Distribuição semanal histórica</p>
           </CardHeader>
           <CardContent className="px-3 pb-4 relative">
-            <ResponsiveContainer width="100%" height={160} minWidth={0}>
-              <BarChart data={semana} margin={{ top: 4, right: 8, left: -20, bottom: 0 }} barCategoryGap="35%">
+            {semana.length > 0 ? (
+              <ResponsiveContainer width="100%" height={160} minWidth={0}>
+                <BarChart data={semana} margin={{ top: 4, right: 8, left: -20, bottom: 0 }} barCategoryGap="35%">
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis dataKey="dia" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
@@ -299,6 +314,11 @@ export function Dashboard() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            ) : (
+              <div className="h-[160px] bg-gray-50 rounded flex items-center justify-center text-xs text-gray-400">
+                Sem dados
+              </div>
+            )}
           </CardContent>
         </Card>
 
