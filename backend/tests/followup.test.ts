@@ -130,7 +130,7 @@ describe('runFollowups', () => {
       .single()
     agendamentoId = ag!.id
 
-    await runFollowups(baseTime)
+    await runFollowups(baseTime, testTenantId)
 
     expect(receivedMessages.length).toBe(1)
     expect(receivedMessages[0].number).toBe('5511999990001')
@@ -160,7 +160,7 @@ describe('runFollowups', () => {
       .update({ ultimo_contato_at: ultimoContato.toISOString(), status: 'em_conversa' })
       .eq('id', pacienteId)
 
-    await runFollowups(baseTime)
+    await runFollowups(baseTime, testTenantId)
 
     expect(receivedMessages.length).toBe(1)
     expect(receivedMessages[0].text).toContain('Ainda tem interesse')
@@ -193,7 +193,7 @@ describe('runFollowups', () => {
       .select('id')
       .single()
 
-    await runFollowups(baseTime)
+    await runFollowups(baseTime, testTenantId)
 
     expect(receivedMessages.length).toBe(0)
 
@@ -219,7 +219,7 @@ describe('runFollowups', () => {
       .select('id')
       .single()
 
-    await runFollowups(baseTime)
+    await runFollowups(baseTime, testTenantId)
 
     expect(receivedMessages.length).toBe(1)
     expect(receivedMessages[0].text).toContain('não conseguiu vir')
@@ -247,7 +247,7 @@ describe('runFollowups', () => {
       .select('id')
       .single()
 
-    await runFollowups(baseTime)
+    await runFollowups(baseTime, testTenantId)
 
     expect(receivedMessages.length).toBe(0)
 

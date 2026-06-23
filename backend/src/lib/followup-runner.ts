@@ -225,12 +225,16 @@ async function processarRegra(tenantId: string, regra: FollowupRegra, agora: Dat
   }
 }
 
-export async function runFollowups(agora = new Date()) {
-  const { data: tenants } = await supabase
+export async function runFollowups(agora = new Date(), tenantId?: string) {
+  let query = supabase
     .from('organizacoes')
     .select('id')
     .eq('ativo', true)
     .is('deleted_at', null)
+
+  if (tenantId) query = query.eq('id', tenantId)
+
+  const { data: tenants } = await query
 
   for (const tenant of tenants ?? []) {
     const config = await loadTenantConfig(tenant.id)
