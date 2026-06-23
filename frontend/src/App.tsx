@@ -14,7 +14,18 @@ import { Configuracoes } from './pages/Configuracoes'
 import { Clientes } from './pages/Clientes'
 import { Admin } from './pages/Admin'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: (failureCount, error) => {
+        const status = (error as { response?: { status?: number } })?.response?.status
+        if (status === 401 || status === 403 || status === 404) return false
+        return failureCount < 3
+      },
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 export default function App() {
   return (
