@@ -10,15 +10,16 @@ interface MarkingEditorProps {
   onSave: (data: { product_id: string; quantity: number; unit: string; lot_id?: string }) => void
   onCancel: () => void
   initial?: { product_id?: string; quantity?: number; unit?: string; lot_id?: string }
+  lockedProduct?: Injetavel
 }
 
-export function MarkingEditor({ x, y, injetaveis, onSave, onCancel, initial }: MarkingEditorProps) {
-  const [product_id, setProductId] = useState(initial?.product_id ?? '')
+export function MarkingEditor({ x, y, injetaveis, onSave, onCancel, initial, lockedProduct }: MarkingEditorProps) {
+  const [product_id, setProductId] = useState(lockedProduct?.id ?? initial?.product_id ?? '')
   const [quantity, setQuantity] = useState(initial?.quantity?.toString() ?? '')
   const [lot_id, setLotId] = useState(initial?.lot_id ?? '')
   const ref = useRef<HTMLDivElement>(null)
 
-  const selectedProduct = injetaveis.find((p) => p.id === product_id)
+  const selectedProduct = lockedProduct ?? injetaveis.find((p) => p.id === product_id)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -52,20 +53,27 @@ export function MarkingEditor({ x, y, injetaveis, onSave, onCancel, initial }: M
         </button>
       </div>
       <form onSubmit={handleSubmit} className="space-y-3">
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Produto *</label>
-          <select
-            value={product_id}
-            onChange={(e) => setProductId(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
-            required
-          >
-            <option value="">Selecionar...</option>
-            {injetaveis.filter((p) => p.ativo).map((p) => (
-              <option key={p.id} value={p.id}>{p.nome} ({p.categoria})</option>
-            ))}
-          </select>
-        </div>
+        {lockedProduct ? (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: lockedProduct.cor_hex }} />
+            <span className="text-sm font-medium text-amber-800">{lockedProduct.nome}</span>
+          </div>
+        ) : (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Produto *</label>
+            <select
+              value={product_id}
+              onChange={(e) => setProductId(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+              required
+            >
+              <option value="">Selecionar...</option>
+              {injetaveis.filter((p) => p.ativo).map((p) => (
+                <option key={p.id} value={p.id}>{p.nome} ({p.categoria})</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-xs text-gray-500 mb-1">
             Quantidade {selectedProduct && `(${selectedProduct.unidade})`} *
@@ -74,6 +82,7 @@ export function MarkingEditor({ x, y, injetaveis, onSave, onCancel, initial }: M
             type="number"
             step="0.1"
             min="0"
+            autoFocus={!!lockedProduct}
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             placeholder="0"
@@ -81,16 +90,18 @@ export function MarkingEditor({ x, y, injetaveis, onSave, onCancel, initial }: M
             required
           />
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Lote (opcional)</label>
-          <input
-            type="text"
-            value={lot_id}
-            onChange={(e) => setLotId(e.target.value)}
-            placeholder="Ex: LOT-2026-001"
-            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
-          />
-        </div>
+        {!lockedProduct && (
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Lote (opcional)</label>
+            <input
+              type="text"
+              value={lot_id}
+              onChange={(e) => setLotId(e.target.value)}
+              placeholder="Ex: LOT-2026-001"
+              className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+            />
+          </div>
+        )}
         <div className="flex gap-2 pt-1">
           <button
             type="button"
