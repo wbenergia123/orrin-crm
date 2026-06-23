@@ -92,3 +92,86 @@ describe('DELETE /api/profissionais/:id', () => {
     expect(data?.ativo).toBe(false)
   })
 })
+
+describe('Foto do profissional', () => {
+  const email = 'sec_foto@clinica.com'
+  let tokenFoto: string
+  let hostTenant: string
+  let fotoProfissionalId: string
+
+  beforeAll(async () => {
+    const { data: org } = await supabase
+      .from('organizacoes')
+      .select('id, slug')
+      .eq('ativo', true)
+      .limit(1)
+      .single()
+    hostTenant = `${org!.slug}.orrin.com.br`
+
+    const hash = await bcrypt.hash('senha123', 10)
+    await supabase.from('usuarios').upsert(
+      { email, senha_hash: hash, role: 'secretaria', tenant_id: org!.id },
+      { onConflict: 'email' }
+    )
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email, senha: 'senha123' })
+    tokenFoto = loginRes.body.token
+
+    const { data: prof } = await supabase
+      .from('profissionais')
+      .insert({ nome: 'Foto Teste', tenant_id: org!.id })
+      .select()
+      .single()
+    fotoProfissionalId = prof!.id
+  })
+
+  afterAll(async () => {
+    await supabase.from('profissionais').delete().eq('id', fotoProfissionalId)
+  })
+
+  it('envia uma foto e retorna foto_url preenchido', async () => {
+    const res = await request(app)
+      .post(`/api/profissionais/${fotoProfissionalId}/foto`)
+      .set('Authorization', `Bearer ${tokenFoto}`)
+      .set('Host', hostTenant)
+      .attach('foto', Buffer.from([0xff, 0xd8, 0xff, 0xd9]), { filename: 'teste.jpg', contentType: 'image/jpeg' })
+    expect(res.status).toBe(200)
+    expect(res.body.foto_url).toContain('fotos-profissionais')
+  })
+
+  it('retorna 400 sem arquivo', async () => {
+    const res = await request(app)
+      .post(`/api/profissionais/${fotoProfissionalId}/foto`)
+      .set('Authorization', `Bearer ${tokenFoto}`)
+      .set('Host', hostTenant)
+    expect(res.status).toBe(400)
+  })
+
+  it('retorna 400 com mimetype inválido', async () => {
+    const res = await request(app)
+      .post(`/api/profissionais/${fotoProfissionalId}/foto`)
+      .set('Authorization', `Bearer ${tokenFoto}`)
+      .set('Host', hostTenant)
+      .attach('foto', Buffer.from('conteudo qualquer'), { filename: 'teste.txt', contentType: 'text/plain' })
+    expect(res.status).toBe(400)
+  })
+
+  it('retorna 404 com id inexistente', async () => {
+    const res = await request(app)
+      .post('/api/profissionais/00000000-0000-0000-0000-000000000000/foto')
+      .set('Authorization', `Bearer ${tokenFoto}`)
+      .set('Host', hostTenant)
+      .attach('foto', Buffer.from([0xff, 0xd8, 0xff, 0xd9]), { filename: 'teste.jpg', contentType: 'image/jpeg' })
+    expect(res.status).toBe(404)
+  })
+
+  it('remove a foto e volta foto_url para null', async () => {
+    const res = await request(app)
+      .delete(`/api/profissionais/${fotoProfissionalId}/foto`)
+      .set('Authorization', `Bearer ${tokenFoto}`)
+      .set('Host', hostTenant)
+    expect(res.status).toBe(200)
+    expect(res.body.foto_url).toBeNull()
+  })
+})
