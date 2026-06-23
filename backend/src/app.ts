@@ -1,7 +1,7 @@
 // backend/src/app.ts
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
-import dotenv from 'dotenv'
 import clientesRouter from './routes/clientes'
 import reunioesRouter from './routes/reunioes'
 import webhookRouter from './routes/webhook'
@@ -19,8 +19,6 @@ import dashboardRouter from './routes/dashboard'
 import whatsappRouter from './routes/whatsapp'
 import configuracoesRouter from './routes/configuracoes'
 import { requireAuth, requireSuperAdmin } from './middleware/auth'
-
-dotenv.config()
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET é obrigatório. Defina a variável no .env ou no painel do host.')
