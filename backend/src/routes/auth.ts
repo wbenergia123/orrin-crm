@@ -33,6 +33,18 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Usuário desativado. Entre em contato com o suporte.' })
   }
 
+  if (usuario.role !== 'super_admin' && usuario.tenant_id) {
+    const { data: org } = await supabaseAdmin
+      .from('organizacoes')
+      .select('ativo')
+      .eq('id', usuario.tenant_id)
+      .single()
+
+    if (!org || !org.ativo) {
+      return res.status(401).json({ error: 'Esta clínica está desativada. Entre em contato com o suporte.' })
+    }
+  }
+
   // Gera JWT
   const token = jwt.sign(
     { sub: usuario.id, email: usuario.email, role: usuario.role, tenant_id: usuario.tenant_id },

@@ -1,5 +1,5 @@
 // tests/auth.test.ts
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import bcrypt from 'bcrypt'
 import { createApp } from '../src/app'
@@ -49,6 +49,40 @@ describe('POST /api/auth/login', () => {
       .send({ email: 'inativo@clinica.com', senha: 'senha123' })
     expect(res.status).toBe(401)
     expect(res.body.error).toMatch(/inativo|desativado/i)
+  })
+})
+
+describe('POST /api/auth/login - clínica desativada', () => {
+  let orgId: string
+
+  beforeAll(async () => {
+    const { data: org } = await supabase
+      .from('organizacoes')
+      .insert({ slug: `auth-test-${Date.now()}`, nome: 'Org Teste Auth', ativo: false })
+      .select()
+      .single()
+    orgId = org!.id
+
+    const senhaHash = await bcrypt.hash('senha123', 10)
+    await supabase
+      .from('usuarios')
+      .upsert(
+        { email: 'clinica-desativada@clinica.com', senha_hash: senhaHash, role: 'admin', tenant_id: orgId },
+        { onConflict: 'email' }
+      )
+  })
+
+  afterAll(async () => {
+    await supabase.from('usuarios').delete().eq('tenant_id', orgId)
+    await supabase.from('organizacoes').delete().eq('id', orgId)
+  })
+
+  it('retorna 401 quando a clínica do usuário está desativada', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'clinica-desativada@clinica.com', senha: 'senha123' })
+    expect(res.status).toBe(401)
+    expect(res.body.error).toMatch(/clínica|desativad/i)
   })
 })
 
