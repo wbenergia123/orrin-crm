@@ -1,6 +1,7 @@
 // backend/src/routes/admin.ts
 import { Router, Request, Response } from 'express'
 import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../services/supabase'
 import { validarSlug } from '../lib/slug'
 import { logAdminAction } from '../middleware/auth'
@@ -120,6 +121,40 @@ router.post('/tenants/:id/cancel', async (req: Request, res: Response) => {
   await logAdminAction(req.user!.id, 'cancel_org', id)
 
   res.json({ org })
+})
+
+router.post('/tenants/:id/impersonate', async (req: Request, res: Response) => {
+  const { id } = req.params
+
+  const { data: org, error } = await supabaseAdmin
+    .from('organizacoes')
+    .select('id, slug, nome, ativo')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .single()
+
+  if (error || !org) {
+    return res.status(404).json({ error: 'Clínica não encontrada' })
+  }
+
+  const token = jwt.sign(
+    {
+      sub: req.user!.id,
+      email: req.user!.email,
+      role: 'super_admin',
+      tenant_id: null,
+      impersonate_tenant_id: org.id,
+    },
+    process.env.JWT_SECRET!,
+    { expiresIn: '1h' }
+  )
+
+  await logAdminAction(req.user!.id, 'impersonate_org', org.id)
+
+  res.json({
+    token,
+    org: { id: org.id, slug: org.slug, nome: org.nome },
+  })
 })
 
 export default router

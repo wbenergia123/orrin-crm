@@ -79,3 +79,73 @@ describe('POST /api/admin/tenants/:id/cancel', () => {
     await supabase.from('usuarios').delete().eq('email', 'admin.teste@orrin.com')
   })
 })
+
+describe('POST /api/admin/tenants/:id/impersonate', () => {
+  let impersonateOrgId: string
+  let impersonateOrgSlug: string
+
+  beforeAll(async () => {
+    const slug = `clinica-impersonate-test-${Date.now()}`
+    const { data: org } = await supabase
+      .from('organizacoes')
+      .insert({ slug, nome: 'Clínica Impersonate Test' })
+      .select('id, slug')
+      .single()
+    impersonateOrgId = org!.id
+    impersonateOrgSlug = org!.slug
+
+    await supabase
+      .from('profissionais')
+      .insert({ nome: 'Profissional Impersonate', tenant_id: impersonateOrgId })
+  })
+
+  afterAll(async () => {
+    await supabase.from('profissionais').delete().eq('tenant_id', impersonateOrgId)
+    await supabase.from('organizacoes').delete().eq('id', impersonateOrgId)
+  })
+
+  it('retorna um token de impersonacao para super_admin', async () => {
+    const res = await request(app)
+      .post(`/api/admin/tenants/${impersonateOrgId}/impersonate`)
+      .set('Authorization', `Bearer ${superToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body.token).toBeDefined()
+    expect(res.body.org.id).toBe(impersonateOrgId)
+  })
+
+  it('retorna 404 com id inexistente', async () => {
+    const res = await request(app)
+      .post('/api/admin/tenants/00000000-0000-0000-0000-000000000000/impersonate')
+      .set('Authorization', `Bearer ${superToken}`)
+    expect(res.status).toBe(404)
+  })
+
+  it('o token de impersonacao acessa dados reais da clinica', async () => {
+    const impersonateRes = await request(app)
+      .post(`/api/admin/tenants/${impersonateOrgId}/impersonate`)
+      .set('Authorization', `Bearer ${superToken}`)
+    const impersonateToken = impersonateRes.body.token
+
+    const res = await request(app)
+      .get('/api/profissionais')
+      .set('Authorization', `Bearer ${impersonateToken}`)
+      .set('Host', `${impersonateOrgSlug}.orrin.com.br`)
+    expect(res.status).toBe(200)
+    expect(res.body.length).toBeGreaterThan(0)
+    expect(res.body[0].nome).toBe('Profissional Impersonate')
+  })
+
+  it('bloqueia escrita (POST) durante impersonacao', async () => {
+    const impersonateRes = await request(app)
+      .post(`/api/admin/tenants/${impersonateOrgId}/impersonate`)
+      .set('Authorization', `Bearer ${superToken}`)
+    const impersonateToken = impersonateRes.body.token
+
+    const res = await request(app)
+      .post('/api/profissionais')
+      .set('Authorization', `Bearer ${impersonateToken}`)
+      .set('Host', `${impersonateOrgSlug}.orrin.com.br`)
+      .send({ nome: 'Tentativa de escrita' })
+    expect(res.status).toBe(403)
+  })
+})
