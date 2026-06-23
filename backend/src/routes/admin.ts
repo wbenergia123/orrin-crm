@@ -80,13 +80,9 @@ router.patch('/tenants/:id', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Campo ativo (boolean) é obrigatório' })
   }
 
-  const updateData: any = { ativo }
-  if (!ativo) updateData.deleted_at = new Date().toISOString()
-  else updateData.deleted_at = null
-
   const { data, error } = await supabaseAdmin
     .from('organizacoes')
-    .update(updateData)
+    .update({ ativo })
     .eq('id', id)
     .select()
     .single()
