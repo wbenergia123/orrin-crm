@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Pencil, ToggleLeft, ToggleRight, Camera } from 'lucide-react'
+import { getAvatarUrl, getAvatarFallback } from '../lib/avatar'
 import { api } from '../api/client'
 import type { Profissional } from '../types'
 import { Button } from '@/components/ui/button'
@@ -9,6 +10,85 @@ import { Label } from '@/components/ui/label'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog'
+
+function FotoProfissional({ profissional }: { profissional: Profissional }) {
+  const qc = useQueryClient()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const { mutate: enviarFoto, isPending: enviando } = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('foto', file)
+      return api.post(`/profissionais/${profissional.id}/foto`, form)
+    },
+    onSuccess: () => {
+      setErro(null)
+      qc.invalidateQueries({ queryKey: ['profissionais'] })
+      qc.invalidateQueries({ queryKey: ['profissionais-todos'] })
+    },
+    onError: () => setErro('Não foi possível enviar a foto. Tente novamente.'),
+  })
+
+  const { mutate: removerFoto, isPending: removendo } = useMutation({
+    mutationFn: () => api.delete(`/profissionais/${profissional.id}/foto`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['profissionais'] })
+      qc.invalidateQueries({ queryKey: ['profissionais-todos'] })
+    },
+  })
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      setErro('Arquivo muito grande (máx. 5MB)')
+      return
+    }
+    enviarFoto(file)
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2 pb-2">
+      <div className="relative">
+        <img
+          src={getAvatarUrl(profissional)}
+          onError={(e) => { e.currentTarget.src = getAvatarFallback(profissional.nome) }}
+          alt={profissional.nome}
+          className="w-20 h-20 rounded-full object-cover border border-gray-100"
+        />
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={enviando}
+          className="absolute -bottom-1 -right-1 bg-violet-600 text-white rounded-full p-1.5 hover:bg-violet-700 disabled:opacity-50"
+          title="Trocar foto"
+        >
+          <Camera size={14} />
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+      </div>
+      {profissional.foto_url && (
+        <button
+          type="button"
+          onClick={() => removerFoto()}
+          disabled={removendo}
+          className="text-xs text-gray-400 hover:text-red-500"
+        >
+          Remover foto
+        </button>
+      )}
+      {erro && <p className="text-xs text-red-500">{erro}</p>}
+    </div>
+  )
+}
 
 function ProfissionalDialog({
   profissional,
@@ -34,6 +114,7 @@ function ProfissionalDialog({
 
   return (
     <div className="space-y-4 pt-2">
+      {profissional && <FotoProfissional profissional={profissional} />}
       <div className="space-y-1">
         <Label>Nome do profissional</Label>
         <Input
