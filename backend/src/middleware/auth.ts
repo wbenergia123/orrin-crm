@@ -7,7 +7,7 @@ import { JWTPayload } from '../types'
 declare global {
   namespace Express {
     interface Request {
-      user?: JWTPayload & { id: string }
+      user?: JWTPayload & { id: string; impersonating?: boolean }
     }
   }
 }
@@ -39,9 +39,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   // Verifica o JWT gerado pela rota /api/auth/login
-  let payload: JWTPayload & { sub: string }
+  let payload: JWTPayload & { sub: string; impersonate_tenant_id?: string }
   try {
-    payload = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload & { sub: string }
+    payload = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload & { sub: string; impersonate_tenant_id?: string }
   } catch {
     return res.status(401).json({ error: 'Token inválido ou expirado' })
   }
@@ -53,12 +53,19 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     .eq('id', payload.sub)
     .single()
 
+  // A claim de impersonação só é honrada se o papel REAL (do banco) for super_admin —
+  // nunca confia em payload.role pra essa decisão.
+  const realRole = userData?.role || payload.role
+  const realTenantId = userData?.tenant_id ?? payload.tenant_id
+  const impersonating = realRole === 'super_admin' && !!payload.impersonate_tenant_id
+
   const user = {
     id: payload.sub,
     sub: payload.sub,
     email: payload.email,
-    role: userData?.role || payload.role,
-    tenant_id: userData?.tenant_id ?? payload.tenant_id,
+    role: impersonating ? 'admin' : realRole,
+    tenant_id: impersonating ? payload.impersonate_tenant_id! : realTenantId,
+    impersonating,
   }
 
   if (user.role === 'super_admin') {
@@ -90,6 +97,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 export function requireTenant(req: Request, res: Response, next: NextFunction) {
   if (!req.user?.tenant_id) {
     return res.json([])
+  }
+  next()
+}
+
+// Modo somente leitura: qualquer escrita durante impersonação é bloqueada.
+export function blockWritesWhenImpersonating(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.impersonating && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Modo somente leitura — você está visualizando como esta clínica.' })
   }
   next()
 }
