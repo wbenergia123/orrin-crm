@@ -126,6 +126,9 @@ router.post('/tenants/:id/cancel', async (req: Request, res: Response) => {
 router.post('/tenants/:id/impersonate', async (req: Request, res: Response) => {
   const { id } = req.params
 
+  // ativo não é checado aqui de propósito: se a clínica estiver desativada, o token
+  // ainda é emitido, mas o 403 de "Organização não disponível" já acontece em
+  // requireAuth na primeira request real (mesma checagem usada pra qualquer usuário).
   const { data: org, error } = await supabaseAdmin
     .from('organizacoes')
     .select('id, slug, nome, ativo')
@@ -137,6 +140,8 @@ router.post('/tenants/:id/impersonate', async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Clínica não encontrada' })
   }
 
+  // tenant_id fica null: o tenant efetivo durante a impersonação vem da claim
+  // impersonate_tenant_id, resolvida em requireAuth — não trocar esse null por org.id.
   const token = jwt.sign(
     {
       sub: req.user!.id,
