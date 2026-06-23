@@ -66,6 +66,19 @@ export function Admin() {
     },
   })
 
+  const { mutate: impersonar, isPending: impersonando } = useMutation({
+    mutationFn: (id: string) => api.post(`/admin/tenants/${id}/impersonate`).then((r) => r.data),
+    onSuccess: (data) => {
+      const params = new URLSearchParams({
+        token: data.token,
+        org_id: data.org.id,
+        org_slug: data.org.slug,
+        org_nome: data.org.nome,
+      })
+      window.location.href = `https://${data.org.slug}.orrin.com.br/impersonar?${params}`
+    },
+  })
+
   if (usuario?.role !== 'super_admin') {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-500">
@@ -199,13 +212,22 @@ export function Admin() {
                           {t.ativo ? 'Desativar' : 'Ativar'}
                         </button>
                         {t.ativo && (
-                          <button
-                            onClick={() => { setConfirmandoId(t.id); setConfirmTexto('') }}
-                            className="text-red-400 hover:text-red-600"
-                            title="Cancelar clínica"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => impersonar(t.id)}
+                              disabled={impersonando}
+                              className="text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
+                            >
+                              Entrar como
+                            </button>
+                            <button
+                              onClick={() => { setConfirmandoId(t.id); setConfirmTexto('') }}
+                              className="text-red-400 hover:text-red-600"
+                              title="Cancelar clínica"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </>
                         )}
                       </>
                     )}
