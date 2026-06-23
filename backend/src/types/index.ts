@@ -194,6 +194,7 @@ export interface FotoPaciente {
   url: string
   tipo: 'antes' | 'depois' | 'geral'
   legenda: string | null
+  visit_id: string | null
   created_at: string
 }
 
