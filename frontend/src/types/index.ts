@@ -25,6 +25,7 @@ export interface Profissional {
   id: string
   nome: string
   ativo: boolean
+  foto_url: string | null
 }
 
 export interface Agendamento {
