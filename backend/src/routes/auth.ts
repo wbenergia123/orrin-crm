@@ -15,7 +15,7 @@ router.post('/login', async (req: Request, res: Response) => {
   // Busca usuário pelo email
   const { data: usuario, error } = await supabaseAdmin
     .from('usuarios')
-    .select('id, email, senha_hash, role, tenant_id')
+    .select('id, email, senha_hash, role, tenant_id, ativo')
     .eq('email', email.toLowerCase().trim())
     .single()
 
@@ -29,6 +29,10 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Email ou senha inválidos' })
   }
 
+  if (usuario.ativo === false) {
+    return res.status(401).json({ error: 'Usuário desativado. Entre em contato com o suporte.' })
+  }
+
   // Gera JWT
   const token = jwt.sign(
     { sub: usuario.id, email: usuario.email, role: usuario.role, tenant_id: usuario.tenant_id },
@@ -40,6 +44,30 @@ router.post('/login', async (req: Request, res: Response) => {
     token,
     usuario: { id: usuario.id, email: usuario.email, role: usuario.role },
   })
+})
+
+router.get('/me', async (req: Request, res: Response) => {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token) {
+    return res.status(401).json({ error: 'Token ausente' })
+  }
+
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET!) as { sub: string; email: string; role: string }
+    const { data: usuario } = await supabaseAdmin
+      .from('usuarios')
+      .select('id, email, role, tenant_id, ativo')
+      .eq('id', payload.sub)
+      .single()
+
+    if (!usuario || !usuario.ativo) {
+      return res.status(401).json({ error: 'Usuário inválido ou desativado' })
+    }
+
+    res.json({ usuario })
+  } catch {
+    res.status(401).json({ error: 'Token inválido ou expirado' })
+  }
 })
 
 router.post('/register', async (req: Request, res: Response) => {

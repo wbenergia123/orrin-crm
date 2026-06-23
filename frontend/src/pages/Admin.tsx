@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Building2, Plus, CheckCircle2, XCircle } from 'lucide-react'
+import { Building2, Plus, CheckCircle2, XCircle, Trash2 } from 'lucide-react'
 
 interface Tenant {
   id: string
@@ -52,6 +52,11 @@ export function Admin() {
   const { mutate: toggle } = useMutation({
     mutationFn: ({ id, ativo }: { id: string; ativo: boolean }) =>
       api.patch(`/admin/tenants/${id}`, { ativo }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-tenants'] }),
+  })
+
+  const { mutate: cancelar, isPending: cancelando } = useMutation({
+    mutationFn: (id: string) => api.post(`/admin/tenants/${id}/cancel`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-tenants'] }),
   })
 
@@ -144,29 +149,45 @@ export function Admin() {
           ) : (
             <div className="divide-y divide-gray-100">
               {tenants.map((t) => (
-                <div key={t.id} className="py-3 flex items-center justify-between">
+                <div key={t.id} className="py-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="font-medium text-gray-800">{t.nome}</p>
                     <p className="text-xs text-gray-400">
                       {t.slug}.orrin.com.br · {new Date(t.created_at).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
-                  <button
-                    onClick={() => toggle({ id: t.id, ativo: !t.ativo })}
-                    className="flex items-center gap-1 text-xs font-medium"
-                  >
-                    {t.ativo ? (
-                      <>
-                        <CheckCircle2 size={14} className="text-emerald-500" />
-                        <span className="text-emerald-600">Ativa</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle size={14} className="text-red-400" />
-                        <span className="text-red-500">Inativa</span>
-                      </>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggle({ id: t.id, ativo: !t.ativo })}
+                      className="flex items-center gap-1 text-xs font-medium"
+                    >
+                      {t.ativo ? (
+                        <>
+                          <CheckCircle2 size={14} className="text-emerald-500" />
+                          <span className="text-emerald-600">Ativa</span>
+                        </>
+                      ) : (
+                        <>
+                          <XCircle size={14} className="text-red-400" />
+                          <span className="text-red-500">Inativa</span>
+                        </>
+                      )}
+                    </button>
+                    {t.ativo && (
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Cancelar a clínica "${t.nome}"? Isso bloqueia o login de todos os usuários dela.`)) {
+                            cancelar(t.id)
+                          }
+                        }}
+                        disabled={cancelando}
+                        className="text-red-400 hover:text-red-600 disabled:opacity-50"
+                        title="Cancelar clínica"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </div>
               ))}
             </div>

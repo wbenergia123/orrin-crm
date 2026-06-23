@@ -98,4 +98,32 @@ router.patch('/tenants/:id', async (req: Request, res: Response) => {
   res.json(data)
 })
 
+router.post('/tenants/:id/cancel', async (req: Request, res: Response) => {
+  const { id } = req.params
+
+  const { data: org, error: orgError } = await supabaseAdmin
+    .from('organizacoes')
+    .update({ ativo: false, deleted_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (orgError) {
+    return res.status(400).json({ error: orgError.message })
+  }
+
+  const { error: userError } = await supabaseAdmin
+    .from('usuarios')
+    .update({ ativo: false })
+    .eq('tenant_id', id)
+
+  if (userError) {
+    return res.status(400).json({ error: userError.message })
+  }
+
+  await logAdminAction(req.user!.id, 'cancel_org', id)
+
+  res.json({ org })
+})
+
 export default router

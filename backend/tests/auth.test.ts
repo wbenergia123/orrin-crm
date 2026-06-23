@@ -37,6 +37,19 @@ describe('POST /api/auth/login', () => {
       .send({ email: 'naoexiste@clinica.com', senha: 'senha123' })
     expect(res.status).toBe(401)
   })
+
+  it('retorna 401 quando o usuario esta inativo', async () => {
+    const senhaHash = await bcrypt.hash('senha123', 10)
+    await supabase
+      .from('usuarios')
+      .upsert({ email: 'inativo@clinica.com', senha_hash: senhaHash, role: 'admin', ativo: false }, { onConflict: 'email' })
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'inativo@clinica.com', senha: 'senha123' })
+    expect(res.status).toBe(401)
+    expect(res.body.error).toMatch(/inativo|desativado/i)
+  })
 })
 
 describe('GET /api/auth/me', () => {
