@@ -11,6 +11,7 @@ let agendamentoId: string
 let lembreteRegraId: string
 let naoRespondeuRegraId: string
 let noShowRegraId: string
+let lembreteDiaRegraId: string
 
 let receivedMessages: { number: string; text: string }[] = []
 let serverUrl: string
@@ -96,12 +97,14 @@ beforeAll(async () => {
     { tenant_id: testTenantId, nome: 'Lembrete 24h', gatilho: 'lembrete_agendamento', delay_minutos: 24 * 60, template: 'Oi [nome], amanhã você tem [servico] às [hora]. Confirma?', ativo: true, ordem_prioridade: 10 },
     { tenant_id: testTenantId, nome: 'Não respondeu', gatilho: 'nao_respondeu', delay_minutos: 60, template: 'Oi [nome], vi que você entrou em contato. Ainda tem interesse?', ativo: true, ordem_prioridade: 5 },
     { tenant_id: testTenantId, nome: 'No-show', gatilho: 'no_show', delay_minutos: 30, template: 'Oi [nome], vi que não conseguiu vir. Quer remarcar?', ativo: true, ordem_prioridade: 8 },
+    { tenant_id: testTenantId, nome: 'Lembrete do dia', gatilho: 'lembrete_dia', horario_fixo: '10:00', template: 'Oi [nome], hoje você tem [servico] às [hora] com [profissional]. Te esperamos!', ativo: true, ordem_prioridade: 12 },
   ]
   const { data: insertedRules } = await supabase.from('followup_regras').insert(rules).select('id,gatilho')
   const ruleMap = Object.fromEntries(insertedRules!.map((r) => [r.gatilho, r.id]))
   lembreteRegraId = ruleMap['lembrete_agendamento']
   naoRespondeuRegraId = ruleMap['nao_respondeu']
   noShowRegraId = ruleMap['no_show']
+  lembreteDiaRegraId = ruleMap['lembrete_dia']
 })
 
 afterAll(async () => {
@@ -233,6 +236,95 @@ describe('runFollowups', () => {
 
     const baseTime = new Date('2026-06-24T04:00:00-03:00')
     const dataHora = new Date(baseTime.getTime() + 24 * 60 * 60 * 1000)
+
+    const { data: ag } = await supabase
+      .from('agendamentos')
+      .insert({
+        tenant_id: testTenantId,
+        paciente_id: pacienteId,
+        servico_id: servicoId,
+        profissional_id: profissionalId,
+        data_hora: dataHora.toISOString(),
+        status: 'confirmado',
+      })
+      .select('id')
+      .single()
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(0)
+
+    await supabase.from('agendamentos').delete().eq('id', ag!.id)
+  })
+
+  it('envia lembrete do dia quando já passou do horário fixo e o agendamento de hoje ainda não aconteceu', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T10:30:00-03:00')
+    const dataHora = new Date('2026-06-24T14:00:00-03:00')
+
+    const { data: ag } = await supabase
+      .from('agendamentos')
+      .insert({
+        tenant_id: testTenantId,
+        paciente_id: pacienteId,
+        servico_id: servicoId,
+        profissional_id: profissionalId,
+        data_hora: dataHora.toISOString(),
+        status: 'confirmado',
+      })
+      .select('id')
+      .single()
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(1)
+    expect(receivedMessages[0].text).toContain('hoje você tem')
+    expect(receivedMessages[0].text).toContain('Limpeza de Pele')
+    expect(receivedMessages[0].text).toContain('Dra. Teste')
+
+    const { data: envios } = await supabase
+      .from('followup_envios')
+      .select('*')
+      .eq('tenant_id', testTenantId)
+    expect(envios?.length).toBe(1)
+    expect(envios?.[0].regra_id).toBe(lembreteDiaRegraId)
+
+    await supabase.from('followup_envios').delete().eq('tenant_id', testTenantId)
+    await supabase.from('agendamentos').delete().eq('id', ag!.id)
+  })
+
+  it('não envia lembrete do dia antes do horário fixo configurado', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T09:00:00-03:00')
+    const dataHora = new Date('2026-06-24T14:00:00-03:00')
+
+    const { data: ag } = await supabase
+      .from('agendamentos')
+      .insert({
+        tenant_id: testTenantId,
+        paciente_id: pacienteId,
+        servico_id: servicoId,
+        profissional_id: profissionalId,
+        data_hora: dataHora.toISOString(),
+        status: 'confirmado',
+      })
+      .select('id')
+      .single()
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(0)
+
+    await supabase.from('agendamentos').delete().eq('id', ag!.id)
+  })
+
+  it('não envia lembrete do dia se o agendamento de hoje já aconteceu', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T10:30:00-03:00')
+    const dataHora = new Date('2026-06-24T08:00:00-03:00')
 
     const { data: ag } = await supabase
       .from('agendamentos')

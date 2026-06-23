@@ -205,6 +205,47 @@ async function processarNoShow(tenantId: string, regra: FollowupRegra, agora: Da
   }
 }
 
+async function processarLembreteDia(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
+  const horaAtual = new Intl.DateTimeFormat('en-GB', {
+    timeZone: config.timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(agora)
+
+  const horarioFixo = (regra.horario_fixo ?? '08:00').substring(0, 5)
+  if (horaAtual < horarioFixo) return
+
+  const hojeStr = new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone }).format(agora)
+
+  const { data: agendamentos } = await supabase
+    .from('agendamentos')
+    .select('*, paciente:pacientes(*), servico:servicos(*), profissional:profissionais(*)')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'confirmado')
+    .gte('data_hora', `${hojeStr}T00:00:00-03:00`)
+    .lte('data_hora', `${hojeStr}T23:59:59-03:00`)
+    .gt('data_hora', agora.toISOString())
+
+  for (const ag of agendamentos ?? []) {
+    const paciente = (ag as any).paciente
+    const servico = (ag as any).servico
+    const profissional = (ag as any).profissional
+    if (!paciente) continue
+
+    const desdeRegra = new Date(agora.getTime() - 24 * 60 * 60 * 1000)
+    if (await jaEnviou(regra.id, paciente.id, ag.id, desdeRegra)) continue
+
+    const { hora } = formatDateTime(ag.data_hora, config.timezone)
+    await enviar(tenantId, regra, paciente, ag, {
+      nome: paciente.nome || 'tudo bem',
+      servico: servico?.nome || 'seu procedimento',
+      profissional: profissional?.nome || 'nossa equipe',
+      hora,
+    }, agora)
+  }
+}
+
 async function processarRegra(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
   try {
     switch (regra.gatilho) {
@@ -216,6 +257,9 @@ async function processarRegra(tenantId: string, regra: FollowupRegra, agora: Dat
         break
       case 'no_show':
         await processarNoShow(tenantId, regra, agora, config)
+        break
+      case 'lembrete_dia':
+        await processarLembreteDia(tenantId, regra, agora, config)
         break
       default:
         console.warn('[followup] Gatilho desconhecido:', regra.gatilho)
