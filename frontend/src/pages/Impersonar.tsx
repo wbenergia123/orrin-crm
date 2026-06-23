@@ -20,6 +20,8 @@ export function Impersonar() {
 
     login(token, { id: 'impersonating', email: '', role: 'admin' }, { id: orgId, slug: orgSlug, nome: orgNome })
     navigate('/dashboard', { replace: true })
+    // login/navigate são estáveis e params só precisa ser lido uma vez, no mount —
+    // rodar de novo a cada render re-disparia o handoff sem necessidade.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
