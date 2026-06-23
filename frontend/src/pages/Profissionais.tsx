@@ -15,6 +15,7 @@ function FotoProfissional({ profissional }: { profissional: Profissional }) {
   const qc = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [fotoUrl, setFotoUrl] = useState(profissional.foto_url)
 
   const { mutate: enviarFoto, isPending: enviando } = useMutation({
     mutationFn: (file: File) => {
@@ -22,8 +23,9 @@ function FotoProfissional({ profissional }: { profissional: Profissional }) {
       form.append('foto', file)
       return api.post(`/profissionais/${profissional.id}/foto`, form)
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       setErro(null)
+      setFotoUrl(res.data.foto_url)
       qc.invalidateQueries({ queryKey: ['profissionais'] })
       qc.invalidateQueries({ queryKey: ['profissionais-todos'] })
     },
@@ -33,9 +35,11 @@ function FotoProfissional({ profissional }: { profissional: Profissional }) {
   const { mutate: removerFoto, isPending: removendo } = useMutation({
     mutationFn: () => api.delete(`/profissionais/${profissional.id}/foto`),
     onSuccess: () => {
+      setFotoUrl(null)
       qc.invalidateQueries({ queryKey: ['profissionais'] })
       qc.invalidateQueries({ queryKey: ['profissionais-todos'] })
     },
+    onError: () => setErro('Não foi possível remover a foto. Tente novamente.'),
   })
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -53,7 +57,7 @@ function FotoProfissional({ profissional }: { profissional: Profissional }) {
     <div className="flex flex-col items-center gap-2 pb-2">
       <div className="relative">
         <img
-          src={getAvatarUrl(profissional)}
+          src={getAvatarUrl({ ...profissional, foto_url: fotoUrl })}
           onError={(e) => { e.currentTarget.src = getAvatarFallback(profissional.nome) }}
           alt={profissional.nome}
           className="w-20 h-20 rounded-full object-cover border border-gray-100"
@@ -75,7 +79,7 @@ function FotoProfissional({ profissional }: { profissional: Profissional }) {
           onChange={handleFileChange}
         />
       </div>
-      {profissional.foto_url && (
+      {fotoUrl && (
         <button
           type="button"
           onClick={() => removerFoto()}
