@@ -18,7 +18,7 @@ import atendimentosRouter from './routes/atendimentos'
 import dashboardRouter from './routes/dashboard'
 import whatsappRouter from './routes/whatsapp'
 import configuracoesRouter from './routes/configuracoes'
-import { requireAuth, requireTenant, requireSuperAdmin } from './middleware/auth'
+import { requireAuth, requireTenant, requireSuperAdmin, blockWritesWhenImpersonating } from './middleware/auth'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET é obrigatório. Defina a variável no .env ou no painel do host.')
@@ -48,20 +48,20 @@ export function createApp() {
   app.use('/api/webhook', webhookRouter)
 
   // Rotas de tenant (requerem auth + tenant válido)
-  app.use('/api/clientes', requireAuth, clientesRouter)
-  app.use('/api/reunioes', requireAuth, reunioesRouter)
-  app.use('/api/injetaveis', requireAuth, injetaveisRouter)
-  app.use('/api/marcacoes', requireAuth, marcacoesRouter)
+  app.use('/api/clientes', requireAuth, blockWritesWhenImpersonating, clientesRouter)
+  app.use('/api/reunioes', requireAuth, blockWritesWhenImpersonating, reunioesRouter)
+  app.use('/api/injetaveis', requireAuth, blockWritesWhenImpersonating, injetaveisRouter)
+  app.use('/api/marcacoes', requireAuth, blockWritesWhenImpersonating, marcacoesRouter)
 
   // Rotas da clínica (super_admin sem tenant recebe [] para não dar 500)
-  app.use('/api/pacientes', requireAuth, requireTenant, pacientesRouter)
-  app.use('/api/servicos', requireAuth, requireTenant, servicosRouter)
-  app.use('/api/profissionais', requireAuth, requireTenant, profissionaisRouter)
-  app.use('/api/agendamentos', requireAuth, requireTenant, agendamentosRouter)
-  app.use('/api/atendimentos', requireAuth, requireTenant, atendimentosRouter)
-  app.use('/api/dashboard', requireAuth, dashboardRouter)
-  app.use('/api/whatsapp', requireAuth, whatsappRouter)
-  app.use('/api/configuracoes', requireAuth, configuracoesRouter)
+  app.use('/api/pacientes', requireAuth, blockWritesWhenImpersonating, requireTenant, pacientesRouter)
+  app.use('/api/servicos', requireAuth, blockWritesWhenImpersonating, requireTenant, servicosRouter)
+  app.use('/api/profissionais', requireAuth, blockWritesWhenImpersonating, requireTenant, profissionaisRouter)
+  app.use('/api/agendamentos', requireAuth, blockWritesWhenImpersonating, requireTenant, agendamentosRouter)
+  app.use('/api/atendimentos', requireAuth, blockWritesWhenImpersonating, requireTenant, atendimentosRouter)
+  app.use('/api/dashboard', requireAuth, blockWritesWhenImpersonating, dashboardRouter)
+  app.use('/api/whatsapp', requireAuth, blockWritesWhenImpersonating, whatsappRouter)
+  app.use('/api/configuracoes', requireAuth, blockWritesWhenImpersonating, configuracoesRouter)
 
   // Rotas super admin
   app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)
