@@ -127,9 +127,9 @@ export function Dashboard() {
       <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
 
       {/* ── Metric cards with sparkline ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 min-w-0">
         {cards.map((card) => (
-          <Card key={card.title} className="border-0 shadow-sm overflow-hidden">
+          <Card key={card.title} className="border-0 shadow-sm overflow-hidden min-w-0">
             <CardHeader className="pb-1 pt-4 px-5">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wide">
@@ -228,10 +228,10 @@ export function Dashboard() {
       </Card>
 
       {/* ── Bottom row: donut + bar ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0">
 
         {/* Donut — pacientes por status */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border-0 shadow-sm min-w-0">
           <CardHeader className="pb-1 pt-4 px-5">
             <CardTitle className="text-sm font-semibold text-gray-800">Pacientes por Status</CardTitle>
             <p className="text-xs text-gray-400">{statusData?.total ?? 0} pacientes total</p>
@@ -284,7 +284,7 @@ export function Dashboard() {
         </Card>
 
         {/* Bar — agendamentos por dia da semana */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border-0 shadow-sm min-w-0">
           <CardHeader className="pb-1 pt-4 px-5">
             <CardTitle className="text-sm font-semibold text-gray-800">Agendamentos por Dia</CardTitle>
             <p className="text-xs text-gray-400">Distribuição semanal histórica</p>
