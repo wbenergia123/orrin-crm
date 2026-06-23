@@ -35,7 +35,7 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-sm shadow-md">
         <CardHeader className="text-center">
-          <img src={orrinIcon} alt="Orrin" className="w-16 h-16 mx-auto mb-2" />
+          <img src={orrinIcon} alt="Orrin" className="w-16 h-16 mx-auto mb-2 object-contain" />
           <CardTitle className="text-2xl font-semibold text-gray-800">
             Orrin
           </CardTitle>
