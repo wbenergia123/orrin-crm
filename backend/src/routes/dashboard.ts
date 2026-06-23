@@ -3,7 +3,17 @@ import { supabaseAdmin } from '../services/supabase'
 
 const router = Router()
 
+const emptyMetrics = {
+  faturamentoMes: 0,
+  agendamentosMes: 0,
+  leadsNovos: 0,
+  taxaConversao: 0,
+  deltas: { faturamento: null, agendamentos: null, leads: null },
+}
+
 router.get('/metricas', async (req, res) => {
+  if (!req.user!.tenant_id) { res.json(emptyMetrics); return }
+
   const now = new Date()
   const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
@@ -71,6 +81,8 @@ router.get('/metricas', async (req, res) => {
 })
 
 router.get('/grafico', async (req, res) => {
+  if (!req.user!.tenant_id) { res.json([]); return }
+
   const hoje = new Date()
   const inicio = new Date(hoje)
   inicio.setDate(hoje.getDate() - 29)
@@ -106,6 +118,8 @@ router.get('/grafico', async (req, res) => {
 })
 
 router.get('/status-pacientes', async (req, res) => {
+  if (!req.user!.tenant_id) { res.json({ total: 0, itens: [] }); return }
+
   const { data } = await supabaseAdmin
     .from('pacientes')
     .select('status')
@@ -144,6 +158,8 @@ router.get('/status-pacientes', async (req, res) => {
 })
 
 router.get('/agendamentos-semana', async (req, res) => {
+  if (!req.user!.tenant_id) { res.json(['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((dia) => ({ dia, agendamentos: 0 }))); return }
+
   const { data } = await supabaseAdmin
     .from('agendamentos')
     .select('data_hora')

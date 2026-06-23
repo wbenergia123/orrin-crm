@@ -4,6 +4,8 @@ import { supabaseAdmin } from '../services/supabase'
 const router = Router()
 
 router.get('/', async (req, res) => {
+  if (!req.user!.tenant_id) { res.json({ configuracoes: [] }); return }
+
   const { data, error } = await supabaseAdmin
     .from('configuracoes')
     .select('chave, valor, updated_at')

@@ -18,7 +18,7 @@ import atendimentosRouter from './routes/atendimentos'
 import dashboardRouter from './routes/dashboard'
 import whatsappRouter from './routes/whatsapp'
 import configuracoesRouter from './routes/configuracoes'
-import { requireAuth, requireSuperAdmin } from './middleware/auth'
+import { requireAuth, requireTenant, requireSuperAdmin } from './middleware/auth'
 
 dotenv.config()
 
@@ -54,12 +54,12 @@ app.use('/api/reunioes', requireAuth, reunioesRouter)
 app.use('/api/injetaveis', requireAuth, injetaveisRouter)
 app.use('/api/marcacoes', requireAuth, marcacoesRouter)
 
-// Rotas da clínica
-app.use('/api/pacientes', requireAuth, pacientesRouter)
-app.use('/api/servicos', requireAuth, servicosRouter)
-app.use('/api/profissionais', requireAuth, profissionaisRouter)
-app.use('/api/agendamentos', requireAuth, agendamentosRouter)
-app.use('/api/atendimentos', requireAuth, atendimentosRouter)
+// Rotas da clínica (super_admin sem tenant recebe [] para não dar 500)
+app.use('/api/pacientes', requireAuth, requireTenant, pacientesRouter)
+app.use('/api/servicos', requireAuth, requireTenant, servicosRouter)
+app.use('/api/profissionais', requireAuth, requireTenant, profissionaisRouter)
+app.use('/api/agendamentos', requireAuth, requireTenant, agendamentosRouter)
+app.use('/api/atendimentos', requireAuth, requireTenant, atendimentosRouter)
 app.use('/api/dashboard', requireAuth, dashboardRouter)
 app.use('/api/whatsapp', requireAuth, whatsappRouter)
 app.use('/api/configuracoes', requireAuth, configuracoesRouter)

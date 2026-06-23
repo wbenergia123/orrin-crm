@@ -86,6 +86,14 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   next()
 }
 
+// Super_admin sem tenant não tem dados de clínica; devolve [] em vez de 500.
+export function requireTenant(req: Request, res: Response, next: NextFunction) {
+  if (!req.user?.tenant_id) {
+    return res.json([])
+  }
+  next()
+}
+
 export async function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.user?.role !== 'super_admin') {
     return res.status(403).json({ error: 'Acesso negado' })
