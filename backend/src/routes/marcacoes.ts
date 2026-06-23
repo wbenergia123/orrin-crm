@@ -1,6 +1,7 @@
 // backend/src/routes/marcacoes.ts
 // Rotas para Marcação Digital: atendimentos, markings e fotos do paciente
 import { Router, Request, Response } from 'express'
+import multer from 'multer'
 import { supabaseAdmin } from '../services/supabase'
 
 const router = Router()
@@ -164,26 +165,57 @@ router.get('/fotos/:paciente_id', async (req: Request, res: Response) => {
   res.json(data)
 })
 
-// Registrar foto (URL já uploadada no storage)
-router.post('/fotos', async (req: Request, res: Response) => {
-  const { paciente_id, url, tipo, legenda } = req.body
-  if (!paciente_id || !url) {
-    return res.status(400).json({ error: 'paciente_id e url são obrigatórios' })
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+})
+
+const TIPOS_ACEITOS = ['image/jpeg', 'image/png', 'image/webp']
+
+// Anexar foto (upload real, multipart)
+router.post('/fotos/upload', (req: Request, res: Response, next) => {
+  upload.single('foto')(req, res, (err: any) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Arquivo muito grande (máx. 5MB)' : 'Erro no upload'
+      res.status(400).json({ error: msg })
+      return
+    }
+    next()
+  })
+}, async (req: Request, res: Response) => {
+  if (!req.file) { res.status(400).json({ error: 'Arquivo "foto" é obrigatório' }); return }
+  if (!TIPOS_ACEITOS.includes(req.file.mimetype)) {
+    res.status(400).json({ error: 'Formato inválido. Use JPG, PNG ou WEBP.' })
+    return
   }
+
+  const { paciente_id, tipo, legenda, visit_id } = req.body
+  if (!paciente_id) { res.status(400).json({ error: 'paciente_id é obrigatório' }); return }
+
+  const ext = req.file.mimetype.split('/')[1]
+  const path = `${req.user!.tenant_id}/${paciente_id}-${Date.now()}.${ext}`
+
+  const { error: uploadError } = await supabaseAdmin.storage
+    .from('fotos-pacientes')
+    .upload(path, req.file.buffer, { contentType: req.file.mimetype })
+  if (uploadError) { res.status(500).json({ error: uploadError.message }); return }
+
+  const { data: { publicUrl } } = supabaseAdmin.storage.from('fotos-pacientes').getPublicUrl(path)
 
   const { data, error } = await supabaseAdmin
     .from('fotos_paciente')
     .insert({
       paciente_id,
-      url,
+      url: publicUrl,
       tipo: tipo || 'geral',
       legenda: legenda || null,
+      visit_id: visit_id || null,
       tenant_id: req.user!.tenant_id,
     })
     .select()
     .single()
 
-  if (error) return res.status(400).json({ error: error.message })
+  if (error) { res.status(400).json({ error: error.message }); return }
   res.status(201).json(data)
 })
 

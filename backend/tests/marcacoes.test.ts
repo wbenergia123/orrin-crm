@@ -57,4 +57,67 @@ describe('Marcação Digital', () => {
       expect(res.body.paciente_id).toBe(pacienteId)
     })
   })
+
+  describe('POST /api/marcacoes/fotos/upload', () => {
+    let visitId: string
+
+    beforeAll(async () => {
+      const { data: visit } = await supabase
+        .from('atendimentos')
+        .insert({ tenant_id: tenantId, paciente_id: pacienteId })
+        .select('id')
+        .single()
+      visitId = visit!.id
+    })
+
+    afterAll(async () => {
+      await supabase.from('fotos_paciente').delete().eq('paciente_id', pacienteId)
+    })
+
+    it('envia uma foto e retorna visit_id e tipo preenchidos', async () => {
+      const res = await request(app)
+        .post('/api/marcacoes/fotos/upload')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .field('paciente_id', pacienteId)
+        .field('tipo', 'antes')
+        .field('visit_id', visitId)
+        .attach('foto', Buffer.from([0xff, 0xd8, 0xff, 0xd9]), { filename: 'teste.jpg', contentType: 'image/jpeg' })
+      expect(res.status).toBe(201)
+      expect(res.body.visit_id).toBe(visitId)
+      expect(res.body.tipo).toBe('antes')
+      expect(res.body.url).toContain('fotos-pacientes')
+    })
+
+    it('envia uma foto sem visit_id (foto solta, sem sessão)', async () => {
+      const res = await request(app)
+        .post('/api/marcacoes/fotos/upload')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .field('paciente_id', pacienteId)
+        .attach('foto', Buffer.from([0xff, 0xd8, 0xff, 0xd9]), { filename: 'teste.jpg', contentType: 'image/jpeg' })
+      expect(res.status).toBe(201)
+      expect(res.body.visit_id).toBeNull()
+      expect(res.body.tipo).toBe('geral')
+    })
+
+    it('retorna 400 sem arquivo', async () => {
+      const res = await request(app)
+        .post('/api/marcacoes/fotos/upload')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .field('paciente_id', pacienteId)
+      expect(res.status).toBe(400)
+    })
+
+    it('retorna 400 com mimetype inválido', async () => {
+      const res = await request(app)
+        .post('/api/marcacoes/fotos/upload')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .field('paciente_id', pacienteId)
+        .attach('foto', Buffer.from('texto qualquer'), { filename: 'teste.txt', contentType: 'text/plain' })
+      expect(res.status).toBe(400)
+    })
+  })
 })
