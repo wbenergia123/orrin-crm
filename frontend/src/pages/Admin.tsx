@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Building2, Plus, CheckCircle2, XCircle, Trash2 } from 'lucide-react'
+import { Building2, Plus, Trash2 } from 'lucide-react'
 
 interface Tenant {
   id: string
@@ -25,6 +25,8 @@ export function Admin() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
   const [criado, setCriado] = useState<{ url: string; email: string; senha: string } | null>(null)
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null)
+  const [confirmTexto, setConfirmTexto] = useState('')
 
   const { data: tenants = [], isLoading } = useQuery<Tenant[]>({
     queryKey: ['admin-tenants'],
@@ -57,7 +59,11 @@ export function Admin() {
 
   const { mutate: cancelar, isPending: cancelando } = useMutation({
     mutationFn: (id: string) => api.post(`/admin/tenants/${id}/cancel`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-tenants'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-tenants'] })
+      setConfirmandoId(null)
+      setConfirmTexto('')
+    },
   })
 
   if (usuario?.role !== 'super_admin') {
@@ -157,35 +163,51 @@ export function Admin() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => toggle({ id: t.id, ativo: !t.ativo })}
-                      className="flex items-center gap-1 text-xs font-medium"
-                    >
-                      {t.ativo ? (
-                        <>
-                          <CheckCircle2 size={14} className="text-emerald-500" />
-                          <span className="text-emerald-600">Ativa</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle size={14} className="text-red-400" />
-                          <span className="text-red-500">Inativa</span>
-                        </>
-                      )}
-                    </button>
-                    {t.ativo && (
-                      <button
-                        onClick={() => {
-                          if (window.confirm(`Cancelar a clínica "${t.nome}"? Isso bloqueia o login de todos os usuários dela.`)) {
-                            cancelar(t.id)
+                    {confirmandoId === t.id ? (
+                      <>
+                        <Input
+                          autoFocus
+                          value={confirmTexto}
+                          onChange={(e) => setConfirmTexto(e.target.value)}
+                          placeholder='digite "excluir"'
+                          className="h-7 w-32 text-xs"
+                        />
+                        <button
+                          onClick={() => cancelar(t.id)}
+                          disabled={confirmTexto.trim().toLowerCase() !== 'excluir' || cancelando}
+                          className="text-xs font-medium text-red-600 disabled:text-gray-300 disabled:cursor-not-allowed"
+                        >
+                          {cancelando ? 'Excluindo...' : 'Confirmar'}
+                        </button>
+                        <button
+                          onClick={() => { setConfirmandoId(null); setConfirmTexto('') }}
+                          className="text-xs text-gray-400 hover:text-gray-600"
+                        >
+                          Cancelar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => toggle({ id: t.id, ativo: !t.ativo })}
+                          className={
+                            t.ativo
+                              ? 'text-xs font-medium px-2.5 py-1 rounded-md border border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                              : 'text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50'
                           }
-                        }}
-                        disabled={cancelando}
-                        className="text-red-400 hover:text-red-600 disabled:opacity-50"
-                        title="Cancelar clínica"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                        >
+                          {t.ativo ? 'Desativar' : 'Ativar'}
+                        </button>
+                        {t.ativo && (
+                          <button
+                            onClick={() => { setConfirmandoId(t.id); setConfirmTexto('') }}
+                            className="text-red-400 hover:text-red-600"
+                            title="Cancelar clínica"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
