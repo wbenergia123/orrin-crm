@@ -55,9 +55,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   // A claim de impersonação só é honrada se o papel REAL (do banco) for super_admin —
   // nunca confia em payload.role pra essa decisão.
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   const realRole = userData?.role || payload.role
   const realTenantId = userData?.tenant_id ?? payload.tenant_id
-  const impersonating = realRole === 'super_admin' && !!payload.impersonate_tenant_id
+  const impersonating =
+    realRole === 'super_admin' && !!payload.impersonate_tenant_id && UUID_REGEX.test(payload.impersonate_tenant_id)
 
   const user = {
     id: payload.sub,
@@ -102,6 +104,7 @@ export function requireTenant(req: Request, res: Response, next: NextFunction) {
 }
 
 // Modo somente leitura: qualquer escrita durante impersonação é bloqueada.
+// Precisa rodar depois de requireAuth (depende de req.user já estar preenchido).
 export function blockWritesWhenImpersonating(req: Request, res: Response, next: NextFunction) {
   if (req.user?.impersonating && req.method !== 'GET') {
     return res.status(403).json({ error: 'Modo somente leitura — você está visualizando como esta clínica.' })
