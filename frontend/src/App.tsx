@@ -13,6 +13,7 @@ import { Atendimentos } from './pages/Atendimentos'
 import { Configuracoes } from './pages/Configuracoes'
 import { Clientes } from './pages/Clientes'
 import { Admin } from './pages/Admin'
+import { Impersonar } from './pages/Impersonar'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/impersonar" element={<Impersonar />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
