@@ -6,33 +6,53 @@ import {
 } from '../src/lib/claude-tools'
 import { supabase } from '../src/db/supabase'
 
+let tenantId: string
 let pacienteId: string
 let servicoId: string
 let profissionalId: string
 let agendamentoId: string
 
 beforeAll(async () => {
+  const { data: org } = await supabase
+    .from('organizacoes')
+    .insert({ slug: 'claude-tools-test', nome: 'Claude Tools Test' })
+    .select('id')
+    .single()
+  tenantId = org!.id
+
   const { data: p } = await supabase
     .from('pacientes')
-    .upsert({ telefone: '5511988880099', nome: 'Paciente Tool Test' }, { onConflict: 'telefone' })
-    .select('id').single()
+    .insert({ tenant_id: tenantId, telefone: '5511988880099', nome: 'Paciente Tool Test' })
+    .select('id')
+    .single()
   pacienteId = p!.id
 
-  const { data: s } = await supabase.from('servicos').select('id').eq('ativo', true).limit(1).single()
+  const { data: s } = await supabase
+    .from('servicos')
+    .insert({ tenant_id: tenantId, nome: 'Serviço Teste', preco: 100, duracao_minutos: 60, ativo: true })
+    .select('id')
+    .single()
   servicoId = s!.id
 
-  const { data: pr } = await supabase.from('profissionais').select('id').eq('ativo', true).limit(1).single()
+  const { data: pr } = await supabase
+    .from('profissionais')
+    .insert({ tenant_id: tenantId, nome: 'Profissional Teste', ativo: true })
+    .select('id')
+    .single()
   profissionalId = pr!.id
 })
 
 afterAll(async () => {
   if (agendamentoId) await supabase.from('agendamentos').delete().eq('id', agendamentoId)
   await supabase.from('pacientes').delete().eq('id', pacienteId)
+  await supabase.from('servicos').delete().eq('id', servicoId)
+  await supabase.from('profissionais').delete().eq('id', profissionalId)
+  await supabase.from('organizacoes').delete().eq('id', tenantId)
 })
 
 describe('executarListarProfissionais', () => {
   it('retorna profissionais ativos', async () => {
-    const result = await executarListarProfissionais()
+    const result = await executarListarProfissionais(tenantId)
     expect(Array.isArray(result.profissionais)).toBe(true)
     expect(result.profissionais.length).toBeGreaterThan(0)
     expect(result.profissionais[0]).toHaveProperty('id')
@@ -50,7 +70,7 @@ describe('executarVerificarSlots', () => {
       data_inicio: amanhaStr,
       data_fim: amanhaStr,
       profissional_id: profissionalId,
-    })
+    }, tenantId)
 
     expect(Array.isArray(result.disponibilidade)).toBe(true)
     if (result.disponibilidade.length > 0) {
@@ -67,7 +87,7 @@ describe('executarVerificarSlots', () => {
     const result = await executarVerificarSlots({
       data_inicio: amanhaStr,
       data_fim: amanhaStr,
-    })
+    }, tenantId)
 
     expect(Array.isArray(result.disponibilidade)).toBe(true)
   })
@@ -84,7 +104,7 @@ describe('executarCriarAgendamento', () => {
       servico_id: servicoId,
       profissional_id: profissionalId,
       data_hora: dataHora,
-    })
+    }, tenantId)
 
     expect(result.sucesso).toBe(true)
     if (result.sucesso) {
@@ -117,7 +137,7 @@ describe('executarCriarAgendamento', () => {
       servico_id: servicoId,
       profissional_id: profissionalId,
       data_hora: dataHora,
-    })
+    }, tenantId)
 
     expect(result.sucesso).toBe(false)
     if (!result.sucesso) {

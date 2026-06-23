@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../services/supabase'
+import { invalidarCachePrompt } from '../lib/claude-agent'
 
 const router = Router()
 
@@ -35,6 +36,11 @@ router.patch('/:chave', async (req, res) => {
     .single()
 
   if (error) { res.status(500).json({ error: error.message }); return }
+
+  if (chave === 'prompt_ana' && req.user!.tenant_id) {
+    invalidarCachePrompt(req.user!.tenant_id)
+  }
+
   res.json(data)
 })
 

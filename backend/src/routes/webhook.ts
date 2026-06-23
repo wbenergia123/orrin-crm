@@ -1,18 +1,20 @@
 // backend/src/routes/webhook.ts
 import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../services/supabase'
-import { processarMensagemCliente, detectarIntencaoReuniao } from '../agents/pedro'
+import { processarComAgente } from '../lib/claude-agent'
+import { enviarMensagemViaUAZAPI } from '../lib/uazapi-client'
 
 const router = Router()
 
 // URL: POST /api/webhook/whatsapp/:tenantSlug
-// Each UAZAPI instance points to this URL with the tenant's slug
+// Cada instância UAZAPI aponta para esta URL com o slug da clínica
 router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
   try {
     const { tenantSlug } = req.params
     const { data: msg } = req.body
 
-    if (!msg?.message?.text?.body) return res.json({ result: 'ok' })
+    const texto = msg?.message?.text?.body
+    if (!texto || typeof texto !== 'string') return res.json({ result: 'ok' })
 
     const { data: org } = await supabaseAdmin
       .from('organizacoes')
@@ -24,58 +26,99 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
     if (!org || !org.ativo) return res.status(404).json({ error: 'Org não encontrada' })
 
     const telefone = msg.from
-    const mensagem = msg.message.text.body
     const tenantId = org.id
 
-    let { data: cliente } = await supabaseAdmin
-      .from('clientes')
-      .select('*')
+    let { data: paciente } = await supabaseAdmin
+      .from('pacientes')
+      .select('id, status')
       .eq('telefone', telefone)
       .eq('tenant_id', tenantId)
       .single()
 
-    if (!cliente) {
+    if (!paciente) {
       const { data: novo } = await supabaseAdmin
-        .from('clientes')
+        .from('pacientes')
         .insert({ telefone, status: 'novo', tenant_id: tenantId })
-        .select()
+        .select('id, status')
         .single()
-      cliente = novo
+      paciente = novo
     }
 
-    // Atualiza ou cria paciente da clínica (usado pelo follow-up automático)
-    const { data: pacienteExistente } = await supabaseAdmin
-      .from('pacientes')
-      .select('id')
-      .eq('telefone', telefone)
+    const pacienteId = paciente!.id
+
+    // Verifica se está em modo humano (não processa com agente)
+    const { data: ultimaConversa } = await supabaseAdmin
+      .from('conversas_pacientes')
+      .select('modo_humano')
+      .eq('paciente_id', pacienteId)
       .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .single()
 
-    if (pacienteExistente) {
+    if (ultimaConversa?.modo_humano) {
+      await supabaseAdmin.from('conversas_pacientes').insert({
+        tenant_id: tenantId,
+        paciente_id: pacienteId,
+        mensagem_paciente: texto,
+        tipo_remetente: 'humano',
+        modo_humano: true,
+      })
       await supabaseAdmin
         .from('pacientes')
         .update({ ultimo_contato_at: new Date().toISOString() })
-        .eq('id', pacienteExistente.id)
-    } else {
-      await supabaseAdmin
-        .from('pacientes')
-        .insert({ telefone, status: 'novo', tenant_id: tenantId, ultimo_contato_at: new Date().toISOString() })
+        .eq('id', pacienteId)
+      console.log(`[WEBHOOK] Modo humano ativo para ${telefone} — mensagem salva sem resposta automática`)
+      return res.json({ result: 'ok' })
     }
 
-    const resposta = await processarMensagemCliente(cliente.id, mensagem)
-
-    await fetch(`${process.env.UAZAPI_URL}/send-message`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.UAZAPI_TOKEN}`,
-      },
-      body: JSON.stringify({ phone: telefone, message: resposta }),
+    await supabaseAdmin.from('conversas_pacientes').insert({
+      tenant_id: tenantId,
+      paciente_id: pacienteId,
+      mensagem_paciente: texto,
+      tipo_remetente: 'humano',
+      modo_humano: false,
     })
 
-    if (detectarIntencaoReuniao(mensagem)) {
-      console.log(`[INTENÇÃO REUNIÃO] cliente ${cliente.id} tenant ${tenantId}`)
+    await supabaseAdmin
+      .from('pacientes')
+      .update({ ultimo_contato_at: new Date().toISOString() })
+      .eq('id', pacienteId)
+
+    const respostaAgente = await processarComAgente(tenantId, pacienteId, [texto])
+
+    const { data: ultimaMsg } = await supabaseAdmin
+      .from('conversas_pacientes')
+      .select('id, modo_humano')
+      .eq('paciente_id', pacienteId)
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (ultimaMsg && !ultimaMsg.modo_humano) {
+      await supabaseAdmin
+        .from('conversas_pacientes')
+        .update({ mensagem_agente: respostaAgente })
+        .eq('id', ultimaMsg.id)
     }
+
+    // Se modo humano foi ativado durante a geração, descarta a resposta
+    const { data: modoAtual } = await supabaseAdmin
+      .from('conversas_pacientes')
+      .select('modo_humano')
+      .eq('paciente_id', pacienteId)
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (modoAtual?.modo_humano === true) {
+      console.warn(`[WEBHOOK] Resposta descartada para ${pacienteId} — modo humano ativo durante geração.`)
+      return res.json({ result: 'ok' })
+    }
+
+    await enviarMensagemViaUAZAPI({ phone: telefone, text: respostaAgente })
 
     res.json({ result: 'ok' })
   } catch (err) {
