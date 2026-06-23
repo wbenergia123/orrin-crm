@@ -15,12 +15,9 @@ function isValidUUID(id: string): boolean {
 router.get('/resumo', async (req, res) => {
   const busca = typeof req.query.busca === 'string' ? req.query.busca : undefined
 
-  let query = supabaseAdmin
+  let pacientesQuery = supabaseAdmin
     .from('pacientes')
-    .select(`
-      id, nome, telefone, status,
-      conversas_pacientes(mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, created_at)
-    `)
+    .select('id, nome, telefone, status')
     .eq('tenant_id', req.user!.tenant_id)
     .not('ultimo_contato_at', 'is', null)
     .order('ultimo_contato_at', { ascending: false })
@@ -29,16 +26,17 @@ router.get('/resumo', async (req, res) => {
   if (busca) {
     const digits = busca.replace(/\D/g, '')
     if (digits) {
-      query = query.or(`nome.ilike.%${busca}%,telefone.ilike.%${digits}%`)
+      pacientesQuery = pacientesQuery.or(`nome.ilike.%${busca}%,telefone.ilike.%${digits}%`)
     } else {
-      query = query.ilike('nome', `%${busca}%`)
+      pacientesQuery = pacientesQuery.ilike('nome', `%${busca}%`)
     }
   }
 
-  const { data, error } = await query
-  if (error) { res.status(500).json({ error: error.message }); return }
+  const { data: pacientes, error: pacientesError } = await pacientesQuery
+  if (pacientesError) { res.status(500).json({ error: pacientesError.message }); return }
 
   interface ConvRow {
+    paciente_id: string
     mensagem_paciente: string | null
     mensagem_agente: string | null
     tipo_remetente: string | null
@@ -46,10 +44,31 @@ router.get('/resumo', async (req, res) => {
     created_at: string
   }
 
-  const resumos = (data ?? []).map((p) => {
-    const convs = (p.conversas_pacientes as ConvRow[]).sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    )
+  const patientIds = (pacientes ?? []).map((p) => p.id)
+  let conversas: ConvRow[] = []
+
+  if (patientIds.length > 0) {
+    const { data: convData, error: convError } = await supabaseAdmin
+      .from('conversas_pacientes')
+      .select('paciente_id, mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, created_at')
+      .eq('tenant_id', req.user!.tenant_id)
+      .in('paciente_id', patientIds)
+      .order('created_at', { ascending: false })
+      .limit(500)
+
+    if (convError) { res.status(500).json({ error: convError.message }); return }
+    conversas = (convData ?? []) as ConvRow[]
+  }
+
+  const conversasPorPaciente = new Map<string, ConvRow[]>()
+  for (const c of conversas) {
+    const lista = conversasPorPaciente.get(c.paciente_id) ?? []
+    lista.push(c)
+    conversasPorPaciente.set(c.paciente_id, lista)
+  }
+
+  const resumos = (pacientes ?? []).map((p) => {
+    const convs = conversasPorPaciente.get(p.id) ?? []
 
     const ultimaConversa = convs[0] ?? null
     const modoHumano = ultimaConversa?.modo_humano === true

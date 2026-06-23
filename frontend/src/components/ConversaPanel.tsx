@@ -24,7 +24,7 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
 
   const { data: conversas = [] } = useQuery<Conversa[]>({
     queryKey: ['conversas-painel', paciente.id],
-    queryFn: async () => (await api.get(`/atendimentos?paciente_id=${paciente.id}`)).data,
+    queryFn: async () => (await api.get(`/atendimentos/${paciente.id}/conversas`)).data,
     refetchInterval: 10_000,
   })
 
