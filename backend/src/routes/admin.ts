@@ -1,5 +1,6 @@
 // backend/src/routes/admin.ts
 import { Router, Request, Response } from 'express'
+import bcrypt from 'bcrypt'
 import { supabaseAdmin } from '../services/supabase'
 import { validarSlug } from '../lib/slug'
 import { logAdminAction } from '../middleware/auth'
@@ -18,7 +19,7 @@ router.get('/tenants', async (req: Request, res: Response) => {
 })
 
 router.post('/tenants', async (req: Request, res: Response) => {
-  const { slug, nome, admin_email } = req.body
+  const { slug, nome, admin_email, admin_senha } = req.body
 
   if (!slug || !nome || !admin_email) {
     return res.status(400).json({ error: 'slug, nome e admin_email são obrigatórios' })
@@ -29,6 +30,10 @@ router.post('/tenants', async (req: Request, res: Response) => {
   } catch (err: any) {
     return res.status(400).json({ error: err.message })
   }
+
+  const senha = typeof admin_senha === 'string' && admin_senha.trim()
+    ? admin_senha.trim()
+    : 'senha123'
 
   const { data: org, error: orgError } = await supabaseAdmin
     .from('organizacoes')
@@ -43,18 +48,18 @@ router.post('/tenants', async (req: Request, res: Response) => {
     return res.status(400).json({ error: orgError.message })
   }
 
-  try {
-    const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      admin_email,
-      {
-        data: { tenant_id: org.id, role: 'admin' },
-        redirectTo: `https://${slug}.orrin.com.br/set-password`,
-      }
-    )
-    if (inviteError) throw inviteError
-  } catch (err: any) {
+  const { error: userError } = await supabaseAdmin
+    .from('usuarios')
+    .insert({
+      email: admin_email.toLowerCase().trim(),
+      senha_hash: await bcrypt.hash(senha, 10),
+      role: 'admin',
+      tenant_id: org.id,
+    })
+
+  if (userError) {
     await supabaseAdmin.from('organizacoes').delete().eq('id', org.id)
-    return res.status(400).json({ error: `Falha ao enviar invite: ${err.message}` })
+    return res.status(400).json({ error: `Falha ao criar usuário admin: ${userError.message}` })
   }
 
   await logAdminAction(req.user!.id, 'create_org', org.id, { slug, nome, admin_email })
@@ -62,7 +67,8 @@ router.post('/tenants', async (req: Request, res: Response) => {
   res.status(201).json({
     org: { id: org.id, slug: org.slug, nome: org.nome },
     url: `https://${slug}.orrin.com.br`,
-    invite_enviado: true,
+    admin_email: admin_email.toLowerCase().trim(),
+    admin_senha: senha,
   })
 })
 

@@ -9,6 +9,7 @@ import {
   UserCog,
   LogOut,
   Settings,
+  Building2,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -22,10 +23,15 @@ const navItems = [
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/atendimentos', icon: MessageSquare, label: 'Atendimentos' },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
+  { to: '/admin', icon: Building2, label: 'Admin', adminOnly: true },
 ]
 
 export function Sidebar() {
-  const { logout } = useAuth()
+  const { logout, usuario } = useAuth()
+
+  const visibleItems = navItems.filter(
+    (item) => !item.adminOnly || usuario?.role === 'super_admin'
+  )
 
   return (
     <aside className="w-16 md:w-56 flex flex-col h-full bg-white border-r border-gray-100 py-6 px-2 md:px-4">
@@ -36,7 +42,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1">
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {visibleItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
