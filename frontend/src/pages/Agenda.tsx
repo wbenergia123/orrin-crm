@@ -9,6 +9,7 @@ import { api } from '../api/client'
 import type { Agendamento, Profissional } from '../types'
 import { NovoAgendamentoModal } from '../components/NovoAgendamentoModal'
 import { AgendamentoPainel } from '../components/AgendamentoPainel'
+import { getAvatarUrl, getAvatarFallback } from '../lib/avatar'
 
 const locales = { 'pt-BR': ptBR }
 const localizer = dateFnsLocalizer({
@@ -45,14 +46,6 @@ function EventoCalendario({ event }: { event: { resource: Agendamento } }) {
   )
 }
 
-const GRADIENT_COLORS = ['#7c3aed', '#2563eb', '#059669', '#dc2626', '#d97706', '#0891b2', '#be185d', '#4f46e5']
-
-function profissionalColor(nome: string): string {
-  let h = 0
-  for (let i = 0; i < nome.length; i++) h = nome.charCodeAt(i) + ((h << 5) - h)
-  return GRADIENT_COLORS[Math.abs(h) % GRADIENT_COLORS.length]
-}
-
 function CardProfissional({
   profissional,
   consultasHoje,
@@ -66,10 +59,8 @@ function CardProfissional({
   inativo: boolean
   onClick: () => void
 }) {
-  const cor = profissionalColor(profissional.nome)
-  const fallbackSrc = `https://ui-avatars.com/api/?name=${encodeURIComponent(profissional.nome)}&background=${cor.replace('#', '')}&color=fff&size=80&bold=true&rounded=true`
-  // pravatar.cc returns consistent real person photos seeded by the professional's id
-  const avatarSrc = `https://i.pravatar.cc/80?u=${profissional.id}`
+  const avatarSrc = getAvatarUrl(profissional)
+  const fallbackSrc = getAvatarFallback(profissional.nome)
   return (
     <button
       onClick={onClick}

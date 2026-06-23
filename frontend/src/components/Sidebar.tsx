@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '@/lib/utils'
+import orrinIcon from '../assets/orrin-icon.png'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -35,9 +36,10 @@ export function Sidebar() {
 
   return (
     <aside className="w-16 md:w-56 flex flex-col h-full bg-white border-r border-gray-100 py-6 px-2 md:px-4">
-      <div className="mb-8 px-2 hidden md:block">
+      <div className="mb-8 px-2 hidden md:flex items-center gap-2">
+        <img src={orrinIcon} alt="Orrin" className="w-6 h-6 object-contain" />
         <span className="font-bold text-gray-800 text-sm tracking-wide uppercase">
-          Clínica
+          Orrin
         </span>
       </div>
 

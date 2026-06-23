@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import orrinIcon from '../assets/orrin-icon.png'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -34,8 +35,9 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-sm shadow-md">
         <CardHeader className="text-center">
+          <img src={orrinIcon} alt="Orrin" className="w-16 h-16 mx-auto mb-2 object-contain" />
           <CardTitle className="text-2xl font-semibold text-gray-800">
-            Clínica Estética
+            Orrin
           </CardTitle>
           <p className="text-sm text-gray-500">Acesse o painel de gestão</p>
         </CardHeader>
