@@ -165,14 +165,15 @@ ID do paciente: ${pacienteId}
 
 <agendamentos_pendentes>
 ${pendentesText}
-Use estes IDs ao chamar confirmar_agendamento ou cancelar_agendamento.
-Se houver mais de um, pergunte ao paciente qual deseja confirmar/cancelar antes de agir.
+Use estes IDs ao chamar confirmar_agendamento, remarcar_agendamento ou cancelar_agendamento.
+Se houver mais de um, pergunte ao paciente qual deseja confirmar/remarcar/cancelar antes de agir.
 </agendamentos_pendentes>
 
-Diretrizes para confirmação/cancelamento:
+Diretrizes para confirmação/remarcação/cancelamento:
 - Se o paciente confirmar presença em uma consulta: chame confirmar_agendamento com o ID correto e responda "Ótimo! Te esperamos. Qualquer dúvida estamos aqui."
-- Se o paciente cancelar: chame cancelar_agendamento, responda com empatia ("Que pena, espero que esteja tudo bem!"), pergunte se quer remarcar. Se quiser, use verificar_slots e criar_agendamento normalmente.
-- Se houver 2+ agendamentos pendentes e a resposta for ambígua: liste-os e pergunte qual o paciente quer confirmar/cancelar.
+- Se o paciente pedir pra mudar o dia/horário de uma consulta já marcada: use verificar_slots pra achar um novo horário, confirme explicitamente com o paciente, e SÓ ENTÃO chame remarcar_agendamento com o ID do agendamento original e a nova data_hora. Nunca diga que remarcou sem ter chamado essa ferramenta.
+- Se o paciente cancelar (sem querer remarcar): chame cancelar_agendamento, responda com empatia ("Que pena, espero que esteja tudo bem!"), pergunte se quer marcar outro dia. Se quiser, use verificar_slots e criar_agendamento normalmente.
+- Se houver 2+ agendamentos pendentes e a resposta for ambígua: liste-os e pergunte qual o paciente quer confirmar/remarcar/cancelar.
 
 Serviços disponíveis (use estes IDs nas ferramentas):
 ${servicosInfo}`

@@ -17,6 +17,11 @@ export interface CriarAgendamentoInput {
   notas?: string
 }
 
+export interface RemarcarAgendamentoInput {
+  agendamento_id: string
+  data_hora: string
+}
+
 type DisponibilidadeItem = {
   data: string
   profissional_id: string
@@ -27,6 +32,10 @@ type DisponibilidadeItem = {
 type ResultadoCriar =
   | { sucesso: true; agendamento_id: string; data_hora_confirmada: string }
   | { sucesso: false; erro: 'slot_ocupado'; mensagem: string }
+
+type ResultadoRemarcar =
+  | { sucesso: true; data_hora_confirmada: string }
+  | { sucesso: false; erro: 'slot_ocupado' | 'nao_encontrado'; mensagem: string }
 
 // ─── Definições das tools para a API da Anthropic ─────────────────────────────
 
@@ -91,6 +100,22 @@ export const TOOLS: Anthropic.Tool[] = [
         notas: { type: 'string', description: 'Observações opcionais' },
       },
       required: ['paciente_id', 'servico_id', 'profissional_id', 'data_hora'],
+    },
+  },
+  {
+    name: 'remarcar_agendamento',
+    description:
+      'Muda a data/hora de um agendamento existente para um novo horário. Chame APENAS após confirmação explícita do paciente sobre o novo horário. Retorna erro slot_ocupado se o novo horário foi tomado — nesse caso chame verificar_slots novamente.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        agendamento_id: { type: 'string', description: 'UUID do agendamento a remarcar' },
+        data_hora: {
+          type: 'string',
+          description: 'Nova data e hora no formato ISO 8601 sem timezone, ex: 2026-06-11T11:00:00',
+        },
+      },
+      required: ['agendamento_id', 'data_hora'],
     },
   },
   {
@@ -298,6 +323,95 @@ export async function executarCriarAgendamento(
   }
 }
 
+export async function executarRemarcarAgendamento(
+  input: RemarcarAgendamentoInput,
+  pacienteId: string,
+  tenantId: string
+): Promise<ResultadoRemarcar> {
+  const { data: original, error: fetchError } = await supabase
+    .from('agendamentos')
+    .select('profissional_id, status')
+    .eq('id', input.agendamento_id)
+    .eq('paciente_id', pacienteId)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (fetchError || !original) {
+    return {
+      sucesso: false,
+      erro: 'nao_encontrado',
+      mensagem: 'Agendamento não encontrado.',
+    }
+  }
+
+  if (original.status === 'cancelado') {
+    return {
+      sucesso: false,
+      erro: 'nao_encontrado',
+      mensagem: 'Esse agendamento já está cancelado. Use criar_agendamento para marcar um novo.',
+    }
+  }
+
+  const hasOffset = input.data_hora.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(input.data_hora)
+  const dataHoraNorm = hasOffset ? input.data_hora : `${input.data_hora}-03:00`
+
+  // Verifica double-booking manualmente (a tabela pode não ter unique constraint)
+  const { data: existente } = await supabase
+    .from('agendamentos')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('profissional_id', original.profissional_id)
+    .eq('data_hora', dataHoraNorm)
+    .neq('status', 'cancelado')
+    .neq('id', input.agendamento_id)
+    .limit(1)
+    .single()
+
+  if (existente) {
+    return {
+      sucesso: false,
+      erro: 'slot_ocupado',
+      mensagem:
+        'Esse horário acabou de ser ocupado por outro paciente. Chame verificar_slots novamente para ver a disponibilidade atual.',
+    }
+  }
+
+  // Remarcar reabre o ciclo de confirmação — mesmo padrão de criar_agendamento
+  const { error } = await supabase
+    .from('agendamentos')
+    .update({ data_hora: dataHoraNorm, status: 'agendado' })
+    .eq('id', input.agendamento_id)
+    .eq('paciente_id', pacienteId)
+    .eq('tenant_id', tenantId)
+
+  if (error) {
+    if (error.code === '23505') {
+      return {
+        sucesso: false,
+        erro: 'slot_ocupado',
+        mensagem:
+          'Esse horário acabou de ser ocupado por outro paciente. Chame verificar_slots novamente para ver a disponibilidade atual.',
+      }
+    }
+    throw error
+  }
+
+  const hora = dataHoraNorm.substring(11, 16)
+  const dataFormatada = new Date(
+    input.data_hora.substring(0, 10) + 'T12:00:00'
+  ).toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'America/Sao_Paulo',
+  })
+
+  return {
+    sucesso: true,
+    data_hora_confirmada: `${dataFormatada} às ${hora}`,
+  }
+}
+
 export async function executarConfirmarAgendamento(
   agendamentoId: string,
   pacienteId: string,
@@ -345,6 +459,8 @@ export async function executarTool(
       return executarVerificarSlots(input as unknown as VerificarSlotsInput, tenantId)
     case 'criar_agendamento':
       return executarCriarAgendamento(pacienteId, input as unknown as CriarAgendamentoInput, tenantId)
+    case 'remarcar_agendamento':
+      return executarRemarcarAgendamento(input as unknown as RemarcarAgendamentoInput, pacienteId, tenantId)
     case 'confirmar_agendamento':
       return executarConfirmarAgendamento((input.agendamento_id as string) ?? '', pacienteId, tenantId)
     case 'cancelar_agendamento':

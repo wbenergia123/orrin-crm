@@ -3,6 +3,7 @@ import {
   executarListarProfissionais,
   executarVerificarSlots,
   executarCriarAgendamento,
+  executarRemarcarAgendamento,
 } from '../src/lib/claude-tools'
 import { supabase } from '../src/db/supabase'
 
@@ -138,6 +139,85 @@ describe('executarCriarAgendamento', () => {
       profissional_id: profissionalId,
       data_hora: dataHora,
     }, tenantId)
+
+    expect(result.sucesso).toBe(false)
+    if (!result.sucesso) {
+      expect((result as { sucesso: false; erro: string }).erro).toBe('slot_ocupado')
+    }
+  })
+})
+
+describe('executarRemarcarAgendamento', () => {
+  let remarcarAgendamentoId: string
+  let remarcarConflitoId: string
+
+  beforeAll(async () => {
+    const dataOriginal = new Date()
+    dataOriginal.setDate(dataOriginal.getDate() + 40)
+    const { data } = await supabase
+      .from('agendamentos')
+      .insert({
+        tenant_id: tenantId,
+        paciente_id: pacienteId,
+        servico_id: servicoId,
+        profissional_id: profissionalId,
+        data_hora: `${dataOriginal.toISOString().substring(0, 10)}T09:00:00-03:00`,
+        status: 'confirmado',
+      })
+      .select('id')
+      .single()
+    remarcarAgendamentoId = data!.id
+  })
+
+  afterAll(async () => {
+    await supabase.from('agendamentos').delete().eq('id', remarcarAgendamentoId)
+    if (remarcarConflitoId) await supabase.from('agendamentos').delete().eq('id', remarcarConflitoId)
+  })
+
+  it('remarca pra um novo horário e volta o status pra agendado', async () => {
+    const novaData = new Date()
+    novaData.setDate(novaData.getDate() + 41)
+    const novaDataHora = `${novaData.toISOString().substring(0, 10)}T14:00:00`
+
+    const result = await executarRemarcarAgendamento({
+      agendamento_id: remarcarAgendamentoId,
+      data_hora: novaDataHora,
+    }, pacienteId, tenantId)
+
+    expect(result.sucesso).toBe(true)
+
+    const { data: ag } = await supabase
+      .from('agendamentos')
+      .select('data_hora, status')
+      .eq('id', remarcarAgendamentoId)
+      .single()
+    expect(ag?.status).toBe('agendado')
+    expect(ag?.data_hora).toContain(novaData.toISOString().substring(0, 10))
+  })
+
+  it('retorna slot_ocupado se o novo horário já está ocupado por outro agendamento do mesmo profissional', async () => {
+    const dataConflito = new Date()
+    dataConflito.setDate(dataConflito.getDate() + 42)
+    const dataHoraConflito = `${dataConflito.toISOString().substring(0, 10)}T11:00:00`
+
+    const { data: conflito } = await supabase
+      .from('agendamentos')
+      .insert({
+        tenant_id: tenantId,
+        paciente_id: pacienteId,
+        servico_id: servicoId,
+        profissional_id: profissionalId,
+        data_hora: `${dataHoraConflito}-03:00`,
+        status: 'agendado',
+      })
+      .select('id')
+      .single()
+    remarcarConflitoId = conflito!.id
+
+    const result = await executarRemarcarAgendamento({
+      agendamento_id: remarcarAgendamentoId,
+      data_hora: dataHoraConflito,
+    }, pacienteId, tenantId)
 
     expect(result.sucesso).toBe(false)
     if (!result.sucesso) {
