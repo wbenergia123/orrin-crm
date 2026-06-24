@@ -137,20 +137,20 @@ function BodyMapSVG({
             }}
           >
             {/* Sombra suave */}
-            <circle cx={m.x} cy={m.y} r="3.5" fill="rgba(0,0,0,0.12)" />
+            <circle cx={m.x} cy={m.y} r="2.3" fill="rgba(0,0,0,0.12)" />
             {/* Ponto principal */}
             <circle
               cx={m.x}
               cy={m.y}
-              r="2.8"
+              r="1.8"
               fill={m.cor_hex}
               stroke="white"
-              strokeWidth="0.9"
+              strokeWidth="0.6"
             >
               <title>{`${m.produto_nome} · ${m.quantity} ${m.unit}`}</title>
             </circle>
             {/* Ponto interno (brilho) */}
-            <circle cx={m.x - 0.7} cy={m.y - 0.7} r="0.8" fill="rgba(255,255,255,0.45)" stroke="none" />
+            <circle cx={m.x - 0.45} cy={m.y - 0.45} r="0.5" fill="rgba(255,255,255,0.45)" stroke="none" />
             {/* Quantidade */}
             {showQuantities && (
               <text

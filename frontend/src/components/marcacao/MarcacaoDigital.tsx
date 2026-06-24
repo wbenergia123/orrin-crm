@@ -147,6 +147,14 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
     setPendingPos(null)
   }
 
+  const updateVisitDate = useMutation({
+    mutationFn: async (data_atendimento: string) =>
+      (await api.patch(`/marcacoes/atendimentos/${currentVisitId}`, { data_atendimento })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['atendimentos', pacienteId] })
+    },
+  })
+
   const uploadFoto = useMutation({
     mutationFn: async ({ file, tipo }: { file: File; tipo: 'antes' | 'depois' | 'geral' }) => {
       const visitId = await ensureVisit()
@@ -313,6 +321,20 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
             markings={currentMarkings}
             onRemove={(id) => removeMarking.mutate(id)}
           />
+
+          {/* Data da sessão */}
+          {currentVisit && (
+            <div className="flex items-center gap-2 mt-4">
+              <label className="text-xs text-gray-500">Data da sessão</label>
+              <input
+                type="date"
+                value={currentVisit.data_atendimento.slice(0, 10)}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => updateVisitDate.mutate(e.target.value)}
+                className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+              />
+            </div>
+          )}
 
           {/* Botão salvar protocolo */}
           {currentMarkings.length > 0 && (

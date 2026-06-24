@@ -58,6 +58,58 @@ describe('Marcação Digital', () => {
     })
   })
 
+  describe('PATCH /api/marcacoes/atendimentos/:id', () => {
+    let visitId: string
+
+    beforeAll(async () => {
+      const { data: visit } = await supabase
+        .from('atendimentos')
+        .insert({ tenant_id: tenantId, paciente_id: pacienteId })
+        .select('id')
+        .single()
+      visitId = visit!.id
+    })
+
+    it('marca a sessão como concluída', async () => {
+      const res = await request(app)
+        .patch(`/api/marcacoes/atendimentos/${visitId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .send({ status: 'concluido' })
+      expect(res.status).toBe(200)
+      expect(res.body.status).toBe('concluido')
+    })
+
+    it('atualiza a data da sessão para uma data passada', async () => {
+      const res = await request(app)
+        .patch(`/api/marcacoes/atendimentos/${visitId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .send({ data_atendimento: '2026-01-10' })
+      expect(res.status).toBe(200)
+      expect(res.body.data_atendimento).toContain('2026-01-10')
+    })
+
+    it('rejeita data futura', async () => {
+      const amanha = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const res = await request(app)
+        .patch(`/api/marcacoes/atendimentos/${visitId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .send({ data_atendimento: amanha })
+      expect(res.status).toBe(400)
+    })
+
+    it('retorna 404 para atendimento inexistente', async () => {
+      const res = await request(app)
+        .patch('/api/marcacoes/atendimentos/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .send({ status: 'concluido' })
+      expect(res.status).toBe(404)
+    })
+  })
+
   describe('POST /api/marcacoes/fotos/upload', () => {
     let visitId: string
 

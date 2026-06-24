@@ -44,6 +44,33 @@ router.post('/atendimentos', async (req: Request, res: Response) => {
   res.status(201).json(data)
 })
 
+// Atualizar atendimento (concluir sessão e/ou corrigir a data)
+router.patch('/atendimentos/:id', async (req: Request, res: Response) => {
+  const { status, data_atendimento } = req.body
+
+  if (data_atendimento) {
+    const hojeBRT = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+    if (data_atendimento.slice(0, 10) > hojeBRT) {
+      return res.status(400).json({ error: 'Data não pode ser no futuro' })
+    }
+  }
+
+  const updates: Record<string, string> = {}
+  if (status) updates.status = status
+  if (data_atendimento) updates.data_atendimento = data_atendimento
+
+  const { data, error } = await supabaseAdmin
+    .from('atendimentos')
+    .update(updates)
+    .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
+    .select()
+    .single()
+
+  if (error || !data) return res.status(404).json({ error: 'Atendimento não encontrado' })
+  res.json(data)
+})
+
 // ── INJECTION MARKINGS ──
 
 // Listar marcações de um atendimento (opcionalmente por view_type)
