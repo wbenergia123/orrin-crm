@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { getAgendamentosPendentes } from '../src/lib/claude-agent'
+import { getAgendamentosPendentes, getHistoricoConversa } from '../src/lib/claude-agent'
 import { supabase } from '../src/db/supabase'
 
 let tenantId: string
@@ -82,5 +82,33 @@ describe('getAgendamentosPendentes', () => {
     expect(ids).toContain(agendamentoAgendadoId)
     expect(ids).toContain(agendamentoConfirmadoId)
     expect(ids).not.toContain(agendamentoCanceladoId)
+  })
+})
+
+describe('getHistoricoConversa', () => {
+  it('retorna as 10 mensagens mais recentes, em ordem cronológica', async () => {
+    const base = Date.now()
+    const linhas = Array.from({ length: 15 }, (_, i) => ({
+      tenant_id: tenantId,
+      paciente_id: pacienteId,
+      mensagem_paciente: `Pergunta ${i + 1}`,
+      mensagem_agente: `Resposta ${i + 1}`,
+      tipo_remetente: 'humano' as const,
+      modo_humano: false,
+      created_at: new Date(base + i * 1000).toISOString(),
+    }))
+    await supabase.from('conversas_pacientes').insert(linhas)
+
+    const result = await getHistoricoConversa(pacienteId)
+
+    expect(result.length).toBe(10)
+    // As 5 primeiras (mais antigas) não devem aparecer — só as 10 últimas
+    expect(result.map((r) => r.mensagem_paciente)).not.toContain('Pergunta 1')
+    expect(result.map((r) => r.mensagem_paciente)).not.toContain('Pergunta 5')
+    // Continua em ordem cronológica (mais antiga primeiro, mais recente por último)
+    expect(result[0].mensagem_paciente).toBe('Pergunta 6')
+    expect(result[9].mensagem_paciente).toBe('Pergunta 15')
+
+    await supabase.from('conversas_pacientes').delete().eq('paciente_id', pacienteId)
   })
 })

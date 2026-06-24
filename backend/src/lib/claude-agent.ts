@@ -42,16 +42,19 @@ interface Servico {
   duracao_minutos: number
 }
 
-async function getHistoricoConversa(pacienteId: string): Promise<ConversaHistorico[]> {
+export async function getHistoricoConversa(pacienteId: string): Promise<ConversaHistorico[]> {
+  // Busca as 10 mais RECENTES (ordem descendente) e depois inverte — senão pega
+  // sempre as 10 mais antigas da conversa inteira, fazendo a Ana "esquecer" tudo
+  // que aconteceu depois das primeiras trocas de mensagem.
   const { data } = await supabase
     .from('conversas_pacientes')
     .select('mensagem_paciente, mensagem_agente')
     .eq('paciente_id', pacienteId)
     .eq('modo_humano', false)
     .not('mensagem_agente', 'is', null)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(10)
-  return data ?? []
+  return (data ?? []).reverse()
 }
 
 async function getPacienteInfo(pacienteId: string) {
