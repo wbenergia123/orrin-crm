@@ -33,6 +33,9 @@ export function Admin() {
   const [uazapiUrlCriacao, setUazapiUrlCriacao] = useState('')
   const [uazapiTokenCriacao, setUazapiTokenCriacao] = useState('')
   const [carregandoUazapiId, setCarregandoUazapiId] = useState<string | null>(null)
+  const [editandoPromptId, setEditandoPromptId] = useState<string | null>(null)
+  const [promptAna, setPromptAna] = useState('')
+  const [carregandoPromptId, setCarregandoPromptId] = useState<string | null>(null)
 
   const { data: tenants = [], isLoading } = useQuery<Tenant[]>({
     queryKey: ['admin-tenants'],
@@ -84,6 +87,15 @@ export function Admin() {
       setEditandoId(null)
       setUazapiUrl('')
       setUazapiToken('')
+    },
+  })
+
+  const { mutate: salvarPrompt, isPending: salvandoPrompt } = useMutation({
+    mutationFn: async ({ id, prompt_ana }: { id: string; prompt_ana: string }) =>
+      (await api.patch(`/admin/tenants/${id}/prompt`, { prompt_ana })).data,
+    onSuccess: () => {
+      setEditandoPromptId(null)
+      setPromptAna('')
     },
   })
 
@@ -282,6 +294,24 @@ export function Admin() {
                               {carregandoUazapiId === t.id ? 'Carregando...' : 'Editar WhatsApp'}
                             </button>
                             <button
+                              onClick={async () => {
+                                setCarregandoPromptId(t.id)
+                                try {
+                                  const { data } = await api.get<{ prompt_ana: string }>(`/admin/tenants/${t.id}/prompt`)
+                                  setPromptAna(data.prompt_ana)
+                                  setEditandoPromptId(t.id)
+                                } catch {
+                                  alert('Não foi possível carregar o prompt da Ana.')
+                                } finally {
+                                  setCarregandoPromptId(null)
+                                }
+                              }}
+                              disabled={carregandoPromptId === t.id}
+                              className="text-xs font-medium text-violet-600 hover:text-violet-700 disabled:opacity-50"
+                            >
+                              {carregandoPromptId === t.id ? 'Carregando...' : 'Editar Prompt'}
+                            </button>
+                            <button
                               onClick={() => { setConfirmandoId(t.id); setConfirmTexto('') }}
                               className="text-red-400 hover:text-red-600"
                               title="Cancelar clínica"
@@ -320,6 +350,32 @@ export function Admin() {
                       </Button>
                       <button
                         onClick={() => { setEditandoId(null); setUazapiUrl(''); setUazapiToken('') }}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {editandoPromptId === t.id && (
+                  <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                    <textarea
+                      value={promptAna}
+                      onChange={(e) => setPromptAna(e.target.value)}
+                      placeholder="Personalidade da Ana pra essa clínica..."
+                      rows={14}
+                      className="w-full border border-gray-200 rounded-lg p-3 text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        disabled={salvandoPrompt}
+                        onClick={() => salvarPrompt({ id: t.id, prompt_ana: promptAna })}
+                      >
+                        {salvandoPrompt ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                      <button
+                        onClick={() => { setEditandoPromptId(null); setPromptAna('') }}
                         className="text-xs text-gray-400 hover:text-gray-600"
                       >
                         Cancelar

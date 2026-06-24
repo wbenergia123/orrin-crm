@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../services/supabase'
 import { validarSlug } from '../lib/slug'
 import { logAdminAction } from '../middleware/auth'
+import { invalidarCachePrompt } from '../lib/claude-agent'
 
 const router = Router()
 
@@ -198,6 +199,51 @@ router.patch('/tenants/:id/uazapi', async (req: Request, res: Response) => {
   if (error) return res.status(400).json({ error: error.message })
 
   await logAdminAction(req.user!.id, 'update_uazapi_config', id, { uazapi_url, uazapi_token })
+
+  res.json({ success: true })
+})
+
+router.get('/tenants/:id/prompt', async (req: Request, res: Response) => {
+  const { id } = req.params
+
+  const { data, error } = await supabaseAdmin
+    .from('configuracoes')
+    .select('valor')
+    .eq('tenant_id', id)
+    .eq('chave', 'prompt_ana')
+    .maybeSingle()
+
+  if (error) return res.status(400).json({ error: error.message })
+  res.json({ prompt_ana: data?.valor || '' })
+})
+
+router.patch('/tenants/:id/prompt', async (req: Request, res: Response) => {
+  const { id } = req.params
+  const { prompt_ana } = req.body
+
+  if (typeof prompt_ana !== 'string') {
+    return res.status(400).json({ error: 'prompt_ana deve ser uma string' })
+  }
+
+  const { data: org, error: orgError } = await supabaseAdmin
+    .from('organizacoes')
+    .select('id')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .single()
+
+  if (orgError || !org) {
+    return res.status(404).json({ error: 'Clínica não encontrada' })
+  }
+
+  const { error } = await supabaseAdmin
+    .from('configuracoes')
+    .upsert({ tenant_id: id, chave: 'prompt_ana', valor: prompt_ana }, { onConflict: 'tenant_id,chave' })
+
+  if (error) return res.status(400).json({ error: error.message })
+
+  invalidarCachePrompt(id)
+  await logAdminAction(req.user!.id, 'update_prompt_ana', id)
 
   res.json({ success: true })
 })

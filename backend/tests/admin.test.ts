@@ -177,3 +177,73 @@ describe('POST /api/admin/tenants/:id/impersonate', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('GET/PATCH /api/admin/tenants/:id/prompt', () => {
+  let promptOrgId: string
+  let promptOrgSlug: string
+
+  beforeAll(async () => {
+    const senhaHash = await bcrypt.hash('senha123', 10)
+    promptOrgSlug = `clinica-prompt-test-${Date.now()}`
+    const { data: org } = await supabase
+      .from('organizacoes')
+      .insert({ slug: promptOrgSlug, nome: 'Clínica Prompt Test' })
+      .select('id')
+      .single()
+    promptOrgId = org!.id
+
+    await supabase
+      .from('usuarios')
+      .upsert({ email: 'admin.prompt@test.com', senha_hash: senhaHash, role: 'admin', tenant_id: promptOrgId, ativo: true }, { onConflict: 'email' })
+  })
+
+  afterAll(async () => {
+    await supabase.from('configuracoes').delete().eq('tenant_id', promptOrgId)
+    await supabase.from('usuarios').delete().eq('email', 'admin.prompt@test.com')
+    await supabase.from('organizacoes').delete().eq('id', promptOrgId)
+  })
+
+  it('retorna vazio quando a clínica ainda não tem prompt salvo', async () => {
+    const res = await request(app)
+      .get(`/api/admin/tenants/${promptOrgId}/prompt`)
+      .set('Authorization', `Bearer ${superToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body.prompt_ana).toBe('')
+  })
+
+  it('salva e devolve o prompt da clínica', async () => {
+    const texto = 'Você é Ana, atendente da Clínica Prompt Test.'
+    const patch = await request(app)
+      .patch(`/api/admin/tenants/${promptOrgId}/prompt`)
+      .set('Authorization', `Bearer ${superToken}`)
+      .send({ prompt_ana: texto })
+    expect(patch.status).toBe(200)
+
+    const get = await request(app)
+      .get(`/api/admin/tenants/${promptOrgId}/prompt`)
+      .set('Authorization', `Bearer ${superToken}`)
+    expect(get.body.prompt_ana).toBe(texto)
+  })
+
+  it('retorna 404 pra clínica inexistente', async () => {
+    const res = await request(app)
+      .patch('/api/admin/tenants/00000000-0000-0000-0000-000000000000/prompt')
+      .set('Authorization', `Bearer ${superToken}`)
+      .send({ prompt_ana: 'teste' })
+    expect(res.status).toBe(404)
+  })
+
+  it('a própria clínica não consegue editar o prompt pela rota normal de configurações', async () => {
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'admin.prompt@test.com', senha: 'senha123' })
+    const clinicaToken = login.body.token
+
+    const res = await request(app)
+      .patch('/api/configuracoes/prompt_ana')
+      .set('Authorization', `Bearer ${clinicaToken}`)
+      .set('Host', `${promptOrgSlug}.orrin.com.br`)
+      .send({ valor: 'tentativa de edição direta' })
+    expect(res.status).toBe(403)
+  })
+})

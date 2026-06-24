@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 
-type Aba = 'prompt' | 'whatsapp' | 'clinica' | 'followup'
+type Aba = 'whatsapp' | 'clinica' | 'followup'
 
 interface Configuracao {
   chave: string
@@ -62,31 +62,11 @@ function getValor(configs: Configuracao[], chave: string): string {
 }
 
 export function Configuracoes() {
-  const [aba, setAba] = useState<Aba>('prompt')
+  const [aba, setAba] = useState<Aba>('whatsapp')
   const qc = useQueryClient()
 
   const { data: configs = [] } = useConfiguracoes()
   const { data: wpStatus } = useWhatsappStatus()
-
-  // Aba Prompt
-  const [promptTexto, setPromptTexto] = useState('')
-  const [promptErro, setPromptErro] = useState('')
-
-  useEffect(() => {
-    const val = getValor(configs, 'prompt_ana')
-    if (val) setPromptTexto(val)
-  }, [configs])
-
-  const salvarPrompt = useMutation({
-    mutationFn: () => api.patch('/configuracoes/prompt_ana', { valor: promptTexto }),
-    onSuccess: () => {
-      setPromptErro('')
-      qc.invalidateQueries({ queryKey: ['configuracoes'] })
-    },
-    onError: (err: { response?: { data?: { error?: string } } }) => {
-      setPromptErro(err.response?.data?.error ?? 'Erro ao salvar')
-    },
-  })
 
   // Aba Clínica
   const [clinica, setClinica] = useState({ nome: '', endereco: '', telefone: '', horario: '' })
@@ -169,41 +149,12 @@ export function Configuracoes() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="flex border-b border-gray-100 px-4">
-          <button className={tabClass('prompt')} onClick={() => setAba('prompt')}>Prompt da Ana</button>
           <button className={tabClass('whatsapp')} onClick={() => setAba('whatsapp')}>WhatsApp</button>
           <button className={tabClass('clinica')} onClick={() => setAba('clinica')}>Clínica</button>
           <button className={tabClass('followup')} onClick={() => setAba('followup')}>Follow-up</button>
         </div>
 
         <div className="p-6">
-          {aba === 'prompt' && (
-            <div className="space-y-4 max-w-2xl">
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-1">Personalidade da Ana</p>
-                <p className="text-xs text-gray-400 mb-3">
-                  Este texto define a personalidade da Ana. Datas, serviços e dados dos pacientes são adicionados automaticamente pelo sistema.
-                </p>
-                <textarea
-                  className="w-full border border-gray-200 rounded-lg p-3 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-violet-500"
-                  rows={14}
-                  value={promptTexto}
-                  onChange={(e) => setPromptTexto(e.target.value)}
-                />
-              </div>
-              {promptErro && <p className="text-xs text-red-500">{promptErro}</p>}
-              <button
-                onClick={() => salvarPrompt.mutate()}
-                disabled={salvarPrompt.isPending}
-                className="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
-              >
-                {salvarPrompt.isPending ? 'Salvando...' : 'Salvar'}
-              </button>
-              {salvarPrompt.isSuccess && (
-                <p className="text-xs text-green-600">Salvo com sucesso.</p>
-              )}
-            </div>
-          )}
-
           {aba === 'whatsapp' && (
             <div className="space-y-6 max-w-md">
               <div className="flex items-center gap-3">

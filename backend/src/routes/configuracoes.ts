@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../services/supabase'
-import { invalidarCachePrompt } from '../lib/claude-agent'
 
 const router = Router()
 
@@ -11,6 +10,7 @@ router.get('/', async (req, res) => {
     .from('configuracoes')
     .select('chave, valor, updated_at')
     .eq('tenant_id', req.user!.tenant_id)
+    .neq('chave', 'prompt_ana')
 
   if (error) { res.status(500).json({ error: error.message }); return }
   res.json({ configuracoes: data ?? [] })
@@ -19,6 +19,14 @@ router.get('/', async (req, res) => {
 router.patch('/:chave', async (req, res) => {
   const { chave } = req.params
   const { valor } = req.body
+
+  // prompt_ana só pode ser editado pelo painel Admin (super_admin) — controla o
+  // comportamento inteiro da Ana, risco alto demais pra edição direta pela clínica.
+  if (chave === 'prompt_ana') {
+    res.status(403).json({ error: 'Esse campo só pode ser editado pelo painel Admin.' })
+    return
+  }
+
   if (typeof valor !== 'string') {
     res.status(400).json({ error: 'valor deve ser uma string' })
     return
@@ -36,10 +44,6 @@ router.patch('/:chave', async (req, res) => {
     .single()
 
   if (error) { res.status(500).json({ error: error.message }); return }
-
-  if (chave === 'prompt_ana' && req.user!.tenant_id) {
-    invalidarCachePrompt(req.user!.tenant_id)
-  }
 
   res.json(data)
 })
