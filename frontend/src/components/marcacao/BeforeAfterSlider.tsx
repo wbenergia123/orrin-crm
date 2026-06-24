@@ -1,6 +1,6 @@
 // frontend/src/components/marcacao/BeforeAfterSlider.tsx
 import { useState, useRef, useCallback } from 'react'
-import { ImageOff } from 'lucide-react'
+import { ImageOff, Camera, Loader2 } from 'lucide-react'
 import type { FotoPaciente } from '../../types'
 
 interface BeforeAfterSliderProps {
@@ -9,9 +9,49 @@ interface BeforeAfterSliderProps {
   depoisId?: string
   onSetAntes?: (id: string) => void
   onSetDepois?: (id: string) => void
+  onUpload: (file: File, tipo: 'antes' | 'depois' | 'geral') => void
+  isUploading: boolean
 }
 
-export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetDepois }: BeforeAfterSliderProps) {
+function UploadFoto({ onUpload, isUploading }: { onUpload: BeforeAfterSliderProps['onUpload']; isUploading: boolean }) {
+  const [tipo, setTipo] = useState<'antes' | 'depois' | 'geral'>('geral')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <select
+        value={tipo}
+        onChange={(e) => setTipo(e.target.value as 'antes' | 'depois' | 'geral')}
+        className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+      >
+        <option value="antes">Antes</option>
+        <option value="depois">Depois</option>
+        <option value="geral">Geral</option>
+      </select>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onUpload(file, tipo)
+          e.target.value = ''
+        }}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={isUploading}
+        className="flex items-center gap-1.5 text-xs text-white bg-amber-500 rounded-lg px-3 py-1.5 hover:bg-amber-600 disabled:opacity-50"
+      >
+        {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+        Adicionar foto
+      </button>
+    </div>
+  )
+}
+
+export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetDepois, onUpload, isUploading }: BeforeAfterSliderProps) {
   const [sliderPos, setSliderPos] = useState(50)
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -45,6 +85,7 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
     return (
       <div className="bg-white rounded-xl border border-gray-100 p-6">
         <h3 className="text-sm font-semibold text-gray-800 mb-4">Comparador Antes / Depois</h3>
+        <UploadFoto onUpload={onUpload} isUploading={isUploading} />
         <div className="flex items-center justify-center h-48 text-gray-400 text-sm">
           <div className="text-center">
             <ImageOff size={32} className="mx-auto mb-2 opacity-40" />
@@ -80,6 +121,7 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-6">
       <h3 className="text-sm font-semibold text-gray-800 mb-4">Comparador Antes / Depois</h3>
+      <UploadFoto onUpload={onUpload} isUploading={isUploading} />
 
       {/* Slider */}
       <div
