@@ -9,6 +9,7 @@ import { MarkingEditor } from './MarkingEditor'
 import { MarkingList } from './MarkingList'
 import { BeforeAfterSlider } from './BeforeAfterSlider'
 import { SessionHistory } from './SessionHistory'
+import { ProductSidebar } from './ProductSidebar'
 
 interface MarcacaoDigitalProps {
   pacienteId: string
@@ -36,6 +37,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
   const [compareVisitId, setCompareVisitId] = useState<string | null>(null)
   const [antesId, setAntesId] = useState<string | undefined>()
   const [depoisId, setDepoisId] = useState<string | undefined>()
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null)
 
   // ── Queries ──
   const { data: injetaveis = [] } = useQuery<Injetavel[]>({
@@ -100,6 +102,13 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
     },
   })
 
+  const ensureVisit = useCallback(async (): Promise<string> => {
+    if (currentVisitId) return currentVisitId
+    const resp = await api.post('/marcacoes/atendimentos', { paciente_id: pacienteId })
+    queryClient.invalidateQueries({ queryKey: ['atendimentos', pacienteId] })
+    return resp.data.id
+  }, [currentVisitId, pacienteId, queryClient])
+
   // ── Handlers ──
   const handleMapClick = useCallback((x: number, y: number) => {
     setPendingPos({ x, y })
@@ -107,17 +116,12 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
 
   const handleSaveMarking = useCallback(
     async (data: { product_id: string; quantity: number; unit: string; lot_id?: string }) => {
-      // Auto-cria atendimento se não existir
-      let visitId = currentVisitId
-      if (!visitId) {
-        try {
-          const resp = await api.post('/marcacoes/atendimentos', { paciente_id: pacienteId })
-          visitId = resp.data.id
-          queryClient.invalidateQueries({ queryKey: ['atendimentos', pacienteId] })
-        } catch (e) {
-          console.error('Erro ao criar atendimento:', e)
-          return
-        }
+      let visitId: string
+      try {
+        visitId = await ensureVisit()
+      } catch (e) {
+        console.error('Erro ao criar atendimento:', e)
+        return
       }
       addMarking.mutate({
         visit_id: visitId,
@@ -129,7 +133,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
       })
       setPendingPos(null)
     },
-    [currentVisitId, pacienteId, viewType, pendingPos, addMarking, queryClient]
+    [ensureVisit, pacienteId, viewType, pendingPos, addMarking]
   )
 
   const handleModoChange = (newModo: 'face' | 'corpo') => {
@@ -142,6 +146,21 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
     setViewType(vt)
     setPendingPos(null)
   }
+
+  const uploadFoto = useMutation({
+    mutationFn: async ({ file, tipo }: { file: File; tipo: 'antes' | 'depois' | 'geral' }) => {
+      const visitId = await ensureVisit()
+      const form = new FormData()
+      form.append('foto', file)
+      form.append('paciente_id', pacienteId)
+      form.append('tipo', tipo)
+      form.append('visit_id', visitId)
+      return (await api.post('/marcacoes/fotos/upload', form)).data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fotos', pacienteId] })
+    },
+  })
 
   // Marcações para exibir no mapa atual
   const markingsForView = currentMarkings.filter((m) => m.view_type === viewType)
@@ -268,6 +287,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
                 injetaveis={injetaveis}
                 onSave={handleSaveMarking}
                 onCancel={() => setPendingPos(null)}
+                lockedProduct={selectedProductId ? injetaveis.find((p) => p.id === selectedProductId) : undefined}
               />
             )}
           </div>
@@ -280,6 +300,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
 
         {/* Lista lateral */}
         <div className="bg-white rounded-xl border border-gray-100 p-4">
+          <ProductSidebar injetaveis={injetaveis} selectedId={selectedProductId} onSelect={setSelectedProductId} />
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-800">
               Marcações da sessão
@@ -318,6 +339,8 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
         depoisId={depoisId}
         onSetAntes={setAntesId}
         onSetDepois={setDepoisId}
+        onUpload={(file, tipo) => uploadFoto.mutate({ file, tipo })}
+        isUploading={uploadFoto.isPending}
       />
 
       {/* ── Info do atendimento atual ── */}
