@@ -31,7 +31,7 @@ router.patch('/:chave', async (req, res) => {
       chave,
       valor,
       updated_at: new Date().toISOString(),
-    })
+    }, { onConflict: 'tenant_id,chave' })
     .select('chave, valor, updated_at')
     .single()
 
