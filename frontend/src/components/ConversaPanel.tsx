@@ -29,7 +29,9 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
   })
 
   // modo_humano = true se a conversa mais recente tiver modo_humano=true
-  const modoHumano = conversas[0]?.modo_humano === true
+  // API retorna ordenado do mais antigo ao mais recente (ascending)
+  const ultimaConversa = conversas.length > 0 ? conversas[conversas.length - 1] : null
+  const modoHumano = ultimaConversa?.modo_humano === true
 
   const { mutate: toggleHandoff } = useMutation({
     mutationFn: (modo: boolean) =>
@@ -54,9 +56,6 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
     if (!mensagem.trim() || enviando || !modoHumano) return
     enviarMensagem(mensagem.trim())
   }
-
-  // conversas vêm em ordem decrescente da API; inverter para exibir do mais antigo ao mais recente
-  const conversasOrdenadas = [...conversas].reverse()
 
   return (
     <div className="w-[360px] flex-shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
@@ -106,10 +105,10 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
 
       {/* Chat history */}
       <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">
-        {conversasOrdenadas.length === 0 && (
+        {conversas.length === 0 && (
           <p className="text-center text-sm text-gray-400 mt-8">Nenhuma mensagem ainda</p>
         )}
-        {conversasOrdenadas.map((c) => (
+        {conversas.map((c) => (
           <div key={c.id} className="flex flex-col gap-1.5">
             {c.mensagem_paciente && (
               <div className="flex flex-col items-start" style={{ maxWidth: '85%' }}>
