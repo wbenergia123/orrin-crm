@@ -12,7 +12,7 @@ interface HistoricoMarcacoesProps {
 export function HistoricoMarcacoes({ pacienteId }: HistoricoMarcacoesProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const { data: atendimentos = [] } = useQuery<Atendimento[]>({
+  const { data: atendimentos = [], isLoading: carregandoAtendimentos } = useQuery<Atendimento[]>({
     queryKey: ['atendimentos', pacienteId],
     queryFn: async () => (await api.get(`/marcacoes/atendimentos/${pacienteId}`)).data,
   })
@@ -26,6 +26,10 @@ export function HistoricoMarcacoes({ pacienteId }: HistoricoMarcacoesProps) {
     queryKey: ['fotos', pacienteId],
     queryFn: async () => (await api.get(`/marcacoes/fotos/${pacienteId}`)).data,
   })
+
+  if (carregandoAtendimentos) {
+    return <p className="text-sm text-gray-400 text-center py-8">Carregando histórico...</p>
+  }
 
   if (atendimentos.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">Nenhuma sessão registrada ainda.</p>
@@ -42,6 +46,7 @@ export function HistoricoMarcacoes({ pacienteId }: HistoricoMarcacoesProps) {
           <div key={sessao.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
             <button
               onClick={() => setExpandedId(isOpen ? null : sessao.id)}
+              aria-expanded={isOpen}
               className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50"
             >
               <span className="text-sm font-medium text-gray-800">
