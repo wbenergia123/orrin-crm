@@ -80,16 +80,18 @@ interface AgendamentoPendente {
   profissional_nome: string
 }
 
-async function getAgendamentosPendentes(pacienteId: string, tenantId: string): Promise<AgendamentoPendente[]> {
+export async function getAgendamentosPendentes(pacienteId: string, tenantId: string): Promise<AgendamentoPendente[]> {
   const agora = new Date()
   const limite48h = new Date(agora.getTime() + 48 * 60 * 60 * 1000)
 
+  // Inclui 'confirmado' também — senão a Ana perde a referência do ID assim que o
+  // paciente confirma, e não consegue mais remarcar/cancelar um agendamento já confirmado.
   const { data } = await supabase
     .from('agendamentos')
     .select('id, data_hora, servicos(nome), profissionais(nome)')
     .eq('tenant_id', tenantId)
     .eq('paciente_id', pacienteId)
-    .eq('status', 'agendado')
+    .in('status', ['agendado', 'confirmado'])
     .gte('data_hora', agora.toISOString())
     .lte('data_hora', limite48h.toISOString())
     .order('data_hora', { ascending: true })
