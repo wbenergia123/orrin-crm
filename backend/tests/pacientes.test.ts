@@ -12,8 +12,10 @@ beforeAll(async () => {
   await supabase.from('usuarios').upsert({ email: 'sec@clinica.com', senha_hash: hash, role: 'secretaria' }, { onConflict: 'email' })
   const loginRes = await request(app).post('/api/auth/login').send({ email: 'sec@clinica.com', senha: 'senha123' })
   token = loginRes.body.token
-  // clean up test patients before tests
-  await supabase.from('pacientes').delete().in('telefone', ['5511999990001', '5511999990002', '5511999990003'])
+  // limpa pacientes de execuções anteriores deste teste — exige telefone E nome
+  // batendo juntos, pra não arriscar apagar um paciente real de outra clínica
+  // que coincida só no telefone (esses números são bem genéricos)
+  await supabase.from('pacientes').delete().in('telefone', ['5511999990001', '5511999990002']).in('nome', ['Teste Novo', 'Maria Teste'])
 })
 
 describe('GET /api/pacientes', () => {

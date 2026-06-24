@@ -33,8 +33,9 @@ describe('POST /api/servicos', () => {
     expect(res.status).toBe(201)
     expect(res.body.nome).toBe('Harmonização Facial')
     expect(Number(res.body.preco)).toBe(2500)
-    // cleanup
-    await supabase.from('servicos').delete().eq('nome', 'Harmonização Facial')
+    // cleanup — apaga só o registro criado por este teste, nunca por nome (um nome
+    // genérico como esse poderia coincidir com um serviço real de outra clínica)
+    await supabase.from('servicos').delete().eq('id', res.body.id)
   })
 
   it('retorna 400 sem nome', async () => {
