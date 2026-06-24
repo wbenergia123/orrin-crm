@@ -39,6 +39,34 @@ afterAll(async () => {
   await supabase.from('organizacoes').delete().eq('id', testOrgId)
 })
 
+describe('POST /api/admin/tenants', () => {
+  let novoOrgId: string
+
+  afterAll(async () => {
+    if (novoOrgId) {
+      await supabase.from('followup_regras').delete().eq('tenant_id', novoOrgId)
+      await supabase.from('usuarios').delete().eq('tenant_id', novoOrgId)
+      await supabase.from('organizacoes').delete().eq('id', novoOrgId)
+    }
+  })
+
+  it('cria a clínica já com as 4 regras de follow-up padrão', async () => {
+    const res = await request(app)
+      .post('/api/admin/tenants')
+      .set('Authorization', `Bearer ${superToken}`)
+      .send({ slug: `clinica-seed-test-${Date.now()}`, nome: 'Clínica Seed Test', admin_email: `seed-${Date.now()}@test.com` })
+    expect(res.status).toBe(201)
+    novoOrgId = res.body.org.id
+
+    const { data: regras } = await supabase
+      .from('followup_regras')
+      .select('gatilho')
+      .eq('tenant_id', novoOrgId)
+    const gatilhos = (regras ?? []).map((r) => r.gatilho).sort()
+    expect(gatilhos).toEqual(['lembrete_agendamento', 'lembrete_dia', 'nao_respondeu', 'no_show'])
+  })
+})
+
 describe('POST /api/admin/tenants/:id/cancel', () => {
   it('desativa a organizacao e os usuarios dela', async () => {
     const res = await request(app)

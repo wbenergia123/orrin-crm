@@ -63,6 +63,13 @@ router.post('/tenants', async (req: Request, res: Response) => {
     return res.status(400).json({ error: `Falha ao criar usuário admin: ${userError.message}` })
   }
 
+  await supabaseAdmin.from('followup_regras').insert([
+    { tenant_id: org.id, nome: 'Lembrete 24h', gatilho: 'lembrete_agendamento', delay_minutos: 24 * 60, template: 'Oi [nome], amanhã você tem [servico] às [hora]. Confirma?', ativo: true, ordem_prioridade: 10 },
+    { tenant_id: org.id, nome: 'Não respondeu', gatilho: 'nao_respondeu', delay_minutos: 60, template: 'Oi [nome], vi que você entrou em contato. Ainda tem interesse em marcar?', ativo: true, ordem_prioridade: 5 },
+    { tenant_id: org.id, nome: 'No-show', gatilho: 'no_show', delay_minutos: 30, template: 'Oi [nome], vi que não conseguiu vir hoje. Quer remarcar?', ativo: true, ordem_prioridade: 8 },
+    { tenant_id: org.id, nome: 'Lembrete do dia', gatilho: 'lembrete_dia', horario_fixo: '08:00', template: 'Oi [nome], hoje você tem [servico] às [hora] com [profissional]. Te esperamos!', ativo: true, ordem_prioridade: 12 },
+  ])
+
   await logAdminAction(req.user!.id, 'create_org', org.id, { slug, nome, admin_email })
 
   res.status(201).json({
