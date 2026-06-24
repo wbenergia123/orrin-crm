@@ -20,7 +20,7 @@ router.get('/tenants', async (req: Request, res: Response) => {
 })
 
 router.post('/tenants', async (req: Request, res: Response) => {
-  const { slug, nome, admin_email, admin_senha } = req.body
+  const { slug, nome, admin_email, admin_senha, uazapi_url, uazapi_token } = req.body
 
   if (!slug || !nome || !admin_email) {
     return res.status(400).json({ error: 'slug, nome e admin_email são obrigatórios' })
@@ -69,6 +69,22 @@ router.post('/tenants', async (req: Request, res: Response) => {
     { tenant_id: org.id, nome: 'No-show', gatilho: 'no_show', delay_minutos: 30, template: 'Oi [nome], vi que não conseguiu vir hoje. Quer remarcar?', ativo: true, ordem_prioridade: 8 },
     { tenant_id: org.id, nome: 'Lembrete do dia', gatilho: 'lembrete_dia', horario_fixo: '08:00', template: 'Oi [nome], hoje você tem [servico] às [hora] com [profissional]. Te esperamos!', ativo: true, ordem_prioridade: 12 },
   ])
+
+  const configRows: { tenant_id: string; chave: string; valor: string }[] = []
+  if (typeof uazapi_url === 'string' && uazapi_url.trim()) {
+    configRows.push({ tenant_id: org.id, chave: 'uazapi_url', valor: uazapi_url.trim() })
+  }
+  if (typeof uazapi_token === 'string' && uazapi_token.trim()) {
+    configRows.push({ tenant_id: org.id, chave: 'uazapi_token', valor: uazapi_token.trim() })
+  }
+  if (configRows.length > 0) {
+    const { error: configError } = await supabaseAdmin
+      .from('configuracoes')
+      .upsert(configRows, { onConflict: 'tenant_id,chave' })
+    if (configError) {
+      console.error('[admin] Falha ao salvar configurações UAZAPI:', configError.message)
+    }
+  }
 
   await logAdminAction(req.user!.id, 'create_org', org.id, { slug, nome, admin_email })
 
@@ -128,6 +144,62 @@ router.post('/tenants/:id/cancel', async (req: Request, res: Response) => {
   await logAdminAction(req.user!.id, 'cancel_org', id)
 
   res.json({ org })
+})
+
+router.get('/tenants/:id/uazapi', async (req: Request, res: Response) => {
+  const { id } = req.params
+
+  const { data: rows, error } = await supabaseAdmin
+    .from('configuracoes')
+    .select('chave, valor')
+    .eq('tenant_id', id)
+    .in('chave', ['uazapi_url', 'uazapi_token'])
+
+  if (error) return res.status(400).json({ error: error.message })
+
+  const map = Object.fromEntries((rows ?? []).map((r) => [r.chave, r.valor]))
+  res.json({
+    uazapi_url: map['uazapi_url'] || '',
+    uazapi_token: map['uazapi_token'] || '',
+  })
+})
+
+router.patch('/tenants/:id/uazapi', async (req: Request, res: Response) => {
+  const { id } = req.params
+  const { uazapi_url, uazapi_token } = req.body
+
+  const { data: org, error: orgError } = await supabaseAdmin
+    .from('organizacoes')
+    .select('id')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .single()
+
+  if (orgError || !org) {
+    return res.status(404).json({ error: 'Clínica não encontrada' })
+  }
+
+  const updates: { tenant_id: string; chave: string; valor: string }[] = []
+  if (typeof uazapi_url === 'string' && uazapi_url.trim()) {
+    updates.push({ tenant_id: id, chave: 'uazapi_url', valor: uazapi_url.trim() })
+  }
+  if (typeof uazapi_token === 'string' && uazapi_token.trim()) {
+    updates.push({ tenant_id: id, chave: 'uazapi_token', valor: uazapi_token.trim() })
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'uazapi_url ou uazapi_token são obrigatórios' })
+  }
+
+  const { error } = await supabaseAdmin
+    .from('configuracoes')
+    .upsert(updates, { onConflict: 'tenant_id,chave' })
+
+  if (error) return res.status(400).json({ error: error.message })
+
+  await logAdminAction(req.user!.id, 'update_uazapi_config', id, { uazapi_url, uazapi_token })
+
+  res.json({ success: true })
 })
 
 router.post('/tenants/:id/impersonate', async (req: Request, res: Response) => {

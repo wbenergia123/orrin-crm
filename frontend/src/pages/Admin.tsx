@@ -27,6 +27,12 @@ export function Admin() {
   const [criado, setCriado] = useState<{ url: string; email: string; senha: string } | null>(null)
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null)
   const [confirmTexto, setConfirmTexto] = useState('')
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [uazapiUrl, setUazapiUrl] = useState('')
+  const [uazapiToken, setUazapiToken] = useState('')
+  const [uazapiUrlCriacao, setUazapiUrlCriacao] = useState('')
+  const [uazapiTokenCriacao, setUazapiTokenCriacao] = useState('')
+  const [carregandoUazapiId, setCarregandoUazapiId] = useState<string | null>(null)
 
   const { data: tenants = [], isLoading } = useQuery<Tenant[]>({
     queryKey: ['admin-tenants'],
@@ -40,6 +46,8 @@ export function Admin() {
         nome,
         admin_email: email,
         admin_senha: senha || undefined,
+        uazapi_url: uazapiUrlCriacao || undefined,
+        uazapi_token: uazapiTokenCriacao || undefined,
       })).data,
     onSuccess: (data) => {
       setCriado({ url: data.url, email: data.admin_email, senha: data.admin_senha })
@@ -47,6 +55,8 @@ export function Admin() {
       setNome('')
       setEmail('')
       setSenha('')
+      setUazapiUrlCriacao('')
+      setUazapiTokenCriacao('')
       qc.invalidateQueries({ queryKey: ['admin-tenants'] })
     },
   })
@@ -63,6 +73,17 @@ export function Admin() {
       qc.invalidateQueries({ queryKey: ['admin-tenants'] })
       setConfirmandoId(null)
       setConfirmTexto('')
+    },
+  })
+
+  const { mutate: salvarUazapi, isPending: salvandoUazapi } = useMutation({
+    mutationFn: async ({ id, uazapi_url, uazapi_token }: { id: string; uazapi_url: string; uazapi_token: string }) =>
+      (await api.patch(`/admin/tenants/${id}/uazapi`, { uazapi_url, uazapi_token })).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-tenants'] })
+      setEditandoId(null)
+      setUazapiUrl('')
+      setUazapiToken('')
     },
   })
 
@@ -139,6 +160,25 @@ export function Admin() {
                 placeholder="padrão: senha123"
               />
             </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="uazapi-url">URL da instância UAZAPI (opcional)</Label>
+              <Input
+                id="uazapi-url"
+                value={uazapiUrlCriacao}
+                onChange={(e) => setUazapiUrlCriacao(e.target.value)}
+                placeholder="https://sua-instancia.uazapi.com"
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="uazapi-token">Token da instância UAZAPI (opcional)</Label>
+              <Input
+                id="uazapi-token"
+                type="text"
+                value={uazapiTokenCriacao}
+                onChange={(e) => setUazapiTokenCriacao(e.target.value)}
+                placeholder="token-da-instancia"
+              />
+            </div>
           </div>
 
           <Button onClick={() => criar()} disabled={isPending || !slug || !nome || !email}>
@@ -169,7 +209,8 @@ export function Admin() {
           ) : (
             <div className="divide-y divide-gray-100">
               {tenants.map((t) => (
-                <div key={t.id} className="py-3 flex items-center justify-between gap-3">
+                <div key={t.id} className="py-3">
+                <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="font-medium text-gray-800">{t.nome}</p>
                     <p className="text-xs text-gray-400">
@@ -222,6 +263,25 @@ export function Admin() {
                               {impersonando ? 'Entrando...' : 'Entrar como'}
                             </button>
                             <button
+                              onClick={async () => {
+                                setCarregandoUazapiId(t.id)
+                                try {
+                                  const { data } = await api.get<{ uazapi_url: string; uazapi_token: string }>(`/admin/tenants/${t.id}/uazapi`)
+                                  setUazapiUrl(data.uazapi_url)
+                                  setUazapiToken(data.uazapi_token)
+                                  setEditandoId(t.id)
+                                } catch {
+                                  alert('Não foi possível carregar a configuração do WhatsApp.')
+                                } finally {
+                                  setCarregandoUazapiId(null)
+                                }
+                              }}
+                              disabled={carregandoUazapiId === t.id}
+                              className="text-xs font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50"
+                            >
+                              {carregandoUazapiId === t.id ? 'Carregando...' : 'Editar WhatsApp'}
+                            </button>
+                            <button
                               onClick={() => { setConfirmandoId(t.id); setConfirmTexto('') }}
                               className="text-red-400 hover:text-red-600"
                               title="Cancelar clínica"
@@ -234,7 +294,41 @@ export function Admin() {
                     )}
                   </div>
                 </div>
-              ))}
+                {editandoId === t.id && (
+                  <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Input
+                        value={uazapiUrl}
+                        onChange={(e) => setUazapiUrl(e.target.value)}
+                        placeholder="URL da instância UAZAPI"
+                        className="text-xs"
+                      />
+                      <Input
+                        value={uazapiToken}
+                        onChange={(e) => setUazapiToken(e.target.value)}
+                        placeholder="Token da instância UAZAPI"
+                        className="text-xs"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        disabled={salvandoUazapi}
+                        onClick={() => salvarUazapi({ id: t.id, uazapi_url: uazapiUrl, uazapi_token: uazapiToken })}
+                      >
+                        {salvandoUazapi ? 'Salvando...' : 'Salvar'}
+                      </Button>
+                      <button
+                        onClick={() => { setEditandoId(null); setUazapiUrl(''); setUazapiToken('') }}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
             </div>
           )}
         </CardContent>

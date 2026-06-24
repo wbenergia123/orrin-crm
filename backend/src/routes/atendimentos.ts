@@ -213,7 +213,7 @@ router.post('/:paciente_id/mensagem', async (req, res) => {
 
   if (error) { res.status(500).json({ error: error.message }); return }
 
-  await enviarMensagemViaUAZAPI({ phone: paciente.telefone, text: texto.trim() }).catch(
+  await enviarMensagemViaUAZAPI({ tenantId: req.user!.tenant_id!, phone: paciente.telefone, text: texto.trim() }).catch(
     (err: unknown) => console.error(`[ATENDIMENTOS] Falha ao enviar para paciente ${paciente_id} via UAZAPI:`, err)
   )
 

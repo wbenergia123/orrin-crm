@@ -2,7 +2,7 @@
 import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../services/supabase'
 import { processarComAgente } from '../lib/claude-agent'
-import { enviarMensagemViaUAZAPI } from '../lib/uazapi-client'
+import { enviarMensagemViaUAZAPI, getUazapiConfig } from '../lib/uazapi-client'
 import { transcreverAudio } from '../lib/groq-transcriber'
 import type { WebhookPayload } from '../types/webhook'
 
@@ -42,34 +42,38 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       payload.message.mediaType === 'audio'
 
     if (isAudio && !texto) {
-      const baseUrl = process.env.UAZAPI_URL
-      const token = process.env.UAZAPI_TOKEN
-      const msgId = payload.message.id || payload.message.messageid
-      console.log(`[WEBHOOK] Áudio recebido — id=${msgId} mediaType=${payload.message.mediaType}`)
-
-      try {
-        const downloadRes = await fetch(`${baseUrl}/message/download`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', token: token || '' },
-          body: JSON.stringify({ id: msgId, return_base64: true, generate_mp3: true }),
-        })
-
-        const downloadBody = await downloadRes.json() as Record<string, unknown>
-        const b64 = (downloadBody.base64Data || downloadBody.base64) as string | undefined
-        const mime = (downloadBody.mimetype || downloadBody.mimeType) as string | undefined
-
-        if (downloadRes.ok && b64) {
-          const transcricao = await transcreverAudio(b64, mime || 'audio/ogg')
-          if (transcricao) texto = `[Áudio] ${transcricao}`
-        } else if (!downloadRes.ok) {
-          console.error(`[WEBHOOK] Falha ao baixar áudio: ${downloadRes.status}`, downloadBody)
-        }
-      } catch (err) {
-        console.error('[WEBHOOK] Erro ao baixar/transcrever áudio:', err)
-      }
-
-      if (!texto) {
+      const uazapiConfig = await getUazapiConfig(tenantId)
+      if (!uazapiConfig) {
+        console.error(`[WEBHOOK] UAZAPI não configurada para tenant ${tenantId} — não foi possível baixar áudio`)
         texto = '[Áudio - não foi possível transcrever a mensagem]'
+      } else {
+        const msgId = payload.message.id || payload.message.messageid
+        console.log(`[WEBHOOK] Áudio recebido — id=${msgId} mediaType=${payload.message.mediaType}`)
+
+        try {
+          const downloadRes = await fetch(`${uazapiConfig.baseUrl}/message/download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', token: uazapiConfig.token },
+            body: JSON.stringify({ id: msgId, return_base64: true, generate_mp3: true }),
+          })
+
+          const downloadBody = await downloadRes.json() as Record<string, unknown>
+          const b64 = (downloadBody.base64Data || downloadBody.base64) as string | undefined
+          const mime = (downloadBody.mimetype || downloadBody.mimeType) as string | undefined
+
+          if (downloadRes.ok && b64) {
+            const transcricao = await transcreverAudio(b64, mime || 'audio/ogg')
+            if (transcricao) texto = `[Áudio] ${transcricao}`
+          } else if (!downloadRes.ok) {
+            console.error(`[WEBHOOK] Falha ao baixar áudio: ${downloadRes.status}`, downloadBody)
+          }
+        } catch (err) {
+          console.error('[WEBHOOK] Erro ao baixar/transcrever áudio:', err)
+        }
+
+        if (!texto) {
+          texto = '[Áudio - não foi possível transcrever a mensagem]'
+        }
       }
     }
 
@@ -183,7 +187,7 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       return res.json({ result: 'ok' })
     }
 
-    await enviarMensagemViaUAZAPI({ phone: telefone, text: respostaAgente })
+    await enviarMensagemViaUAZAPI({ tenantId, phone: telefone, text: respostaAgente })
 
     res.json({ result: 'ok' })
   } catch (err) {

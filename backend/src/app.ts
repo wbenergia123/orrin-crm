@@ -61,7 +61,7 @@ export function createApp() {
   app.use('/api/agendamentos', requireAuth, blockWritesWhenImpersonating, requireTenant, agendamentosRouter)
   app.use('/api/atendimentos', requireAuth, blockWritesWhenImpersonating, requireTenant, atendimentosRouter)
   app.use('/api/dashboard', requireAuth, blockWritesWhenImpersonating, dashboardRouter)
-  app.use('/api/whatsapp', requireAuth, blockWritesWhenImpersonating, whatsappRouter)
+  app.use('/api/whatsapp', requireAuth, blockWritesWhenImpersonating, requireTenant, whatsappRouter)
   app.use('/api/configuracoes', requireAuth, blockWritesWhenImpersonating, configuracoesRouter)
   app.use('/api/followup', requireAuth, blockWritesWhenImpersonating, requireTenant, followupRouter)
 

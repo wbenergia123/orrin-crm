@@ -112,7 +112,7 @@ async function temAgendamentoFuturo(pacienteId: string, agora: Date) {
 
 async function enviar(tenantId: string, regra: FollowupRegra, paciente: any, agendamento: any | null, vars: Record<string, string>, agora: Date) {
   const mensagem = applyTemplate(regra.template, vars)
-  const enviado = await enviarMensagemViaUAZAPI({ phone: paciente.telefone, text: mensagem })
+  const enviado = await enviarMensagemViaUAZAPI({ tenantId, phone: paciente.telefone, text: mensagem })
 
   if (!enviado) return
 
