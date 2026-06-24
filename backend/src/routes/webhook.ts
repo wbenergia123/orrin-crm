@@ -67,6 +67,10 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       } catch (err) {
         console.error('[WEBHOOK] Erro ao baixar/transcrever áudio:', err)
       }
+
+      if (!texto) {
+        texto = '[Áudio - não foi possível transcrever a mensagem]'
+      }
     }
 
     if (!texto) {
