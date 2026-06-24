@@ -7,7 +7,7 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 })
 
-const MODELO_PADRAO = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+const MODELO_PADRAO = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001'
 
 let promptCache: Record<string, string> = {}
 
