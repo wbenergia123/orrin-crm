@@ -14,12 +14,22 @@ function limparTelefone(raw: string | undefined): string {
 
 // URL: POST /api/webhook/whatsapp/:tenantSlug
 // Cada instância UAZAPI aponta para esta URL com o slug da clínica
+// GET de verificação — alguns serviços (incluindo UAZAPI) fazem ping GET no webhook antes de enviar eventos
+router.get('/whatsapp/:tenantSlug', (_req: Request, res: Response) => {
+  res.json({ result: 'ok' })
+})
+
 router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
   try {
     const { tenantSlug } = req.params
     const payload = req.body as WebhookPayload
 
-    if (!payload?.message) return res.json({ result: 'ok' })
+    console.log(`[WEBHOOK] Recebido em /whatsapp/${tenantSlug} — messageType=${payload?.message?.messageType || 'n/a'} mediaType=${payload?.message?.mediaType || 'n/a'}`)
+
+    if (!payload?.message) {
+      console.log('[WEBHOOK] Payload sem message. Keys:', Object.keys(payload || {}).join(', '))
+      return res.json({ result: 'ok' })
+    }
 
     const { data: org } = await supabaseAdmin
       .from('organizacoes')
