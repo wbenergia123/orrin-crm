@@ -3,18 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ArrowLeft, MessageCircle, Calendar, Phone, Mail, TrendingUp, CheckCircle2, Clock, XCircle, LayoutDashboard, Syringe } from 'lucide-react'
+import { ArrowLeft, MessageCircle, Calendar, Phone, Mail, TrendingUp, CheckCircle2, Clock, XCircle, LayoutDashboard, Syringe, History } from 'lucide-react'
 import { api } from '../api/client'
 import type { Paciente, Agendamento, Conversa } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { StatusStepper } from '../components/StatusStepper'
 import { MarcacaoDigital } from '../components/marcacao/MarcacaoDigital'
+import { HistoricoMarcacoes } from '../components/marcacao/HistoricoMarcacoes'
 
-type Aba = 'visao_geral' | 'marcacao_digital'
+type Aba = 'visao_geral' | 'marcacao_digital' | 'historico'
 
 const ABAS: { id: Aba; label: string; icon: React.ElementType }[] = [
   { id: 'visao_geral', label: 'Visão Geral', icon: LayoutDashboard },
   { id: 'marcacao_digital', label: 'Marcação Digital', icon: Syringe },
+  { id: 'historico', label: 'Histórico', icon: History },
 ]
 
 const GRADIENTS = [
@@ -213,6 +215,8 @@ export function FichaPaciente() {
       {/* ── Conteúdo por aba ── */}
       {aba === 'marcacao_digital' && id ? (
         <MarcacaoDigital pacienteId={id} />
+      ) : aba === 'historico' && id ? (
+        <HistoricoMarcacoes pacienteId={id} />
       ) : (
         <div className="contents">
       {/* ── Agendamentos ── */}
