@@ -77,6 +77,14 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       }
     }
 
+    const isImage =
+      payload.message.messageType === 'ImageMessage' ||
+      payload.message.mediaType === 'image'
+
+    if (isImage && !texto) {
+      texto = '[Foto recebida]'
+    }
+
     if (!texto) {
       console.log(`[WEBHOOK] Mensagem sem texto ignorada (type: ${payload.message.type}, mediaType: ${payload.message.mediaType})`)
       return res.json({ result: 'ok' })
