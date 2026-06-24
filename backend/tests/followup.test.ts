@@ -50,14 +50,34 @@ async function cleanup() {
   await supabase.from('followup_envios').delete().eq('tenant_id', testTenantId)
   await supabase.from('followup_regras').delete().eq('tenant_id', testTenantId)
   await supabase.from('agendamentos').delete().eq('tenant_id', testTenantId)
+  await supabase.from('conversas_pacientes').delete().eq('tenant_id', testTenantId)
   await supabase.from('pacientes').delete().eq('tenant_id', testTenantId)
   await supabase.from('servicos').delete().eq('tenant_id', testTenantId)
   await supabase.from('profissionais').delete().eq('tenant_id', testTenantId)
+  await supabase.from('usuarios').delete().eq('tenant_id', testTenantId)
   await supabase.from('organizacoes').delete().eq('id', testTenantId)
 }
 
 beforeAll(async () => {
   await startTestServer()
+
+  // Limpa organização de teste anterior, se houver (evita conflito de slug)
+  const { data: orgExistente } = await supabase
+    .from('organizacoes')
+    .select('id')
+    .eq('slug', 'followup-test')
+    .single()
+  if (orgExistente) {
+    await supabase.from('followup_envios').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('followup_regras').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('agendamentos').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('conversas_pacientes').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('pacientes').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('servicos').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('profissionais').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('usuarios').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('organizacoes').delete().eq('id', orgExistente.id)
+  }
 
   const { data: org } = await supabase
     .from('organizacoes')

@@ -3,18 +3,23 @@ import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../services/supabase'
 import { processarComAgente } from '../lib/claude-agent'
 import { enviarMensagemViaUAZAPI } from '../lib/uazapi-client'
+import { transcreverAudio } from '../lib/groq-transcriber'
+import type { WebhookPayload } from '../types/webhook'
 
 const router = Router()
+
+function limparTelefone(raw: string | undefined): string {
+  return (raw || '').replace('@s.whatsapp.net', '').replace(/\D/g, '')
+}
 
 // URL: POST /api/webhook/whatsapp/:tenantSlug
 // Cada instância UAZAPI aponta para esta URL com o slug da clínica
 router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
   try {
     const { tenantSlug } = req.params
-    const { data: msg } = req.body
+    const payload = req.body as WebhookPayload
 
-    const texto = msg?.message?.text?.body
-    if (!texto || typeof texto !== 'string') return res.json({ result: 'ok' })
+    if (!payload?.message) return res.json({ result: 'ok' })
 
     const { data: org } = await supabaseAdmin
       .from('organizacoes')
@@ -25,12 +30,55 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
 
     if (!org || !org.ativo) return res.status(404).json({ error: 'Org não encontrada' })
 
-    const telefone = msg.from
     const tenantId = org.id
+    const telefone = limparTelefone(payload.chat?.phone || payload.message?.chatid)
+    if (!telefone) return res.status(400).json({ error: 'Telefone não encontrado' })
+
+    let texto = payload.message.content?.text || payload.message.text || ''
+
+    const isAudio =
+      payload.message.messageType === 'AudioMessage' ||
+      payload.message.mediaType === 'ptt' ||
+      payload.message.mediaType === 'audio'
+
+    if (isAudio && !texto) {
+      const baseUrl = process.env.UAZAPI_URL
+      const token = process.env.UAZAPI_TOKEN
+      const msgId = payload.message.id || payload.message.messageid
+      console.log(`[WEBHOOK] Áudio recebido — id=${msgId} mediaType=${payload.message.mediaType}`)
+
+      try {
+        const downloadRes = await fetch(`${baseUrl}/message/download`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', token: token || '' },
+          body: JSON.stringify({ id: msgId, return_base64: true, generate_mp3: true }),
+        })
+
+        const downloadBody = await downloadRes.json() as Record<string, unknown>
+        const b64 = (downloadBody.base64Data || downloadBody.base64) as string | undefined
+        const mime = (downloadBody.mimetype || downloadBody.mimeType) as string | undefined
+
+        if (downloadRes.ok && b64) {
+          const transcricao = await transcreverAudio(b64, mime || 'audio/ogg')
+          if (transcricao) texto = `[Áudio] ${transcricao}`
+        } else if (!downloadRes.ok) {
+          console.error(`[WEBHOOK] Falha ao baixar áudio: ${downloadRes.status}`, downloadBody)
+        }
+      } catch (err) {
+        console.error('[WEBHOOK] Erro ao baixar/transcrever áudio:', err)
+      }
+    }
+
+    if (!texto) {
+      console.log(`[WEBHOOK] Mensagem sem texto ignorada (type: ${payload.message.type}, mediaType: ${payload.message.mediaType})`)
+      return res.json({ result: 'ok' })
+    }
+
+    console.log(`[WEBHOOK] Mensagem recebida de ${telefone}: "${texto}"`)
 
     let { data: paciente } = await supabaseAdmin
       .from('pacientes')
-      .select('id, status')
+      .select('id, status, nome')
       .eq('telefone', telefone)
       .eq('tenant_id', tenantId)
       .single()
@@ -39,12 +87,25 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       const { data: novo } = await supabaseAdmin
         .from('pacientes')
         .insert({ telefone, status: 'novo', tenant_id: tenantId })
-        .select('id, status')
+        .select('id, status, nome')
         .single()
       paciente = novo
     }
 
     const pacienteId = paciente!.id
+
+    // Atualiza nome do paciente se vier do contato do WhatsApp e ainda não tiver nome
+    const contactName =
+      payload.chat?.name ||
+      payload.chat?.lead_name ||
+      (payload.chat as { pushName?: string }).pushName
+
+    if (contactName && !paciente?.nome) {
+      await supabaseAdmin
+        .from('pacientes')
+        .update({ nome: contactName })
+        .eq('id', pacienteId)
+    }
 
     // Verifica se está em modo humano (não processa com agente)
     const { data: ultimaConversa } = await supabaseAdmin
