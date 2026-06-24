@@ -102,15 +102,17 @@ async function getAgendamentosPendentes(pacienteId: string, tenantId: string): P
   }))
 }
 
-async function acionarHandoff(pacienteId: string, tenantId: string): Promise<void> {
+// Registra a falha na conversa (visível pra equipe acompanhar), mas não pausa
+// a Ana — a próxima mensagem do paciente continua sendo respondida automaticamente.
+async function registrarFalhaTecnica(pacienteId: string, tenantId: string): Promise<void> {
   await supabase.from('conversas_pacientes').insert({
     tenant_id: tenantId,
     paciente_id: pacienteId,
-    tipo_remetente: 'humano',
-    modo_humano: true,
-    mensagem_agente: '[SISTEMA] Handoff automático ativado por erro técnico.',
+    tipo_remetente: 'agente',
+    modo_humano: false,
+    mensagem_agente: '[SISTEMA] Falha técnica nesta resposta — resposta de contingência enviada ao paciente.',
   })
-  console.log(`[CLAUDE] Handoff ativado para paciente ${pacienteId}`)
+  console.log(`[CLAUDE] Falha técnica registrada para paciente ${pacienteId}`)
 }
 
 export async function processarComAgente(
@@ -248,7 +250,7 @@ ${servicosInfo}`
             })
 
             if (consecutiveToolFailures >= 3) {
-              await acionarHandoff(pacienteId, tenantId)
+              await registrarFalhaTecnica(pacienteId, tenantId)
               return 'Desculpe, estou com dificuldades técnicas agora. Nossa equipe vai entrar em contato em breve.'
             }
           }
@@ -263,11 +265,11 @@ ${servicosInfo}`
     }
 
     console.warn(`[CLAUDE] Máximo de ${MAX_ITERATIONS} iterações atingido para paciente ${pacienteId}`)
-    await acionarHandoff(pacienteId, tenantId)
+    await registrarFalhaTecnica(pacienteId, tenantId)
     return 'Desculpe, não consegui processar sua mensagem agora. Nossa equipe vai te ajudar em breve.'
   } catch (error) {
     console.error('[CLAUDE] Erro irrecuperável no agentic loop:', error)
-    await acionarHandoff(pacienteId, tenantId).catch(() => {})
+    await registrarFalhaTecnica(pacienteId, tenantId).catch(() => {})
     return 'Desculpe, estou com dificuldades técnicas agora. Nossa equipe vai entrar em contato em breve.'
   }
 }
