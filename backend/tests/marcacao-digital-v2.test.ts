@@ -286,6 +286,26 @@ describe('/api/imagens-referencia', () => {
     const res = await request(app).delete(`/api/imagens-referencia/${imagemRefId}`).set(authHeader())
     expect(res.status).toBe(200)
   })
+
+  it('imagem global (tenant_id null) aparece pra qualquer clínica', async () => {
+    const { data: global } = await supabase
+      .from('imagens_referencia')
+      .insert({ tenant_id: null, nome: 'Rosto masculino padrão', url: 'https://example.com/global.png' })
+      .select('id')
+      .single()
+
+    const res = await request(app).get('/api/imagens-referencia').set(authHeader())
+    expect(res.status).toBe(200)
+    expect(res.body.some((img: { id: string }) => img.id === global!.id)).toBe(true)
+
+    // não pode ser apagada pela clínica comum (delete filtra por tenant_id próprio)
+    const delRes = await request(app).delete(`/api/imagens-referencia/${global!.id}`).set(authHeader())
+    expect(delRes.status).toBe(200)
+    const { data: aindaExiste } = await supabase.from('imagens_referencia').select('id').eq('id', global!.id).single()
+    expect(aindaExiste).not.toBeNull()
+
+    await supabase.from('imagens_referencia').delete().eq('id', global!.id)
+  })
 })
 
 describe('injetaveis.categoria — aceita enzimas', () => {

@@ -6,12 +6,13 @@ import { supabaseAdmin } from '../services/supabase'
 
 const router = Router()
 
-// Listar imagens de referência da clínica
+// Listar imagens de referência da clínica + as globais (tenant_id null, ex: rosto
+// masculino padrão — reaproveitadas em todas as clínicas)
 router.get('/', async (req: Request, res: Response) => {
   const { data, error } = await supabaseAdmin
     .from('imagens_referencia')
     .select('*')
-    .eq('tenant_id', req.user!.tenant_id)
+    .or(`tenant_id.is.null,tenant_id.eq.${req.user!.tenant_id}`)
     .order('created_at', { ascending: false })
 
   if (error) return res.status(400).json({ error: error.message })
