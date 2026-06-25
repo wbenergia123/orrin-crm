@@ -15,9 +15,19 @@ interface FollowupRegra {
   nome: string
   gatilho: string
   delay_minutos: number | null
+  horario_fixo: string | null
   template: string
   ativo: boolean
   ordem_prioridade: number
+}
+
+function formatarTempo(regra: FollowupRegra): string {
+  if (regra.horario_fixo) return `às ${regra.horario_fixo.substring(0, 5)}`
+  if (!regra.delay_minutos) return ''
+  const min = regra.delay_minutos
+  if (min % 1440 === 0) return `${min / 1440} dia${min / 1440 > 1 ? 's' : ''}`
+  if (min % 60 === 0) return `${min / 60}h`
+  return `${min} min`
 }
 
 interface WhatsappStatus {
@@ -266,7 +276,10 @@ export function Configuracoes() {
                   {regras.map((regra) => (
                     <div key={regra.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-gray-800">{regra.nome}</p>
+                        <p className="text-sm font-medium text-gray-800">
+                          {regra.nome}
+                          <span className="ml-2 text-xs font-normal text-gray-400">{formatarTempo(regra)}</span>
+                        </p>
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input
                             type="checkbox"
