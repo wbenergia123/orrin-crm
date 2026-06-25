@@ -92,6 +92,37 @@ describe('executarVerificarSlots', () => {
 
     expect(Array.isArray(result.disponibilidade)).toBe(true)
   })
+
+  it('marca o horário ocupado exatamente na hora salva, sem deslocar 3h', async () => {
+    const dataFutura = new Date()
+    dataFutura.setDate(dataFutura.getDate() + 35)
+    const dataStr = dataFutura.toISOString().substring(0, 10)
+
+    const { data: ocupado } = await supabase
+      .from('agendamentos')
+      .insert({
+        tenant_id: tenantId,
+        paciente_id: pacienteId,
+        servico_id: servicoId,
+        profissional_id: profissionalId,
+        data_hora: `${dataStr}T14:00:00`,
+        status: 'agendado',
+      })
+      .select('id')
+      .single()
+
+    const result = await executarVerificarSlots({
+      data_inicio: dataStr,
+      data_fim: dataStr,
+      profissional_id: profissionalId,
+    }, tenantId)
+
+    const slots = result.disponibilidade.find((d) => d.data === dataStr)?.slots ?? []
+    expect(slots).not.toContain('14:00')
+    expect(slots).toContain('11:00') // não deve ficar ocupado por engano
+
+    await supabase.from('agendamentos').delete().eq('id', ocupado!.id)
+  })
 })
 
 describe('executarCriarAgendamento', () => {

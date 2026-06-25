@@ -1,5 +1,6 @@
 import { supabase } from '../db/supabase'
 import type Anthropic from '@anthropic-ai/sdk'
+import { formatarTextoLocal } from './datetime-local'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -197,15 +198,12 @@ export async function executarVerificarSlots(
   if (agError) throw agError
 
   // Monta set de slots ocupados: "profissional_id|YYYY-MM-DD|HH"
-  // data_hora é retornado pelo Supabase em UTC — converte para BRT (UTC-3, sem DST desde 2019)
+  // data_hora é uma coluna TIMESTAMP (sem timezone) — o texto salvo já é o horário
+  // de Brasília literal, sem precisar de nenhuma conversão.
   const occupiedSet = new Set<string>()
   for (const a of ocupados ?? []) {
-    const utcHour = parseInt(a.data_hora.substring(11, 13), 10)
-    const brtHour = ((utcHour - 3) + 24) % 24
-    const dt = new Date(a.data_hora)
-    const brtDate = new Date(dt.getTime() - 3 * 60 * 60 * 1000)
-    const dateStr = brtDate.toISOString().substring(0, 10)
-    const hourStr = brtHour.toString().padStart(2, '0')
+    const dateStr = a.data_hora.substring(0, 10)
+    const hourStr = a.data_hora.substring(11, 13)
     occupiedSet.add(`${a.profissional_id}|${dateStr}|${hourStr}`)
   }
 
@@ -247,9 +245,10 @@ export async function executarCriarAgendamento(
   input: CriarAgendamentoInput,
   tenantId: string
 ): Promise<ResultadoCriar> {
-  // Normaliza data_hora: se não tem offset de timezone, trata como horário local de Brasília
-  const hasOffset = input.data_hora.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(input.data_hora)
-  const dataHoraNorm = hasOffset ? input.data_hora : `${input.data_hora}-03:00`
+  // data_hora é uma coluna TIMESTAMP (sem timezone) — qualquer indicador de fuso no
+  // texto (Z, +03:00 etc.) é ignorado pelo Postgres ao salvar, então normaliza
+  // removendo aqui pra refletir exatamente o que vai ficar salvo.
+  const dataHoraNorm = input.data_hora.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
 
   // Verifica double-booking manualmente (a tabela pode não ter unique constraint)
   const { data: existente } = await supabase
@@ -306,14 +305,12 @@ export async function executarCriarAgendamento(
     .in('status', ['novo', 'em_conversa'])
   if (updErr) console.error('[claude-tools] falha ao atualizar status do paciente:', updErr)
 
-  const hora = dataHoraNorm.substring(11, 16)
-  const dataFormatada = new Date(
-    input.data_hora.substring(0, 10) + 'T12:00:00'
-  ).toLocaleDateString('pt-BR', {
+  const { data: dataConfirmada, hora } = formatarTextoLocal(dataHoraNorm)
+  const [ano, mes, dia] = dataConfirmada.split('-').map(Number)
+  const dataFormatada = new Date(ano, mes - 1, dia).toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-    timeZone: 'America/Sao_Paulo',
   })
 
   return {
@@ -352,8 +349,7 @@ export async function executarRemarcarAgendamento(
     }
   }
 
-  const hasOffset = input.data_hora.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(input.data_hora)
-  const dataHoraNorm = hasOffset ? input.data_hora : `${input.data_hora}-03:00`
+  const dataHoraNorm = input.data_hora.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
 
   // Verifica double-booking manualmente (a tabela pode não ter unique constraint)
   const { data: existente } = await supabase
@@ -396,14 +392,12 @@ export async function executarRemarcarAgendamento(
     throw error
   }
 
-  const hora = dataHoraNorm.substring(11, 16)
-  const dataFormatada = new Date(
-    input.data_hora.substring(0, 10) + 'T12:00:00'
-  ).toLocaleDateString('pt-BR', {
+  const { data: dataConfirmada, hora } = formatarTextoLocal(dataHoraNorm)
+  const [ano, mes, dia] = dataConfirmada.split('-').map(Number)
+  const dataFormatada = new Date(ano, mes - 1, dia).toLocaleDateString('pt-BR', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-    timeZone: 'America/Sao_Paulo',
   })
 
   return {

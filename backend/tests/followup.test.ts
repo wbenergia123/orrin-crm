@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createServer } from 'http'
 import { supabase } from '../src/db/supabase'
 import { runFollowups } from '../src/lib/followup-runner'
+import { comoTextoLocal } from '../src/lib/datetime-local'
 
 let testTenantId: string
 let pacienteId: string
@@ -146,7 +147,7 @@ describe('runFollowups', () => {
         paciente_id: pacienteId,
         servico_id: servicoId,
         profissional_id: profissionalId,
-        data_hora: dataHora.toISOString(),
+        data_hora: comoTextoLocal(dataHora),
         status: 'confirmado',
       })
       .select('id')
@@ -210,7 +211,7 @@ describe('runFollowups', () => {
         paciente_id: pacienteId,
         servico_id: servicoId,
         profissional_id: profissionalId,
-        data_hora: dataHora.toISOString(),
+        data_hora: comoTextoLocal(dataHora),
         status: 'confirmado',
       })
       .select('id')
@@ -236,7 +237,7 @@ describe('runFollowups', () => {
         paciente_id: pacienteId,
         servico_id: servicoId,
         profissional_id: profissionalId,
-        data_hora: dataHora.toISOString(),
+        data_hora: comoTextoLocal(dataHora),
         status: 'confirmado',
       })
       .select('id')
@@ -264,7 +265,7 @@ describe('runFollowups', () => {
         paciente_id: pacienteId,
         servico_id: servicoId,
         profissional_id: profissionalId,
-        data_hora: dataHora.toISOString(),
+        data_hora: comoTextoLocal(dataHora),
         status: 'confirmado',
       })
       .select('id')
@@ -290,7 +291,7 @@ describe('runFollowups', () => {
         paciente_id: pacienteId,
         servico_id: servicoId,
         profissional_id: profissionalId,
-        data_hora: dataHora.toISOString(),
+        data_hora: comoTextoLocal(dataHora),
         status: 'confirmado',
       })
       .select('id')
@@ -327,7 +328,7 @@ describe('runFollowups', () => {
         paciente_id: pacienteId,
         servico_id: servicoId,
         profissional_id: profissionalId,
-        data_hora: dataHora.toISOString(),
+        data_hora: comoTextoLocal(dataHora),
         status: 'confirmado',
       })
       .select('id')
@@ -353,7 +354,7 @@ describe('runFollowups', () => {
         paciente_id: pacienteId,
         servico_id: servicoId,
         profissional_id: profissionalId,
-        data_hora: dataHora.toISOString(),
+        data_hora: comoTextoLocal(dataHora),
         status: 'confirmado',
       })
       .select('id')

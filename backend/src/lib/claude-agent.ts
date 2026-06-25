@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { toZonedTime, format as formatTz } from 'date-fns-tz'
 import { supabase } from '../db/supabase'
 import { TOOLS, executarTool } from './claude-tools'
+import { agoraComoTextoLocal, somarMinutosTextoLocal, formatarTextoLocal } from './datetime-local'
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -102,8 +102,8 @@ interface AgendamentoPendente {
 }
 
 export async function getAgendamentosPendentes(pacienteId: string, tenantId: string): Promise<AgendamentoPendente[]> {
-  const agora = new Date()
-  const limite48h = new Date(agora.getTime() + 48 * 60 * 60 * 1000)
+  const agora = agoraComoTextoLocal()
+  const limite48h = somarMinutosTextoLocal(agora, 48 * 60)
 
   // Inclui 'confirmado' também — senão a Ana perde a referência do ID assim que o
   // paciente confirma, e não consegue mais remarcar/cancelar um agendamento já confirmado.
@@ -113,8 +113,8 @@ export async function getAgendamentosPendentes(pacienteId: string, tenantId: str
     .eq('tenant_id', tenantId)
     .eq('paciente_id', pacienteId)
     .in('status', ['agendado', 'confirmado'])
-    .gte('data_hora', agora.toISOString())
-    .lte('data_hora', limite48h.toISOString())
+    .gte('data_hora', agora)
+    .lte('data_hora', limite48h)
     .order('data_hora', { ascending: true })
 
   return (data ?? []).map((ag) => ({
@@ -167,9 +167,7 @@ export async function processarComAgente(
 
     const pendentesText = pendentes.length > 0
       ? pendentes.map((ag) => {
-          const zonado = toZonedTime(new Date(ag.data_hora), 'America/Sao_Paulo')
-          const dataSP = formatTz(zonado, 'yyyy-MM-dd', { timeZone: 'America/Sao_Paulo' })
-          const horaSP = formatTz(zonado, 'HH:mm', { timeZone: 'America/Sao_Paulo' })
+          const { data: dataSP, hora: horaSP } = formatarTextoLocal(ag.data_hora)
           return `ID=${ag.id} | ${ag.servico_nome} | ${dataSP} às ${horaSP} | ${ag.profissional_nome}`
         }).join('\n')
       : '(nenhum agendamento próximo pendente de confirmação)'

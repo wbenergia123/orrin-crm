@@ -1,5 +1,6 @@
 import { supabase } from '../db/supabase'
 import { enviarMensagemViaUAZAPI } from './uazapi-client'
+import { comoTextoLocal, somarMinutosTextoLocal, formatarTextoLocal } from './datetime-local'
 import type { FollowupRegra } from '../types'
 
 const PADRAO_TIMEZONE = 'America/Sao_Paulo'
@@ -59,12 +60,11 @@ async function loadActiveRules(tenantId: string): Promise<FollowupRegra[]> {
   return (data ?? []) as FollowupRegra[]
 }
 
-function formatDateTime(dateStr: string, timezone: string) {
-  const date = new Date(dateStr)
-  return {
-    data: new Intl.DateTimeFormat('pt-BR', { timeZone: timezone, day: '2-digit', month: '2-digit' }).format(date),
-    hora: new Intl.DateTimeFormat('pt-BR', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(date),
-  }
+// data_hora é texto local (sem timezone) — extrai direto, sem passar por Date/Intl.
+function formatDateTime(dataHora: string) {
+  const { data, hora } = formatarTextoLocal(dataHora)
+  const [, mes, dia] = data.split('-')
+  return { data: `${dia}/${mes}`, hora }
 }
 
 function applyTemplate(template: string, vars: Record<string, string>) {
@@ -98,13 +98,13 @@ async function pacienteEmCooldown(tenantId: string, pacienteId: string, agora: D
   return (data ?? []).length > 0
 }
 
-async function temAgendamentoFuturo(pacienteId: string, agora: Date) {
+async function temAgendamentoFuturo(pacienteId: string, agora: Date, timezone: string) {
   const { data } = await supabase
     .from('agendamentos')
     .select('id')
     .eq('paciente_id', pacienteId)
     .eq('status', 'confirmado')
-    .gt('data_hora', agora.toISOString())
+    .gt('data_hora', comoTextoLocal(agora, timezone))
     .limit(1)
 
   return (data ?? []).length > 0
@@ -140,7 +140,7 @@ async function processarNaoRespondeu(tenantId: string, regra: FollowupRegra, ago
 
   for (const paciente of pacientes ?? []) {
     if (await pacienteEmCooldown(tenantId, paciente.id, agora)) continue
-    if (await temAgendamentoFuturo(paciente.id, agora)) continue
+    if (await temAgendamentoFuturo(paciente.id, agora, config.timezone)) continue
 
     const desdeRegra = new Date(agora.getTime() - 24 * 60 * 60 * 1000)
     if (await jaEnviou(regra.id, paciente.id, null, desdeRegra)) continue
@@ -150,16 +150,17 @@ async function processarNaoRespondeu(tenantId: string, regra: FollowupRegra, ago
 }
 
 async function processarLembreteAgendamento(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
-  const desde = new Date(agora.getTime() + (regra.delay_minutos! - 10) * 60 * 1000)
-  const ate = new Date(agora.getTime() + (regra.delay_minutos! + 10) * 60 * 1000)
+  const agoraLocal = comoTextoLocal(agora, config.timezone)
+  const desde = somarMinutosTextoLocal(agoraLocal, regra.delay_minutos! - 10)
+  const ate = somarMinutosTextoLocal(agoraLocal, regra.delay_minutos! + 10)
 
   const { data: agendamentos } = await supabase
     .from('agendamentos')
     .select('*, paciente:pacientes(*), servico:servicos(*), profissional:profissionais(*)')
     .eq('tenant_id', tenantId)
     .eq('status', 'confirmado')
-    .gte('data_hora', desde.toISOString())
-    .lte('data_hora', ate.toISOString())
+    .gte('data_hora', desde)
+    .lte('data_hora', ate)
 
   for (const ag of agendamentos ?? []) {
     const paciente = (ag as any).paciente
@@ -171,7 +172,7 @@ async function processarLembreteAgendamento(tenantId: string, regra: FollowupReg
     const desdeRegra = new Date(agora.getTime() - 24 * 60 * 60 * 1000)
     if (await jaEnviou(regra.id, paciente.id, ag.id, desdeRegra)) continue
 
-    const { data, hora } = formatDateTime(ag.data_hora, config.timezone)
+    const { data, hora } = formatDateTime(ag.data_hora)
     await enviar(tenantId, regra, paciente, ag, {
       nome: paciente.nome || 'tudo bem',
       servico: servico?.nome || 'seu procedimento',
@@ -183,16 +184,17 @@ async function processarLembreteAgendamento(tenantId: string, regra: FollowupReg
 }
 
 async function processarNoShow(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
-  const desde = new Date(agora.getTime() - 60 * 60 * 1000)
-  const ate = new Date(agora.getTime() - 15 * 60 * 1000)
+  const agoraLocal = comoTextoLocal(agora, config.timezone)
+  const desde = somarMinutosTextoLocal(agoraLocal, -60)
+  const ate = somarMinutosTextoLocal(agoraLocal, -15)
 
   const { data: agendamentos } = await supabase
     .from('agendamentos')
     .select('*, paciente:pacientes(*)')
     .eq('tenant_id', tenantId)
     .eq('status', 'confirmado')
-    .gte('data_hora', desde.toISOString())
-    .lte('data_hora', ate.toISOString())
+    .gte('data_hora', desde)
+    .lte('data_hora', ate)
 
   for (const ag of agendamentos ?? []) {
     const paciente = (ag as any).paciente
@@ -206,26 +208,22 @@ async function processarNoShow(tenantId: string, regra: FollowupRegra, agora: Da
 }
 
 async function processarLembreteDia(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
-  const horaAtual = new Intl.DateTimeFormat('en-GB', {
-    timeZone: config.timezone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(agora)
+  const agoraLocal = comoTextoLocal(agora, config.timezone)
+  const horaAtual = agoraLocal.substring(11, 16)
 
   const horarioFixo = (regra.horario_fixo ?? '08:00').substring(0, 5)
   if (horaAtual < horarioFixo) return
 
-  const hojeStr = new Intl.DateTimeFormat('en-CA', { timeZone: config.timezone }).format(agora)
+  const hojeStr = agoraLocal.substring(0, 10)
 
   const { data: agendamentos } = await supabase
     .from('agendamentos')
     .select('*, paciente:pacientes(*), servico:servicos(*), profissional:profissionais(*)')
     .eq('tenant_id', tenantId)
     .eq('status', 'confirmado')
-    .gte('data_hora', `${hojeStr}T00:00:00-03:00`)
-    .lte('data_hora', `${hojeStr}T23:59:59-03:00`)
-    .gt('data_hora', agora.toISOString())
+    .gte('data_hora', `${hojeStr}T00:00:00`)
+    .lte('data_hora', `${hojeStr}T23:59:59`)
+    .gt('data_hora', agoraLocal)
 
   for (const ag of agendamentos ?? []) {
     const paciente = (ag as any).paciente
@@ -236,7 +234,7 @@ async function processarLembreteDia(tenantId: string, regra: FollowupRegra, agor
     const desdeRegra = new Date(agora.getTime() - 24 * 60 * 60 * 1000)
     if (await jaEnviou(regra.id, paciente.id, ag.id, desdeRegra)) continue
 
-    const { hora } = formatDateTime(ag.data_hora, config.timezone)
+    const { hora } = formatDateTime(ag.data_hora)
     await enviar(tenantId, regra, paciente, ag, {
       nome: paciente.nome || 'tudo bem',
       servico: servico?.nome || 'seu procedimento',

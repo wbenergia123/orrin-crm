@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../services/supabase'
+import { agoraComoTextoLocal, somarMinutosTextoLocal } from '../lib/datetime-local'
 
 const router = Router()
 
@@ -11,14 +12,38 @@ const emptyMetrics = {
   deltas: { faturamento: null, agendamentos: null, leads: null },
 }
 
+// Limites do mês (atual e anterior) calculados no calendário de Brasília — tanto em
+// texto local puro (pra comparar com data_hora) quanto em ISO/UTC real (pra
+// comparar com colunas como created_at, que são populadas via NOW() e por isso
+// guardam o valor já em UTC).
+function limitesDoMes() {
+  const [anoStr, mesStr] = agoraComoTextoLocal().split('-')
+  const ano = parseInt(anoStr, 10)
+  const mes = parseInt(mesStr, 10) // 1-12
+  const pad = (n: number) => String(n).padStart(2, '0')
+
+  const mesAnt = mes === 1 ? 12 : mes - 1
+  const anoAnt = mes === 1 ? ano - 1 : ano
+  const ultimoDia = (a: number, m: number) => new Date(a, m, 0).getDate()
+
+  const local = {
+    inicioMes: `${ano}-${pad(mes)}-01T00:00:00`,
+    fimMes: `${ano}-${pad(mes)}-${pad(ultimoDia(ano, mes))}T23:59:59`,
+    inicioMesAnt: `${anoAnt}-${pad(mesAnt)}-01T00:00:00`,
+    fimMesAnt: `${anoAnt}-${pad(mesAnt)}-${pad(ultimoDia(anoAnt, mesAnt))}T23:59:59`,
+  }
+  const utc = Object.fromEntries(
+    Object.entries(local).map(([k, v]) => [k, new Date(`${v}-03:00`).toISOString()])
+  ) as Record<keyof typeof local, string>
+
+  return { local, utc }
+}
+
 router.get('/metricas', async (req, res) => {
   if (!req.user!.tenant_id) { res.json(emptyMetrics); return }
 
-  const now = new Date()
-  const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const fimMes = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString()
-  const inicioMesAnt = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
-  const fimMesAnt = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString()
+  const { local, utc } = limitesDoMes()
+  const { inicioMes, fimMes, inicioMesAnt, fimMesAnt } = local
 
   const [
     { count: totalAgendamentos },
@@ -38,10 +63,10 @@ router.get('/metricas', async (req, res) => {
       .gte('data_hora', inicioMesAnt).lte('data_hora', fimMesAnt),
     supabaseAdmin.from('pacientes').select('*', { count: 'exact', head: true })
       .eq('tenant_id', req.user!.tenant_id)
-      .gte('created_at', inicioMes).eq('status', 'novo'),
+      .gte('created_at', utc.inicioMes).eq('status', 'novo'),
     supabaseAdmin.from('pacientes').select('*', { count: 'exact', head: true })
       .eq('tenant_id', req.user!.tenant_id)
-      .gte('created_at', inicioMesAnt).lte('created_at', fimMesAnt).eq('status', 'novo'),
+      .gte('created_at', utc.inicioMesAnt).lte('created_at', utc.fimMesAnt).eq('status', 'novo'),
     supabaseAdmin.from('agendamentos').select('servico_id, servicos(preco)').eq('status', 'concluido')
       .eq('tenant_id', req.user!.tenant_id)
       .gte('data_hora', inicioMes).lte('data_hora', fimMes),
@@ -88,10 +113,15 @@ router.get('/grafico', async (req, res) => {
   inicio.setDate(hoje.getDate() - 29)
   inicio.setHours(0, 0, 0, 0)
 
+  // data_hora é texto local (sem timezone) — usa um limite no calendário de
+  // Brasília, não o "inicio" em UTC usado pra created_at.
+  const hojeMeiaNoiteLocal = `${agoraComoTextoLocal().substring(0, 10)}T00:00:00`
+  const inicioDataHora = somarMinutosTextoLocal(hojeMeiaNoiteLocal, -29 * 24 * 60)
+
   const { data: agendamentos } = await supabaseAdmin
     .from('agendamentos').select('data_hora')
     .eq('tenant_id', req.user!.tenant_id)
-    .gte('data_hora', inicio.toISOString()).neq('status', 'cancelado')
+    .gte('data_hora', inicioDataHora).neq('status', 'cancelado')
 
   const { data: conversas } = await supabaseAdmin
     .from('conversas_pacientes').select('created_at')

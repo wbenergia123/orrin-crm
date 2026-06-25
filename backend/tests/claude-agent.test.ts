@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { getAgendamentosPendentes, getHistoricoConversa, getModeloAna, invalidarCachePrompt } from '../src/lib/claude-agent'
 import { supabase } from '../src/db/supabase'
+import { agoraComoTextoLocal, somarMinutosTextoLocal } from '../src/lib/datetime-local'
 
 let tenantId: string
 let pacienteId: string
@@ -82,6 +83,23 @@ describe('getAgendamentosPendentes', () => {
     expect(ids).toContain(agendamentoAgendadoId)
     expect(ids).toContain(agendamentoConfirmadoId)
     expect(ids).not.toContain(agendamentoCanceladoId)
+  })
+
+  it('inclui agendamento daqui a 1h — janela não pode ficar deslocada à frente do horário real', async () => {
+    const em1h = somarMinutosTextoLocal(agoraComoTextoLocal(), 60)
+    const { data: proximo } = await supabase
+      .from('agendamentos')
+      .insert({ tenant_id: tenantId, paciente_id: pacienteId, servico_id: servicoId, profissional_id: profissionalId, data_hora: em1h, status: 'agendado' })
+      .select('id')
+      .single()
+
+    const result = await getAgendamentosPendentes(pacienteId, tenantId)
+    expect(result.map((ag) => ag.id)).toContain(proximo!.id)
+
+    const encontrado = result.find((ag) => ag.id === proximo!.id)
+    expect(encontrado?.data_hora).toBe(em1h)
+
+    await supabase.from('agendamentos').delete().eq('id', proximo!.id)
   })
 })
 

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { supabaseAdmin } from '../services/supabase'
+import { somarMinutosTextoLocal } from '../lib/datetime-local'
 
 const router = Router()
 
@@ -8,21 +9,26 @@ const HORA_INICIO = 8   // 08:00
 const HORA_FIM = 18     // 18:00
 const DURACAO_MIN = 60
 
-function gerarSlots(dataStr: string): Date[] {
-  const slots: Date[] = []
+// data_hora é uma coluna TIMESTAMP (sem timezone) — texto local puro. Nunca passa
+// por Date/timezone aqui, senão o horário desloca conforme o fuso do processo.
+function gerarSlots(dataStr: string): { textoLocal: string; hora: string }[] {
+  const slots: { textoLocal: string; hora: string }[] = []
   for (let h = HORA_INICIO; h < HORA_FIM; h++) {
-    const slot = new Date(`${dataStr}T00:00:00`)
-    slot.setHours(h, 0, 0, 0)
-    slots.push(slot)
+    const hora = `${String(h).padStart(2, '0')}:00`
+    slots.push({ textoLocal: `${dataStr}T${hora}:00`, hora })
   }
   return slots
 }
 
-function dentroDoExpediente(dataHora: Date): boolean {
-  const hora = dataHora.getHours()
-  const minuto = dataHora.getMinutes()
+function dentroDoExpediente(textoLocal: string): boolean {
+  const hora = parseInt(textoLocal.substring(11, 13), 10)
+  const minuto = parseInt(textoLocal.substring(14, 16), 10)
   const totalMin = hora * 60 + minuto
   return totalMin >= HORA_INICIO * 60 && totalMin + DURACAO_MIN <= HORA_FIM * 60
+}
+
+function normalizarTextoLocal(dataHora: string): string {
+  return dataHora.replace(/(Z|[+-]\d{2}:\d{2})$/, '')
 }
 
 // IMPORTANT: /slots-disponiveis must be defined BEFORE /:id so Express doesn't treat "slots-disponiveis" as an id
@@ -34,8 +40,6 @@ router.get('/slots-disponiveis', async (req, res) => {
   }
 
   const dataStr = dataParam as string
-  const inicioDia = new Date(`${dataStr}T00:00:00`).toISOString()
-  const fimDia = new Date(`${dataStr}T23:59:59`).toISOString()
 
   const { data: ocupados } = await supabaseAdmin
     .from('agendamentos')
@@ -43,19 +47,19 @@ router.get('/slots-disponiveis', async (req, res) => {
     .eq('tenant_id', req.user!.tenant_id)
     .eq('profissional_id', profissional_id)
     .neq('status', 'cancelado')
-    .gte('data_hora', inicioDia)
-    .lte('data_hora', fimDia)
+    .gte('data_hora', `${dataStr}T00:00:00`)
+    .lte('data_hora', `${dataStr}T23:59:59`)
 
   const horariosOcupados = new Set(
-    (ocupados ?? []).map((a) => new Date(a.data_hora).getHours())
+    (ocupados ?? []).map((a) => a.data_hora.substring(11, 16))
   )
 
   const todos = gerarSlots(dataStr)
 
   res.json(todos.map((s) => ({
-    iso: s.toISOString(),
-    hora: `${String(s.getHours()).padStart(2, '0')}:00`,
-    disponivel: !horariosOcupados.has(s.getHours()),
+    iso: `${s.textoLocal}-03:00`,
+    hora: s.hora,
+    disponivel: !horariosOcupados.has(s.hora),
   })))
 })
 
@@ -80,7 +84,7 @@ const agendamentoSchema = z.object({
   paciente_id: z.string().uuid(),
   servico_id: z.string().uuid(),
   profissional_id: z.string().uuid(),
-  data_hora: z.string().datetime(),
+  data_hora: z.string().datetime({ offset: true }),
   notas: z.string().optional(),
 })
 
@@ -88,21 +92,21 @@ router.post('/', async (req, res) => {
   const parsed = agendamentoSchema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
 
-  const dataHora = new Date(parsed.data.data_hora)
-  if (!dentroDoExpediente(dataHora)) {
+  const dataHoraNorm = normalizarTextoLocal(parsed.data.data_hora)
+  if (!dentroDoExpediente(dataHoraNorm)) {
     res.status(400).json({ error: 'Horário fora do expediente (08:00–18:00)' })
     return
   }
 
-  const fim = new Date(dataHora.getTime() + DURACAO_MIN * 60 * 1000)
+  const fim = somarMinutosTextoLocal(dataHoraNorm, DURACAO_MIN)
   const { data: conflito } = await supabaseAdmin
     .from('agendamentos')
     .select('id')
     .eq('tenant_id', req.user!.tenant_id)
     .eq('profissional_id', parsed.data.profissional_id)
     .neq('status', 'cancelado')
-    .gte('data_hora', dataHora.toISOString())
-    .lt('data_hora', fim.toISOString())
+    .gte('data_hora', dataHoraNorm)
+    .lt('data_hora', fim)
     .limit(1)
 
   if (conflito && conflito.length > 0) {
@@ -112,7 +116,7 @@ router.post('/', async (req, res) => {
 
   const { data, error } = await supabaseAdmin
     .from('agendamentos')
-    .insert({ ...parsed.data, tenant_id: req.user!.tenant_id })
+    .insert({ ...parsed.data, data_hora: dataHoraNorm, tenant_id: req.user!.tenant_id })
     .select()
     .single()
   if (error) { res.status(400).json({ error: error.message }); return }
@@ -164,16 +168,17 @@ router.get('/:id', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const schema = z.object({
-    data_hora: z.string().datetime().optional(),
+    data_hora: z.string().datetime({ offset: true }).optional(),
     status: z.enum(['agendado', 'confirmado', 'cancelado', 'concluido']).optional(),
     notas: z.string().optional(),
   })
   const parsed = schema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
 
+  let dataHoraNorm: string | undefined
   if (parsed.data.data_hora) {
-    const dataHora = new Date(parsed.data.data_hora)
-    if (!dentroDoExpediente(dataHora)) {
+    dataHoraNorm = normalizarTextoLocal(parsed.data.data_hora)
+    if (!dentroDoExpediente(dataHoraNorm)) {
       res.status(400).json({ error: 'Horário fora do expediente (08:00–18:00)' })
       return
     }
@@ -181,7 +186,7 @@ router.patch('/:id', async (req, res) => {
 
   const { data, error } = await supabaseAdmin
     .from('agendamentos')
-    .update(parsed.data)
+    .update({ ...parsed.data, ...(dataHoraNorm ? { data_hora: dataHoraNorm } : {}) })
     .eq('id', req.params.id)
     .eq('tenant_id', req.user!.tenant_id)
     .select()
