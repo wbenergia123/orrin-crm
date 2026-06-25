@@ -244,6 +244,15 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
     },
   })
 
+  const deleteFoto = useMutation({
+    mutationFn: async (id: string) => api.delete(`/marcacoes/fotos/${id}`),
+    onSuccess: (_data, id) => {
+      if (antesId === id) setAntesId(undefined)
+      if (depoisId === id) setDepoisId(undefined)
+      queryClient.invalidateQueries({ queryKey: ['fotos', pacienteId] })
+    },
+  })
+
   const handleBackgroundChange = useCallback(
     (change: {
       background_modo?: BackgroundModo
@@ -496,6 +505,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
         onSetAntes={setAntesId}
         onSetDepois={setDepoisId}
         onUpload={(file, tipo) => uploadFoto.mutate({ file, tipo })}
+        onDelete={(id) => deleteFoto.mutate(id)}
         isUploading={uploadFoto.isPending}
       />
 

@@ -1,6 +1,6 @@
 // frontend/src/components/marcacao/BeforeAfterSlider.tsx
 import { useState, useRef, useCallback } from 'react'
-import { ImageOff, Camera, Loader2 } from 'lucide-react'
+import { ImageOff, Camera, Loader2, Trash2 } from 'lucide-react'
 import type { FotoPaciente } from '../../types'
 
 interface BeforeAfterSliderProps {
@@ -10,6 +10,7 @@ interface BeforeAfterSliderProps {
   onSetAntes?: (id: string) => void
   onSetDepois?: (id: string) => void
   onUpload: (file: File, tipo: 'antes' | 'depois' | 'geral') => void
+  onDelete?: (id: string) => void
   isUploading: boolean
 }
 
@@ -51,7 +52,7 @@ function UploadFoto({ onUpload, isUploading }: { onUpload: BeforeAfterSliderProp
   )
 }
 
-export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetDepois, onUpload, isUploading }: BeforeAfterSliderProps) {
+export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetDepois, onUpload, onDelete, isUploading }: BeforeAfterSliderProps) {
   const [sliderPos, setSliderPos] = useState(50)
   const containerRef = useRef<HTMLDivElement>(null)
   const isDragging = useRef(false)
@@ -100,12 +101,14 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
               fotos={fotos}
               selectedId={antesId}
               onSelect={onSetAntes}
+              onDelete={onDelete}
             />
             <PhotoSelector
               label="Depois"
               fotos={fotos}
               selectedId={depoisId}
               onSelect={onSetDepois}
+              onDelete={onDelete}
             />
           </div>
         )}
@@ -183,12 +186,14 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
           fotos={fotos}
           selectedId={antesId}
           onSelect={onSetAntes}
+          onDelete={onDelete}
         />
         <PhotoSelector
           label="Depois"
           fotos={fotos}
           selectedId={depoisId}
           onSelect={onSetDepois}
+          onDelete={onDelete}
         />
       </div>
     </div>
@@ -200,28 +205,50 @@ function PhotoSelector({
   fotos,
   selectedId,
   onSelect,
+  onDelete,
 }: {
   label: string
   fotos: FotoPaciente[]
   selectedId?: string
   onSelect?: (id: string) => void
+  onDelete?: (id: string) => void
 }) {
+  const handleDelete = () => {
+    if (!selectedId) return
+    if (window.confirm('Tem certeza que quer excluir essa foto?')) {
+      onDelete?.(selectedId)
+    }
+  }
+
   return (
     <div>
       <label className="block text-xs text-gray-500 mb-1">{label}</label>
-      <select
-        value={selectedId ?? ''}
-        onChange={(e) => onSelect?.(e.target.value)}
-        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
-      >
-        <option value="">Selecionar foto...</option>
-        {fotos.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.tipo === 'antes' ? '📸 ' : f.tipo === 'depois' ? '✨ ' : '🖼️ '}
-            {f.legenda ?? `${f.tipo} — ${new Date(f.created_at).toLocaleDateString('pt-BR')}`}
-          </option>
-        ))}
-      </select>
+      <div className="flex items-center gap-1.5">
+        <select
+          value={selectedId ?? ''}
+          onChange={(e) => onSelect?.(e.target.value)}
+          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+        >
+          <option value="">Selecionar foto...</option>
+          {fotos.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.tipo === 'antes' ? '📸 ' : f.tipo === 'depois' ? '✨ ' : '🖼️ '}
+              {f.legenda ?? `${f.tipo} — ${new Date(f.created_at).toLocaleDateString('pt-BR')}`}
+            </option>
+          ))}
+        </select>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={!selectedId}
+            title="Excluir foto selecionada"
+            className="flex-shrink-0 p-1.5 text-gray-400 hover:text-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+      </div>
     </div>
   )
 }
