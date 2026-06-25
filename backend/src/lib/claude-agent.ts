@@ -10,9 +10,11 @@ const client = new Anthropic({
 const MODELO_PADRAO = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001'
 
 let promptCache: Record<string, string> = {}
+let modeloCache: Record<string, string> = {}
 
 export function invalidarCachePrompt(tenantId: string): void {
   delete promptCache[tenantId]
+  delete modeloCache[tenantId]
 }
 
 async function getPromptAna(tenantId: string): Promise<string> {
@@ -27,6 +29,22 @@ async function getPromptAna(tenantId: string): Promise<string> {
 
   const valor = data?.valor?.trim() || ''
   promptCache[tenantId] = valor
+  return valor
+}
+
+// Modelo por clínica — em branco usa o padrão global (env ou fallback fixo).
+export async function getModeloAna(tenantId: string): Promise<string> {
+  if (modeloCache[tenantId] !== undefined) return modeloCache[tenantId]
+
+  const { data } = await supabase
+    .from('configuracoes')
+    .select('valor')
+    .eq('tenant_id', tenantId)
+    .eq('chave', 'ana_model')
+    .single()
+
+  const valor = data?.valor?.trim() || MODELO_PADRAO
+  modeloCache[tenantId] = valor
   return valor
 }
 
@@ -126,12 +144,13 @@ export async function processarComAgente(
   mensagensDoUsuario: string[]
 ): Promise<string> {
   try {
-    const [paciente, historico, servicos, pendentes, promptEditavel] = await Promise.all([
+    const [paciente, historico, servicos, pendentes, promptEditavel, modelo] = await Promise.all([
       getPacienteInfo(pacienteId),
       getHistoricoConversa(pacienteId),
       getServicos(tenantId),
       getAgendamentosPendentes(pacienteId, tenantId),
       getPromptAna(tenantId),
+      getModeloAna(tenantId),
     ])
 
     const dataAtualStr = new Date().toLocaleDateString('pt-BR', {
@@ -201,7 +220,7 @@ ${servicosInfo}`
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
       const response = await client.messages.create({
-        model: MODELO_PADRAO,
+        model: modelo,
         max_tokens: 1024,
         system: systemPrompt,
         tools: TOOLS,

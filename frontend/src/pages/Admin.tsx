@@ -35,6 +35,7 @@ export function Admin() {
   const [carregandoUazapiId, setCarregandoUazapiId] = useState<string | null>(null)
   const [editandoPromptId, setEditandoPromptId] = useState<string | null>(null)
   const [promptAna, setPromptAna] = useState('')
+  const [anaModel, setAnaModel] = useState('')
   const [carregandoPromptId, setCarregandoPromptId] = useState<string | null>(null)
 
   const { data: tenants = [], isLoading } = useQuery<Tenant[]>({
@@ -91,11 +92,12 @@ export function Admin() {
   })
 
   const { mutate: salvarPrompt, isPending: salvandoPrompt } = useMutation({
-    mutationFn: async ({ id, prompt_ana }: { id: string; prompt_ana: string }) =>
-      (await api.patch(`/admin/tenants/${id}/prompt`, { prompt_ana })).data,
+    mutationFn: async ({ id, prompt_ana, ana_model }: { id: string; prompt_ana: string; ana_model: string }) =>
+      (await api.patch(`/admin/tenants/${id}/prompt`, { prompt_ana, ana_model })).data,
     onSuccess: () => {
       setEditandoPromptId(null)
       setPromptAna('')
+      setAnaModel('')
     },
   })
 
@@ -297,8 +299,9 @@ export function Admin() {
                               onClick={async () => {
                                 setCarregandoPromptId(t.id)
                                 try {
-                                  const { data } = await api.get<{ prompt_ana: string }>(`/admin/tenants/${t.id}/prompt`)
+                                  const { data } = await api.get<{ prompt_ana: string; ana_model: string }>(`/admin/tenants/${t.id}/prompt`)
                                   setPromptAna(data.prompt_ana)
+                                  setAnaModel(data.ana_model)
                                   setEditandoPromptId(t.id)
                                 } catch {
                                   alert('Não foi possível carregar o prompt da Ana.')
@@ -366,16 +369,30 @@ export function Admin() {
                       rows={14}
                       className="w-full border border-gray-200 rounded-lg p-3 text-xs font-mono resize-y focus:outline-none focus:ring-2 focus:ring-violet-500"
                     />
+                    <div className="space-y-1">
+                      <Label htmlFor={`modelo-${t.id}`} className="text-xs">Modelo da Ana</Label>
+                      <select
+                        id={`modelo-${t.id}`}
+                        value={anaModel}
+                        onChange={(e) => setAnaModel(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
+                      >
+                        <option value="">Padrão do sistema (Haiku — mais barato)</option>
+                        <option value="claude-haiku-4-5-20251001">Haiku 4.5 (mais barato)</option>
+                        <option value="claude-sonnet-4-6">Sonnet 4.6 (mais inteligente)</option>
+                        <option value="claude-opus-4-8">Opus 4.8 (mais caro e mais capaz)</option>
+                      </select>
+                    </div>
                     <div className="flex items-center gap-2">
                       <Button
                         size="sm"
                         disabled={salvandoPrompt}
-                        onClick={() => salvarPrompt({ id: t.id, prompt_ana: promptAna })}
+                        onClick={() => salvarPrompt({ id: t.id, prompt_ana: promptAna, ana_model: anaModel })}
                       >
                         {salvandoPrompt ? 'Salvando...' : 'Salvar'}
                       </Button>
                       <button
-                        onClick={() => { setEditandoPromptId(null); setPromptAna('') }}
+                        onClick={() => { setEditandoPromptId(null); setPromptAna(''); setAnaModel('') }}
                         className="text-xs text-gray-400 hover:text-gray-600"
                       >
                         Cancelar

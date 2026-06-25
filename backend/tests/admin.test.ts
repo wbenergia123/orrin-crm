@@ -225,6 +225,20 @@ describe('GET/PATCH /api/admin/tenants/:id/prompt', () => {
     expect(get.body.prompt_ana).toBe(texto)
   })
 
+  it('salva o modelo sem afetar o prompt já salvo', async () => {
+    const patch = await request(app)
+      .patch(`/api/admin/tenants/${promptOrgId}/prompt`)
+      .set('Authorization', `Bearer ${superToken}`)
+      .send({ ana_model: 'claude-sonnet-4-6' })
+    expect(patch.status).toBe(200)
+
+    const get = await request(app)
+      .get(`/api/admin/tenants/${promptOrgId}/prompt`)
+      .set('Authorization', `Bearer ${superToken}`)
+    expect(get.body.ana_model).toBe('claude-sonnet-4-6')
+    expect(get.body.prompt_ana).toBe('Você é Ana, atendente da Clínica Prompt Test.') // do teste anterior, não foi apagado
+  })
+
   it('retorna 404 pra clínica inexistente', async () => {
     const res = await request(app)
       .patch('/api/admin/tenants/00000000-0000-0000-0000-000000000000/prompt')

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { getAgendamentosPendentes, getHistoricoConversa } from '../src/lib/claude-agent'
+import { getAgendamentosPendentes, getHistoricoConversa, getModeloAna, invalidarCachePrompt } from '../src/lib/claude-agent'
 import { supabase } from '../src/db/supabase'
 
 let tenantId: string
@@ -110,5 +110,23 @@ describe('getHistoricoConversa', () => {
     expect(result[9].mensagem_paciente).toBe('Pergunta 15')
 
     await supabase.from('conversas_pacientes').delete().eq('paciente_id', pacienteId)
+  })
+})
+
+describe('getModeloAna', () => {
+  afterAll(async () => {
+    await supabase.from('configuracoes').delete().eq('tenant_id', tenantId).eq('chave', 'ana_model')
+  })
+
+  it('usa o padrão global quando a clínica não tem modelo configurado', async () => {
+    const modelo = await getModeloAna(tenantId)
+    expect(modelo).toBe(process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001')
+  })
+
+  it('usa o modelo configurado pra clínica quando existe', async () => {
+    await supabase.from('configuracoes').insert({ tenant_id: tenantId, chave: 'ana_model', valor: 'claude-sonnet-4-6' })
+    invalidarCachePrompt(tenantId) // limpa o cache pra refletir o valor recém-criado
+    const modelo = await getModeloAna(tenantId)
+    expect(modelo).toBe('claude-sonnet-4-6')
   })
 })

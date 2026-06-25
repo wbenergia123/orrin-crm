@@ -208,21 +208,31 @@ router.get('/tenants/:id/prompt', async (req: Request, res: Response) => {
 
   const { data, error } = await supabaseAdmin
     .from('configuracoes')
-    .select('valor')
+    .select('chave, valor')
     .eq('tenant_id', id)
-    .eq('chave', 'prompt_ana')
-    .maybeSingle()
+    .in('chave', ['prompt_ana', 'ana_model'])
 
   if (error) return res.status(400).json({ error: error.message })
-  res.json({ prompt_ana: data?.valor || '' })
+
+  const map = Object.fromEntries((data ?? []).map((r) => [r.chave, r.valor]))
+  res.json({
+    prompt_ana: map['prompt_ana'] || '',
+    ana_model: map['ana_model'] || '',
+  })
 })
 
 router.patch('/tenants/:id/prompt', async (req: Request, res: Response) => {
   const { id } = req.params
-  const { prompt_ana } = req.body
+  const { prompt_ana, ana_model } = req.body
 
-  if (typeof prompt_ana !== 'string') {
-    return res.status(400).json({ error: 'prompt_ana deve ser uma string' })
+  // Os dois campos são opcionais — só atualiza o que realmente veio na request,
+  // pra dar pra editar prompt e modelo separadamente sem apagar o outro.
+  const updates: { tenant_id: string; chave: string; valor: string }[] = []
+  if (typeof prompt_ana === 'string') updates.push({ tenant_id: id, chave: 'prompt_ana', valor: prompt_ana })
+  if (typeof ana_model === 'string') updates.push({ tenant_id: id, chave: 'ana_model', valor: ana_model })
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: 'prompt_ana ou ana_model são obrigatórios' })
   }
 
   const { data: org, error: orgError } = await supabaseAdmin
@@ -238,7 +248,7 @@ router.patch('/tenants/:id/prompt', async (req: Request, res: Response) => {
 
   const { error } = await supabaseAdmin
     .from('configuracoes')
-    .upsert({ tenant_id: id, chave: 'prompt_ana', valor: prompt_ana }, { onConflict: 'tenant_id,chave' })
+    .upsert(updates, { onConflict: 'tenant_id,chave' })
 
   if (error) return res.status(400).json({ error: error.message })
 
