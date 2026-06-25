@@ -71,7 +71,7 @@ export async function getHistoricoConversa(pacienteId: string): Promise<Conversa
     .eq('modo_humano', false)
     .not('mensagem_agente', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(10)
+    .limit(30)
   return (data ?? []).reverse()
 }
 
