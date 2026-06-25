@@ -118,6 +118,14 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
     },
   })
 
+  const moveMarking = useMutation({
+    mutationFn: async ({ id, x, y }: { id: string; x: number; y: number }) =>
+      (await api.patch(`/marcacoes/${id}`, { x, y })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['markings', currentVisitId] })
+    },
+  })
+
   const saveProtocolo = useMutation({
     mutationFn: async () => {
       if (currentVisitId) {
@@ -397,6 +405,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
               onMarkingClick={(id: string) => {
                 removeMarking.mutate(id)
               }}
+              onMoveMarking={(id, x, y) => moveMarking.mutate({ id, x, y })}
               showQuantities={showQuantities}
               backgroundOverride={backgroundOverride}
             />
@@ -426,6 +435,11 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
           {compareVisitId && (
             <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
               <Eye size={12} /> Exibindo marcações da sessão atual + sessão anterior sobrepostas
+            </p>
+          )}
+          {tool === 'ponto' && markingsForView.length > 0 && (
+            <p className="text-xs text-gray-400 mt-2">
+              Arraste uma marcação pra mover de posição. Clique sem arrastar pra excluir.
             </p>
           )}
         </div>

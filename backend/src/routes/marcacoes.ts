@@ -227,6 +227,26 @@ router.post('/protocolo', async (req: Request, res: Response) => {
   res.status(201).json(data)
 })
 
+// Mover marcação do tipo ponto (arrastar pra outra posição sem precisar excluir)
+router.patch('/:id', async (req: Request, res: Response) => {
+  const { x, y } = req.body
+  if (typeof x !== 'number' || typeof y !== 'number' || x < 0 || x > 100 || y < 0 || y > 100) {
+    return res.status(400).json({ error: 'x e y devem ser números entre 0 e 100' })
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('injection_markings')
+    .update({ x, y })
+    .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
+    .eq('tipo_desenho', 'ponto')
+    .select('*, injetaveis(nome, cor_hex, categoria, unidade)')
+    .single()
+
+  if (error) return res.status(400).json({ error: error.message })
+  res.json(data)
+})
+
 // Remover marcação
 router.delete('/:id', async (req: Request, res: Response) => {
   const { error } = await supabaseAdmin

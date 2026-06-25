@@ -203,6 +203,50 @@ describe('POST /api/marcacoes — tipos de desenho', () => {
   })
 })
 
+describe('PATCH /api/marcacoes/:id — mover marcação (arrastar)', () => {
+  let marcacaoId: string
+
+  beforeAll(async () => {
+    const res = await request(app)
+      .post('/api/marcacoes')
+      .set(authHeader())
+      .send({
+        visit_id: atendimentoId,
+        paciente_id: pacienteId,
+        view_type: 'face_front',
+        x: 30,
+        y: 30,
+        product_id: injetavelPontoId,
+        quantity: 5,
+      })
+    marcacaoId = res.body.id
+  })
+
+  afterAll(async () => {
+    await supabase.from('injection_markings').delete().eq('id', marcacaoId)
+  })
+
+  it('atualiza x/y de uma marcação do tipo ponto', async () => {
+    const res = await request(app)
+      .patch(`/api/marcacoes/${marcacaoId}`)
+      .set(authHeader())
+      .send({ x: 60, y: 70 })
+
+    expect(res.status).toBe(200)
+    expect(res.body.x).toBe(60)
+    expect(res.body.y).toBe(70)
+  })
+
+  it('rejeita x/y fora do intervalo 0-100', async () => {
+    const res = await request(app)
+      .patch(`/api/marcacoes/${marcacaoId}`)
+      .set(authHeader())
+      .send({ x: 150, y: 30 })
+
+    expect(res.status).toBe(400)
+  })
+})
+
 describe('PATCH /api/marcacoes/atendimentos/:id — fundo customizável', () => {
   it('atualiza background para foto do paciente com opacidade', async () => {
     const res = await request(app)

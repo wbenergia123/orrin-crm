@@ -38,10 +38,14 @@ export interface BodyMapSVGProps {
   onAddMarking?: (x: number, y: number) => void
   onFinishPath?: (pontos: { x: number; y: number }[]) => void
   onMarkingClick?: (markingId: string) => void
+  onMoveMarking?: (markingId: string, x: number, y: number) => void
   showQuantities?: boolean
   backgroundOverride?: BackgroundOverride
   className?: string
 }
+
+// Distância mínima (em % do container) pra considerar que foi um arrasto, não um clique.
+const DRAG_THRESHOLD = 1
 
 /* ------------------------------------------------------------------ */
 /*  Map de imagens por vista                                             */
@@ -66,6 +70,7 @@ function BodyMapSVG({
   onAddMarking,
   onFinishPath,
   onMarkingClick,
+  onMoveMarking,
   showQuantities = false,
   backgroundOverride,
   className,
@@ -73,6 +78,7 @@ function BodyMapSVG({
   const containerRef = useRef<HTMLDivElement>(null)
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null)
   const [drawingPoints, setDrawingPoints] = useState<{ x: number; y: number }[]>([])
+  const [dragState, setDragState] = useState<{ id: string; startX: number; startY: number; x: number; y: number } | null>(null)
 
   // Converte coordenadas de clique para % (0-100) relativa ao container
   function getRelativePos(e: React.MouseEvent<HTMLDivElement>): { x: number; y: number } | null {
@@ -116,9 +122,29 @@ function BodyMapSVG({
 
   const cancelDrawing = () => setDrawingPoints([])
 
+  const handleMarkingMouseDown = (e: React.MouseEvent, m: MarkingData) => {
+    if (m.tipo_desenho !== 'ponto' || !onMoveMarking) return
+    e.stopPropagation()
+    setDragState({ id: m.id, startX: m.x, startY: m.y, x: m.x, y: m.y })
+  }
+
+  const handleMouseUp = () => {
+    if (!dragState) return
+    const moved = Math.hypot(dragState.x - dragState.startX, dragState.y - dragState.startY)
+    if (moved < DRAG_THRESHOLD) {
+      onMarkingClick?.(dragState.id)
+    } else {
+      onMoveMarking?.(dragState.id, dragState.x, dragState.y)
+    }
+    setDragState(null)
+  }
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const pos = getRelativePos(e)
     setHoverPos(pos)
+    if (dragState && pos) {
+      setDragState((prev) => (prev ? { ...prev, x: pos.x, y: pos.y } : prev))
+    }
   }
 
   // Esc cancela desenho em progresso
@@ -151,7 +177,8 @@ function BodyMapSVG({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onMouseMove={handleMouseMove}
-      onMouseLeave={() => setHoverPos(null)}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={() => { setHoverPos(null); handleMouseUp() }}
     >
       {/* ── Imagem de fundo ── */}
       <img
@@ -199,6 +226,9 @@ function BodyMapSVG({
 
         {/* Marcações existentes */}
         {markings.map((m) => {
+          const isDragging = dragState?.id === m.id
+          const effX = isDragging ? dragState.x : m.x
+          const effY = isDragging ? dragState.y : m.y
           const pointsAttr = (m.pontos ?? [{ x: m.x, y: m.y }])
             .map((p) => `${p.x},${p.y}`)
             .join(' ')
@@ -206,19 +236,23 @@ function BodyMapSVG({
           return (
             <g
               key={m.id}
-              style={{ cursor: onMarkingClick ? 'pointer' : 'default', pointerEvents: 'all' }}
+              style={{
+                cursor: m.tipo_desenho === 'ponto' && onMoveMarking ? (isDragging ? 'grabbing' : 'grab') : onMarkingClick ? 'pointer' : 'default',
+                pointerEvents: 'all',
+              }}
+              onMouseDown={(e) => handleMarkingMouseDown(e, m)}
               onClick={(e) => {
                 e.stopPropagation()
-                onMarkingClick?.(m.id)
+                if (m.tipo_desenho !== 'ponto') onMarkingClick?.(m.id)
               }}
             >
               {m.tipo_desenho === 'ponto' && (
                 <>
-                  <circle cx={m.x} cy={m.y} r="1.6" fill="rgba(0,0,0,0.12)" />
-                  <circle cx={m.x} cy={m.y} r="1.25" fill={m.cor_hex} stroke="white" strokeWidth="0.45">
+                  <circle cx={effX} cy={effY} r="1.6" fill="rgba(0,0,0,0.12)" />
+                  <circle cx={effX} cy={effY} r="1.25" fill={m.cor_hex} stroke="white" strokeWidth="0.45" opacity={isDragging ? 0.75 : 1}>
                     <title>{`${m.produto_nome} · ${m.quantity} ${m.unit}`}</title>
                   </circle>
-                  <circle cx={m.x - 0.32} cy={m.y - 0.32} r="0.35" fill="rgba(255,255,255,0.45)" stroke="none" />
+                  <circle cx={effX - 0.32} cy={effY - 0.32} r="0.35" fill="rgba(255,255,255,0.45)" stroke="none" />
                 </>
               )}
 
