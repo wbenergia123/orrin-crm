@@ -255,10 +255,13 @@ describe('GET /api/marcacoes/atendimentos/:paciente_id — retorna campos de fun
 })
 
 describe('/api/imagens-referencia', () => {
-  it('lista vazio inicialmente', async () => {
+  let baseCount = 0
+
+  it('lista imagens de referência (incluindo globais do tenant_id null)', async () => {
     const res = await request(app).get('/api/imagens-referencia').set(authHeader())
     expect(res.status).toBe(200)
-    expect(res.body).toEqual([])
+    expect(Array.isArray(res.body)).toBe(true)
+    baseCount = res.body.length
   })
 
   it('faz upload de imagem de referência', async () => {
@@ -278,13 +281,16 @@ describe('/api/imagens-referencia', () => {
   it('lista a imagem recém-uploadada', async () => {
     const res = await request(app).get('/api/imagens-referencia').set(authHeader())
     expect(res.status).toBe(200)
-    expect(res.body.length).toBe(1)
-    expect(res.body[0].id).toBe(imagemRefId)
+    expect(res.body.length).toBe(baseCount + 1)
+    expect(res.body.some((img: { id: string }) => img.id === imagemRefId)).toBe(true)
   })
 
   it('remove a imagem de referência', async () => {
     const res = await request(app).delete(`/api/imagens-referencia/${imagemRefId}`).set(authHeader())
     expect(res.status).toBe(200)
+
+    const list = await request(app).get('/api/imagens-referencia').set(authHeader())
+    expect(list.body.length).toBe(baseCount)
   })
 
   it('imagem global (tenant_id null) aparece pra qualquer clínica', async () => {
