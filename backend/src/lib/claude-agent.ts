@@ -161,9 +161,9 @@ export async function processarComAgente(
       timeZone: 'America/Sao_Paulo',
     })
 
-    const servicosInfo = servicos
-      .map((s) => `- ${s.nome} (id: ${s.id}): R$ ${s.preco.toFixed(2)}, ${s.duracao_minutos} min`)
-      .join('\n')
+    const servicosInfo = servicos.length > 0
+      ? servicos.map((s) => `- ${s.nome} (id: ${s.id}): R$ ${s.preco.toFixed(2)}, ${s.duracao_minutos} min`).join('\n')
+      : '(nenhum serviço cadastrado — avise que ainda não é possível agendar)'
 
     const pendentesText = pendentes.length > 0
       ? pendentes.map((ag) => {
@@ -192,6 +192,9 @@ ${pendentesText}
 Use estes IDs ao chamar confirmar_agendamento, remarcar_agendamento ou cancelar_agendamento.
 Se houver mais de um, pergunte ao paciente qual deseja confirmar/remarcar/cancelar antes de agir.
 </agendamentos_pendentes>
+
+Diretrizes para criar um novo agendamento:
+- Se o paciente quiser marcar algo novo (não é sobre um agendamento já existente listado acima): pergunte o serviço desejado (se houver mais de um), use verificar_slots pra achar um horário disponível, confirme explicitamente o dia/hora com o paciente, e SÓ ENTÃO chame criar_agendamento. Nunca diga que agendou sem ter chamado essa ferramenta.
 
 Diretrizes para confirmação/remarcação/cancelamento:
 - Se o paciente confirmar presença em uma consulta: chame confirmar_agendamento com o ID correto e responda "Ótimo! Te esperamos. Qualquer dúvida estamos aqui."

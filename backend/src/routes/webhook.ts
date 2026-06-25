@@ -116,6 +116,10 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
         .select('id, status, nome')
         .single()
       paciente = novo
+    } else if (paciente.status === 'novo') {
+      // 2ª mensagem do mesmo paciente — já está em conversa, não é mais só "novo".
+      await supabaseAdmin.from('pacientes').update({ status: 'em_conversa' }).eq('id', paciente.id)
+      paciente.status = 'em_conversa'
     }
 
     const pacienteId = paciente!.id
