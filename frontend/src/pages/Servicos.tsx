@@ -16,7 +16,7 @@ function ServicoDialog({ servico, onClose }: { servico?: Servico; onClose: () =>
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => {
-      const body = { nome, preco: Number(preco), duracao_minutos: Number(duracao) }
+      const body = { nome, preco: Number(preco.replace(',', '.')), duracao_minutos: Number(duracao) }
       return servico
         ? api.patch(`/servicos/${servico.id}`, body)
         : api.post('/servicos', body)
@@ -27,6 +27,12 @@ function ServicoDialog({ servico, onClose }: { servico?: Servico; onClose: () =>
     },
   })
 
+  // input type="number" não aceita vírgula digitada (vira número errado) —
+  // usa texto livre e filtra só dígitos/vírgula/ponto.
+  const handlePrecoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPreco(e.target.value.replace(/[^0-9.,]/g, ''))
+  }
+
   return (
     <div className="space-y-4 pt-2">
       <div className="space-y-1">
@@ -36,7 +42,7 @@ function ServicoDialog({ servico, onClose }: { servico?: Servico; onClose: () =>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>Preço (R$)</Label>
-          <Input type="number" value={preco} onChange={(e) => setPreco(e.target.value)} placeholder="800" />
+          <Input type="text" inputMode="decimal" value={preco} onChange={handlePrecoChange} placeholder="800" />
         </div>
         <div className="space-y-1">
           <Label>Duração (min)</Label>

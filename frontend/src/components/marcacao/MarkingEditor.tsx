@@ -31,13 +31,20 @@ export function MarkingEditor({ x, y, injetaveis, onSave, onCancel, initial, loc
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!product_id || !quantity) return
+    const parsed = parseFloat(quantity.replace(',', '.'))
+    if (!product_id || !quantity || Number.isNaN(parsed)) return
     onSave({
       product_id,
-      quantity: parseFloat(quantity),
+      quantity: parsed,
       unit: selectedProduct?.unidade ?? 'UI',
       lot_id: lot_id || undefined,
     })
+  }
+
+  // input type="number" não aceita vírgula digitada (vira "015" em vez de
+  // "0,15") — usa texto livre e filtra só dígitos/vírgula/ponto.
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuantity(e.target.value.replace(/[^0-9.,]/g, ''))
   }
 
   return (
@@ -79,12 +86,11 @@ export function MarkingEditor({ x, y, injetaveis, onSave, onCancel, initial, loc
             Quantidade {selectedProduct && `(${selectedProduct.unidade})`} *
           </label>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            type="text"
+            inputMode="decimal"
             autoFocus={!!lockedProduct}
             value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
+            onChange={handleQuantityChange}
             placeholder="0"
             className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
             required
