@@ -104,9 +104,9 @@ describe('getAgendamentosPendentes', () => {
 })
 
 describe('getHistoricoConversa', () => {
-  it('retorna as 10 mensagens mais recentes, em ordem cronológica', async () => {
+  it('retorna as 30 mensagens mais recentes, em ordem cronológica', async () => {
     const base = Date.now()
-    const linhas = Array.from({ length: 15 }, (_, i) => ({
+    const linhas = Array.from({ length: 35 }, (_, i) => ({
       tenant_id: tenantId,
       paciente_id: pacienteId,
       mensagem_paciente: `Pergunta ${i + 1}`,
@@ -119,13 +119,13 @@ describe('getHistoricoConversa', () => {
 
     const result = await getHistoricoConversa(pacienteId)
 
-    expect(result.length).toBe(10)
-    // As 5 primeiras (mais antigas) não devem aparecer — só as 10 últimas
+    expect(result.length).toBe(30)
+    // As 5 primeiras (mais antigas) não devem aparecer — só as 30 últimas
     expect(result.map((r) => r.mensagem_paciente)).not.toContain('Pergunta 1')
     expect(result.map((r) => r.mensagem_paciente)).not.toContain('Pergunta 5')
     // Continua em ordem cronológica (mais antiga primeiro, mais recente por último)
     expect(result[0].mensagem_paciente).toBe('Pergunta 6')
-    expect(result[9].mensagem_paciente).toBe('Pergunta 15')
+    expect(result[29].mensagem_paciente).toBe('Pergunta 35')
 
     await supabase.from('conversas_pacientes').delete().eq('paciente_id', pacienteId)
   })
