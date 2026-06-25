@@ -9,25 +9,24 @@ interface BeforeAfterSliderProps {
   depoisId?: string
   onSetAntes?: (id: string) => void
   onSetDepois?: (id: string) => void
-  onUpload: (file: File, tipo: 'antes' | 'depois' | 'geral') => void
+  onUpload: (file: File, tipo: 'antes' | 'depois') => void
   onDelete?: (id: string) => void
   isUploading: boolean
 }
 
 function UploadFoto({ onUpload, isUploading }: { onUpload: BeforeAfterSliderProps['onUpload']; isUploading: boolean }) {
-  const [tipo, setTipo] = useState<'antes' | 'depois' | 'geral'>('geral')
+  const [tipo, setTipo] = useState<'antes' | 'depois'>('antes')
   const inputRef = useRef<HTMLInputElement>(null)
 
   return (
     <div className="flex items-center gap-2 mb-4">
       <select
         value={tipo}
-        onChange={(e) => setTipo(e.target.value as 'antes' | 'depois' | 'geral')}
+        onChange={(e) => setTipo(e.target.value as 'antes' | 'depois')}
         className="border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
       >
         <option value="antes">Antes</option>
         <option value="depois">Depois</option>
-        <option value="geral">Geral</option>
       </select>
       <input
         ref={inputRef}
@@ -100,6 +99,7 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
               label="Antes"
               fotos={fotos}
               selectedId={antesId}
+              excludeId={depoisId}
               onSelect={onSetAntes}
               onDelete={onDelete}
             />
@@ -107,6 +107,7 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
               label="Depois"
               fotos={fotos}
               selectedId={depoisId}
+              excludeId={antesId}
               onSelect={onSetDepois}
               onDelete={onDelete}
             />
@@ -185,6 +186,7 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
           label="Antes"
           fotos={fotos}
           selectedId={antesId}
+          excludeId={depoisId}
           onSelect={onSetAntes}
           onDelete={onDelete}
         />
@@ -192,6 +194,7 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
           label="Depois"
           fotos={fotos}
           selectedId={depoisId}
+          excludeId={antesId}
           onSelect={onSetDepois}
           onDelete={onDelete}
         />
@@ -204,12 +207,14 @@ function PhotoSelector({
   label,
   fotos,
   selectedId,
+  excludeId,
   onSelect,
   onDelete,
 }: {
   label: string
   fotos: FotoPaciente[]
   selectedId?: string
+  excludeId?: string
   onSelect?: (id: string) => void
   onDelete?: (id: string) => void
 }) {
@@ -219,6 +224,10 @@ function PhotoSelector({
       onDelete?.(selectedId)
     }
   }
+
+  // Esconde a foto já escolhida no outro seletor — não faz sentido usar a
+  // mesma foto como "antes" e "depois" ao mesmo tempo.
+  const opcoes = fotos.filter((f) => f.id !== excludeId)
 
   return (
     <div>
@@ -230,7 +239,7 @@ function PhotoSelector({
           className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
         >
           <option value="">Selecionar foto...</option>
-          {fotos.map((f) => (
+          {opcoes.map((f) => (
             <option key={f.id} value={f.id}>
               {f.tipo === 'antes' ? '📸 ' : f.tipo === 'depois' ? '✨ ' : '🖼️ '}
               {f.legenda ?? `${f.tipo} — ${new Date(f.created_at).toLocaleDateString('pt-BR')}`}

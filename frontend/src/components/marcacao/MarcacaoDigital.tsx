@@ -238,7 +238,7 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
   })
 
   const uploadFoto = useMutation({
-    mutationFn: async ({ file, tipo }: { file: File; tipo: 'antes' | 'depois' | 'geral' }) => {
+    mutationFn: async ({ file, tipo }: { file: File; tipo: 'antes' | 'depois' }) => {
       const visitId = await ensureVisit()
       const form = new FormData()
       form.append('foto', file)
