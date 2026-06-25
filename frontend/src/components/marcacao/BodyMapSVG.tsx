@@ -214,11 +214,11 @@ function BodyMapSVG({
             >
               {m.tipo_desenho === 'ponto' && (
                 <>
-                  <circle cx={m.x} cy={m.y} r="2.3" fill="rgba(0,0,0,0.12)" />
-                  <circle cx={m.x} cy={m.y} r="1.8" fill={m.cor_hex} stroke="white" strokeWidth="0.6">
+                  <circle cx={m.x} cy={m.y} r="1.6" fill="rgba(0,0,0,0.12)" />
+                  <circle cx={m.x} cy={m.y} r="1.25" fill={m.cor_hex} stroke="white" strokeWidth="0.45">
                     <title>{`${m.produto_nome} · ${m.quantity} ${m.unit}`}</title>
                   </circle>
-                  <circle cx={m.x - 0.45} cy={m.y - 0.45} r="0.5" fill="rgba(255,255,255,0.45)" stroke="none" />
+                  <circle cx={m.x - 0.32} cy={m.y - 0.32} r="0.35" fill="rgba(255,255,255,0.45)" stroke="none" />
                 </>
               )}
 
@@ -233,7 +233,7 @@ function BodyMapSVG({
                     strokeLinejoin="round"
                   />
                   {(m.pontos ?? []).map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r="1" fill={m.cor_hex} stroke="white" strokeWidth="0.4" />
+                    <circle key={i} cx={p.x} cy={p.y} r="0.7" fill={m.cor_hex} stroke="white" strokeWidth="0.3" />
                   ))}
                 </>
               )}
@@ -248,7 +248,7 @@ function BodyMapSVG({
                     strokeWidth="0.6"
                   />
                   {(m.pontos ?? []).map((p, i) => (
-                    <circle key={i} cx={p.x} cy={p.y} r="0.7" fill={m.cor_hex} stroke="white" strokeWidth="0.3" />
+                    <circle key={i} cx={p.x} cy={p.y} r="0.5" fill={m.cor_hex} stroke="white" strokeWidth="0.25" />
                   ))}
                 </>
               )}
