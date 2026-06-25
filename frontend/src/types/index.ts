@@ -55,7 +55,10 @@ export interface Conversa {
 
 export type CategoriaInjetavel =
   | 'botox' | 'filler' | 'pdo_wire' | 'bioestimulador'
-  | 'bioremodelador' | 'skinbooster' | 'outro'
+  | 'bioremodelador' | 'skinbooster' | 'enzimas' | 'outro'
+
+export type TipoDesenho = 'ponto' | 'linha' | 'forma'
+export type BackgroundModo = 'anatomico' | 'foto_paciente' | 'imagem_referencia'
 
 export type ViewType =
   | 'face_front' | 'face_left' | 'face_right'
@@ -82,6 +85,10 @@ export interface Atendimento {
   data_atendimento: string
   status: 'em_andamento' | 'concluido' | 'cancelado'
   notas: string | null
+  background_modo: BackgroundModo
+  background_foto_id: string | null
+  background_imagem_id: string | null
+  background_opacidade: number
   created_at: string
   updated_at: string
 }
@@ -94,6 +101,8 @@ export interface InjectionMarking {
   view_type: ViewType
   x: number
   y: number
+  tipo_desenho: TipoDesenho
+  pontos: { x: number; y: number }[] | null
   product_id: string
   quantity: number
   unit: string
@@ -101,6 +110,14 @@ export interface InjectionMarking {
   created_by: string | null
   created_at: string
   injetaveis?: { nome: string; cor_hex: string; categoria: CategoriaInjetavel; unidade: string }
+}
+
+export interface ImagemReferencia {
+  id: string
+  tenant_id: string
+  nome: string
+  url: string
+  created_at: string
 }
 
 export interface FotoPaciente {

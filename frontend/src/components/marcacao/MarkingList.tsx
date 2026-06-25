@@ -1,11 +1,17 @@
 // frontend/src/components/marcacao/MarkingList.tsx
-import { Trash2, Pencil } from 'lucide-react'
-import type { InjectionMarking } from '../../types'
+import { Trash2, Pencil, Circle, Minus, Square } from 'lucide-react'
+import type { InjectionMarking, TipoDesenho } from '../../types'
 
 interface MarkingListProps {
   markings: InjectionMarking[]
   onEdit?: (marking: InjectionMarking) => void
   onRemove?: (markingId: string) => void
+}
+
+const TIPO_ICON: Record<TipoDesenho, typeof Circle> = {
+  ponto: Circle,
+  linha: Minus,
+  forma: Square,
 }
 
 const CATEGORIA_LABELS: Record<string, string> = {
@@ -15,6 +21,7 @@ const CATEGORIA_LABELS: Record<string, string> = {
   bioestimulador: 'Bioestimulador',
   bioremodelador: 'Bioremodelador',
   skinbooster: 'Skinbooster',
+  enzimas: 'Enzimas',
   outro: 'Outro',
 }
 
@@ -57,15 +64,18 @@ export function MarkingList({ markings, onEdit, onRemove }: MarkingListProps) {
               const nome = m.injetaveis?.nome ?? 'Produto'
               const cor = m.injetaveis?.cor_hex ?? '#f59e0b'
               const unidade = m.injetaveis?.unidade ?? m.unit
+              const TipoIcon = TIPO_ICON[m.tipo_desenho]
               return (
                 <div
                   key={m.id}
                   className="flex items-center gap-2 bg-white border border-gray-100 rounded-lg px-3 py-2 group hover:shadow-sm transition-shadow"
                 >
                   <span
-                    className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white"
-                    style={{ backgroundColor: cor }}
-                  />
+                    className="w-6 h-6 rounded-full shrink-0 ring-2 ring-white flex items-center justify-center"
+                    style={{ backgroundColor: `${cor}22`, color: cor }}
+                  >
+                    <TipoIcon size={12} />
+                  </span>
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium text-gray-800 truncate block">
                       {nome}

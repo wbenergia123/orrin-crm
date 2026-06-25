@@ -44,9 +44,9 @@ router.post('/atendimentos', async (req: Request, res: Response) => {
   res.status(201).json(data)
 })
 
-// Atualizar atendimento (concluir sessão e/ou corrigir a data)
+// Atualizar atendimento (concluir sessão, corrigir a data ou trocar o fundo)
 router.patch('/atendimentos/:id', async (req: Request, res: Response) => {
-  const { status, data_atendimento } = req.body
+  const { status, data_atendimento, background_modo, background_foto_id, background_imagem_id, background_opacidade } = req.body
 
   if (data_atendimento) {
     const hojeBRT = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
@@ -55,9 +55,25 @@ router.patch('/atendimentos/:id', async (req: Request, res: Response) => {
     }
   }
 
-  const updates: Record<string, string> = {}
+  const updates: Record<string, unknown> = {}
   if (status) updates.status = status
   if (data_atendimento) updates.data_atendimento = data_atendimento
+
+  if (background_modo !== undefined) {
+    if (!['anatomico', 'foto_paciente', 'imagem_referencia'].includes(background_modo)) {
+      return res.status(400).json({ error: 'background_modo inválido' })
+    }
+    updates.background_modo = background_modo
+  }
+  if (background_foto_id !== undefined) updates.background_foto_id = background_foto_id || null
+  if (background_imagem_id !== undefined) updates.background_imagem_id = background_imagem_id || null
+  if (background_opacidade !== undefined) {
+    const op = Number(background_opacidade)
+    if (Number.isNaN(op) || op < 10 || op > 100) {
+      return res.status(400).json({ error: 'background_opacidade deve estar entre 10 e 100' })
+    }
+    updates.background_opacidade = op
+  }
 
   const { data, error } = await supabaseAdmin
     .from('atendimentos')
@@ -106,10 +122,37 @@ router.get('/paciente/:paciente_id', async (req: Request, res: Response) => {
 
 // Adicionar marcação
 router.post('/', async (req: Request, res: Response) => {
-  const { visit_id, paciente_id, view_type, x, y, product_id, quantity, unit, lot_id } = req.body
+  const { visit_id, paciente_id, view_type, x, y, product_id, quantity, unit, lot_id, tipo_desenho, pontos } = req.body
 
-  if (!visit_id || !paciente_id || !view_type || x == null || y == null || !product_id) {
-    return res.status(400).json({ error: 'visit_id, paciente_id, view_type, x, y e product_id são obrigatórios' })
+  if (!visit_id || !paciente_id || !view_type || !product_id) {
+    return res.status(400).json({ error: 'visit_id, paciente_id, view_type e product_id são obrigatórios' })
+  }
+
+  const tipo = tipo_desenho || 'ponto'
+  if (!['ponto', 'linha', 'forma'].includes(tipo)) {
+    return res.status(400).json({ error: 'tipo_desenho deve ser ponto, linha ou forma' })
+  }
+
+  let finalX = x ?? 0
+  let finalY = y ?? 0
+  let finalPontos = pontos ?? null
+
+  if (tipo === 'ponto') {
+    if (x == null || y == null) {
+      return res.status(400).json({ error: 'x e y são obrigatórios para tipo_desenho=ponto' })
+    }
+  } else if (tipo === 'linha') {
+    if (!Array.isArray(pontos) || pontos.length < 2) {
+      return res.status(400).json({ error: 'pontos deve ter pelo menos 2 itens para tipo_desenho=linha' })
+    }
+    finalX = pontos[0].x
+    finalY = pontos[0].y
+  } else if (tipo === 'forma') {
+    if (!Array.isArray(pontos) || pontos.length < 3) {
+      return res.status(400).json({ error: 'pontos deve ter pelo menos 3 itens para tipo_desenho=forma' })
+    }
+    finalX = pontos[0].x
+    finalY = pontos[0].y
   }
 
   const { data, error } = await supabaseAdmin
@@ -118,8 +161,10 @@ router.post('/', async (req: Request, res: Response) => {
       visit_id,
       paciente_id,
       view_type,
-      x,
-      y,
+      x: finalX,
+      y: finalY,
+      tipo_desenho: tipo,
+      pontos: finalPontos,
       product_id,
       quantity,
       unit: unit || 'UI',
@@ -142,19 +187,36 @@ router.post('/protocolo', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'visit_id, paciente_id e markings[] são obrigatórios' })
   }
 
-  const rows = markings.map((m: any) => ({
-    visit_id,
-    paciente_id,
-    view_type: m.view_type,
-    x: m.x,
-    y: m.y,
-    product_id: m.product_id,
-    quantity: m.quantity,
-    unit: m.unit || 'UI',
-    lot_id: m.lot_id || null,
-    created_by: req.user!.id,
-    tenant_id: req.user!.tenant_id,
-  }))
+  const rows = markings.map((m: any) => {
+    const tipo = m.tipo_desenho || 'ponto'
+    let finalX = m.x ?? 0
+    let finalY = m.y ?? 0
+    let finalPontos = m.pontos ?? null
+
+    if (tipo === 'linha' && Array.isArray(m.pontos) && m.pontos.length >= 2) {
+      finalX = m.pontos[0].x
+      finalY = m.pontos[0].y
+    } else if (tipo === 'forma' && Array.isArray(m.pontos) && m.pontos.length >= 3) {
+      finalX = m.pontos[0].x
+      finalY = m.pontos[0].y
+    }
+
+    return {
+      visit_id,
+      paciente_id,
+      view_type: m.view_type,
+      x: finalX,
+      y: finalY,
+      tipo_desenho: tipo,
+      pontos: finalPontos,
+      product_id: m.product_id,
+      quantity: m.quantity,
+      unit: m.unit || 'UI',
+      lot_id: m.lot_id || null,
+      created_by: req.user!.id,
+      tenant_id: req.user!.tenant_id,
+    }
+  })
 
   const { data, error } = await supabaseAdmin
     .from('injection_markings')
