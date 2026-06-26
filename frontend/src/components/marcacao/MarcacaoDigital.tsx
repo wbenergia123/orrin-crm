@@ -1,7 +1,7 @@
 // frontend/src/components/marcacao/MarcacaoDigital.tsx
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Save, Eye, EyeOff, User, Loader2, Image } from 'lucide-react'
+import { Save, Eye, EyeOff, User, Loader2, Image, Plus } from 'lucide-react'
 import { api } from '../../api/client'
 import type { Injetavel, InjectionMarking, FotoPaciente, Atendimento, ViewType, BackgroundModo, ImagemReferencia } from '../../types'
 import { BodyMapSVG, type DrawTool } from './BodyMapSVG'
@@ -135,6 +135,16 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['atendimentos', pacienteId] })
       queryClient.invalidateQueries({ queryKey: ['markings', currentVisitId] })
+    },
+  })
+
+  // Sessão concluída fica "congelada" — pra marcar algo novo precisa de uma sessão
+  // de verdade, senão a data só reetiqueta o protocolo antigo (e apagar uma
+  // marcação apaga do protocolo já salvo, não de uma sessão nova).
+  const novoProtocolo = useMutation({
+    mutationFn: async () => (await api.post('/marcacoes/atendimentos', { paciente_id: pacienteId })).data,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['atendimentos', pacienteId] })
     },
   })
 
@@ -403,7 +413,9 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
               onAddMarking={handleMapClick}
               onFinishPath={handleFinishPath}
               onMarkingClick={(id: string) => {
-                removeMarking.mutate(id)
+                if (window.confirm('Tem certeza que quer excluir essa marcação?')) {
+                  removeMarking.mutate(id)
+                }
               }}
               onMoveMarking={(id, x, y) => moveMarking.mutate({ id, x, y })}
               showQuantities={showQuantities}
@@ -476,7 +488,11 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
           </div>
           <MarkingList
             markings={currentMarkings}
-            onRemove={(id) => removeMarking.mutate(id)}
+            onRemove={(id) => {
+              if (window.confirm('Tem certeza que quer excluir essa marcação?')) {
+                removeMarking.mutate(id)
+              }
+            }}
           />
 
           {/* Data da sessão */}
@@ -493,8 +509,21 @@ export function MarcacaoDigital({ pacienteId }: MarcacaoDigitalProps) {
             </div>
           )}
 
-          {/* Botão salvar protocolo */}
-          {currentMarkings.length > 0 && (
+          {/* Sessão concluída: precisa de um protocolo novo pra marcar de novo */}
+          {currentVisit?.status === 'concluido' ? (
+            <button
+              onClick={() => novoProtocolo.mutate()}
+              disabled={novoProtocolo.isPending}
+              className="w-full mt-4 flex items-center justify-center gap-2 bg-amber-500 text-white text-sm font-medium rounded-lg py-2.5 hover:bg-amber-600 transition-colors disabled:opacity-50"
+            >
+              {novoProtocolo.isPending ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Plus size={16} />
+              )}
+              Novo protocolo
+            </button>
+          ) : currentMarkings.length > 0 && (
             <button
               onClick={() => saveProtocolo.mutate()}
               disabled={isSaving}
