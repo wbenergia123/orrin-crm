@@ -1,5 +1,6 @@
 import { supabase } from '../db/supabase'
 import { enviarMensagemViaUAZAPI } from './uazapi-client'
+import { processarComAgente } from './claude-agent'
 import { comoTextoLocal, somarMinutosTextoLocal, formatarTextoLocal } from './datetime-local'
 import type { FollowupRegra } from '../types'
 
@@ -145,7 +146,41 @@ async function processarNaoRespondeu(tenantId: string, regra: FollowupRegra, ago
     const desdeRegra = new Date(agora.getTime() - 24 * 60 * 60 * 1000)
     if (await jaEnviou(regra.id, paciente.id, null, desdeRegra)) continue
 
-    await enviar(tenantId, regra, paciente, null, { nome: paciente.nome || 'tudo bem' }, agora)
+    const mensagemSistema = `[SISTEMA] O lead não responde há algum tempo. Decida se faz sentido mandar uma mensagem curta de retomada, considerando a conversa até aqui. Responda APENAS com a palavra SEM_RESPOSTA (e nada mais) SOMENTE se o lead disse explicitamente que vai responder depois (ex: "já te respondo", "te chamo depois", "deixa eu ver e te falo"). Em qualquer outro caso — incluindo quando ele só fez uma pergunta e ainda não decidiu, ou simplesmente parou de responder sem dizer nada — escreva uma mensagem curta e natural de retomada.`
+
+    const respostaAgente = (await processarComAgente(tenantId, paciente.id, [mensagemSistema])).trim()
+
+    if (respostaAgente.toLowerCase() === 'sem_resposta') {
+      const { data: regrasPosteriores } = await supabase
+        .from('followup_regras')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('gatilho', 'nao_respondeu')
+        .eq('ativo', true)
+        .gt('delay_minutos', regra.delay_minutos!)
+        .limit(1)
+
+      if ((regrasPosteriores ?? []).length === 0) {
+        await supabase
+          .from('pacientes')
+          .update({ status: 'frio' })
+          .eq('id', paciente.id)
+          .in('status', ['novo', 'em_conversa'])
+      }
+      continue
+    }
+
+    const enviado = await enviarMensagemViaUAZAPI({ tenantId, phone: paciente.telefone, text: respostaAgente })
+    if (!enviado) continue
+
+    await supabase.from('followup_envios').insert({
+      tenant_id: tenantId,
+      paciente_id: paciente.id,
+      regra_id: regra.id,
+      agendamento_id: null,
+      mensagem: respostaAgente,
+      enviado_em: agora.toISOString(),
+    })
   }
 }
 

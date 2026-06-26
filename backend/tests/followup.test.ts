@@ -56,6 +56,7 @@ async function cleanup() {
   await supabase.from('servicos').delete().eq('tenant_id', testTenantId)
   await supabase.from('profissionais').delete().eq('tenant_id', testTenantId)
   await supabase.from('usuarios').delete().eq('tenant_id', testTenantId)
+  await supabase.from('configuracoes').delete().eq('tenant_id', testTenantId)
   await supabase.from('organizacoes').delete().eq('id', testTenantId)
 }
 
@@ -77,6 +78,7 @@ beforeAll(async () => {
     await supabase.from('servicos').delete().eq('tenant_id', orgExistente.id)
     await supabase.from('profissionais').delete().eq('tenant_id', orgExistente.id)
     await supabase.from('usuarios').delete().eq('tenant_id', orgExistente.id)
+    await supabase.from('configuracoes').delete().eq('tenant_id', orgExistente.id)
     await supabase.from('organizacoes').delete().eq('id', orgExistente.id)
   }
 
@@ -91,6 +93,15 @@ beforeAll(async () => {
     tenant_id: testTenantId,
     chave: 'followup_ativo',
     valor: 'true',
+  }, { onConflict: 'tenant_id,chave' })
+
+  await supabase.from('configuracoes').upsert({
+    tenant_id: testTenantId,
+    chave: 'prompt_ana',
+    valor:
+      'Você é uma assistente de uma clínica de estética. Quando receber uma mensagem de [SISTEMA] pedindo para decidir sobre retomada de contato, siga rigorosamente: ' +
+      'se o lead pediu para esperar, disse "já te respondo", "te chamo depois" ou qualquer variação de que responderá mais tarde, responda APENAS e EXATAMENTE com a palavra SEM_RESPOSTA (sem pontuação, sem aspas). ' +
+      'Caso contrário, escreva uma única mensagem curta e natural de retomada, sem usar ferramentas.',
   }, { onConflict: 'tenant_id,chave' })
 
   const { data: servico } = await supabase
@@ -173,23 +184,149 @@ describe('runFollowups', () => {
     await supabase.from('agendamentos').delete().eq('id', agendamentoId)
   })
 
-  it('envia follow-up quando paciente não respondeu em 1h', async () => {
+  it('não envia nada quando Ana retorna SEM_RESPOSTA (lead pediu pra esperar)', async () => {
     receivedMessages = []
 
     const baseTime = new Date('2026-06-24T15:00:00-03:00')
     const ultimoContato = new Date(baseTime.getTime() - 60 * 60 * 1000)
 
-    await supabase
+    const { data: p } = await supabase
       .from('pacientes')
-      .update({ ultimo_contato_at: ultimoContato.toISOString(), status: 'em_conversa' })
-      .eq('id', pacienteId)
+      .insert({ tenant_id: testTenantId, telefone: '5511999990010', nome: 'Lead Espera', status: 'em_conversa', ultimo_contato_at: ultimoContato.toISOString() })
+      .select('id')
+      .single()
+
+    await supabase.from('conversas_pacientes').insert([
+      { tenant_id: testTenantId, paciente_id: p!.id, tipo_remetente: 'humano', modo_humano: false, mensagem_paciente: 'Oi, vocês fazem botox?', mensagem_agente: 'Olá! Sim, trabalhamos com botox. Como posso ajudar?' },
+      { tenant_id: testTenantId, paciente_id: p!.id, tipo_remetente: 'humano', modo_humano: false, mensagem_paciente: 'já te respondo', mensagem_agente: 'Combinado, fico no aguardo.' },
+    ])
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(0)
+
+    const { data: envios } = await supabase
+      .from('followup_envios')
+      .select('id')
+      .eq('tenant_id', testTenantId)
+      .eq('paciente_id', p!.id)
+    expect(envios?.length).toBe(0)
+
+    await supabase.from('conversas_pacientes').delete().eq('paciente_id', p!.id)
+    await supabase.from('pacientes').delete().eq('id', p!.id)
+  })
+
+  it('envia mensagem contextual gerada pela Ana quando o lead está realmente parado', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T15:00:00-03:00')
+    const ultimoContato = new Date(baseTime.getTime() - 60 * 60 * 1000)
+
+    const { data: p } = await supabase
+      .from('pacientes')
+      .insert({ tenant_id: testTenantId, telefone: '5511999990011', nome: 'Lead Parado', status: 'em_conversa', ultimo_contato_at: ultimoContato.toISOString() })
+      .select('id')
+      .single()
+
+    await supabase.from('conversas_pacientes').insert([
+      { tenant_id: testTenantId, paciente_id: p!.id, tipo_remetente: 'humano', modo_humano: false, mensagem_paciente: 'Oi', mensagem_agente: 'Olá! Tudo bem? Como posso ajudar?' },
+      { tenant_id: testTenantId, paciente_id: p!.id, tipo_remetente: 'humano', modo_humano: false, mensagem_paciente: 'Quero informações sobre botox', mensagem_agente: 'Claro! Temos sessões a partir de R$ 800. Gostaria de agendar uma avaliação?' },
+    ])
 
     await runFollowups(baseTime, testTenantId)
 
     expect(receivedMessages.length).toBe(1)
-    expect(receivedMessages[0].text).toContain('Ainda tem interesse')
+    expect(receivedMessages[0].text.trim().toLowerCase()).not.toBe('sem_resposta')
+    expect(receivedMessages[0].text.length).toBeGreaterThan(5)
+
+    const { data: envios } = await supabase
+      .from('followup_envios')
+      .select('*')
+      .eq('tenant_id', testTenantId)
+      .eq('paciente_id', p!.id)
+    expect(envios?.length).toBe(1)
+    expect(envios?.[0].mensagem).toBe(receivedMessages[0].text)
 
     await supabase.from('followup_envios').delete().eq('tenant_id', testTenantId)
+    await supabase.from('conversas_pacientes').delete().eq('paciente_id', p!.id)
+    await supabase.from('pacientes').delete().eq('id', p!.id)
+  })
+
+  it('marca lead como frio quando Ana retorna SEM_RESPOSTA na última regra nao_respondeu', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T15:00:00-03:00')
+    const ultimoContato = new Date(baseTime.getTime() - 60 * 60 * 1000)
+
+    const { data: p } = await supabase
+      .from('pacientes')
+      .insert({ tenant_id: testTenantId, telefone: '5511999990012', nome: 'Lead Frio', status: 'em_conversa', ultimo_contato_at: ultimoContato.toISOString() })
+      .select('id,status')
+      .single()
+
+    await supabase.from('conversas_pacientes').insert([
+      { tenant_id: testTenantId, paciente_id: p!.id, tipo_remetente: 'humano', modo_humano: false, mensagem_paciente: 'já te respondo', mensagem_agente: 'Tudo bem, fico no aguardo.' },
+    ])
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(0)
+
+    const { data: atualizado } = await supabase
+      .from('pacientes')
+      .select('status')
+      .eq('id', p!.id)
+      .single()
+    expect(atualizado?.status).toBe('frio')
+
+    await supabase.from('conversas_pacientes').delete().eq('paciente_id', p!.id)
+    await supabase.from('pacientes').delete().eq('id', p!.id)
+  })
+
+  it('não marca como frio quando SEM_RESPOSTA numa regra que não é a última', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T15:00:00-03:00')
+    const ultimoContato = new Date(baseTime.getTime() - 60 * 60 * 1000)
+
+    const { data: regraMaior } = await supabase
+      .from('followup_regras')
+      .insert({
+        tenant_id: testTenantId,
+        nome: 'Não respondeu 2h',
+        gatilho: 'nao_respondeu',
+        delay_minutos: 120,
+        template: 'template não usado',
+        ativo: true,
+        ordem_prioridade: 6,
+      })
+      .select('id')
+      .single()
+
+    const { data: p } = await supabase
+      .from('pacientes')
+      .insert({ tenant_id: testTenantId, telefone: '5511999990013', nome: 'Lead Espera Intermediária', status: 'em_conversa', ultimo_contato_at: ultimoContato.toISOString() })
+      .select('id')
+      .single()
+
+    await supabase.from('conversas_pacientes').insert([
+      { tenant_id: testTenantId, paciente_id: p!.id, tipo_remetente: 'humano', modo_humano: false, mensagem_paciente: 'já te respondo', mensagem_agente: 'Tudo bem, fico no aguardo.' },
+    ])
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(0)
+
+    const { data: atualizado } = await supabase
+      .from('pacientes')
+      .select('status')
+      .eq('id', p!.id)
+      .single()
+    expect(atualizado?.status).toBe('em_conversa')
+
+    await supabase.from('followup_regras').delete().eq('id', regraMaior!.id)
+    await supabase.from('conversas_pacientes').delete().eq('paciente_id', p!.id)
+    await supabase.from('pacientes').delete().eq('id', p!.id)
   })
 
   it('não envia follow-up de não respondeu se paciente tem agendamento futuro confirmado', async () => {
