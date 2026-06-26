@@ -86,7 +86,7 @@ export function Clientes() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">Clientes</h1>
           <p className="text-sm text-gray-400 mt-0.5">{pacientes.length} pacientes cadastrados</p>
@@ -142,31 +142,99 @@ export function Clientes() {
 
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Table header */}
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Paciente</span>
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Telefone</span>
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">CPF</span>
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</span>
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cadastro</span>
-        </div>
-
-        {isLoading ? (
-          <div className="divide-y divide-gray-50">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3.5 animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-gray-100 shrink-0" />
-                  <div className="h-4 w-32 bg-gray-100 rounded" />
-                </div>
-                <div className="h-4 w-28 bg-gray-100 rounded self-center" />
-                <div className="h-4 w-24 bg-gray-100 rounded self-center" />
-                <div className="h-5 w-20 bg-gray-100 rounded-full self-center" />
-                <div className="h-4 w-16 bg-gray-100 rounded self-center" />
+        {isLoading || sorted.length > 0 ? (
+          <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
+              {/* Table header */}
+              <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Paciente</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Telefone</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">CPF</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cadastro</span>
               </div>
-            ))}
+
+              {isLoading ? (
+                <div className="divide-y divide-gray-50">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3.5 animate-pulse">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-gray-100 shrink-0" />
+                        <div className="h-4 w-32 bg-gray-100 rounded" />
+                      </div>
+                      <div className="h-4 w-28 bg-gray-100 rounded self-center" />
+                      <div className="h-4 w-24 bg-gray-100 rounded self-center" />
+                      <div className="h-5 w-20 bg-gray-100 rounded-full self-center" />
+                      <div className="h-4 w-16 bg-gray-100 rounded self-center" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {sorted.map((p) => {
+                    const seed = p.nome ?? p.telefone
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => navigate(`/pacientes/${p.id}`)}
+                        className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left items-center group"
+                      >
+                        {/* Nome + avatar */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0"
+                            style={{ background: avatarGradient(seed) }}
+                          >
+                            {getInitials(p.nome, p.telefone)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">
+                              {p.nome ?? <span className="text-gray-400 italic">Sem nome</span>}
+                            </p>
+                            {p.email && (
+                              <p className="text-xs text-gray-400 truncate">{p.email}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Telefone */}
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                          <Phone size={13} className="text-gray-400 shrink-0" />
+                          {p.telefone}
+                        </div>
+
+                        {/* CPF */}
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                          {p.cpf ? (
+                            <>
+                              <CreditCard size={13} className="text-gray-400 shrink-0" />
+                              {formatCpf(p.cpf)}
+                            </>
+                          ) : (
+                            <span className="text-gray-300 text-xs">—</span>
+                          )}
+                        </div>
+
+                        {/* Status */}
+                        <div>
+                          <StatusBadge status={p.status} />
+                        </div>
+
+                        {/* Data + seta */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-400">
+                            {format(new Date(p.created_at), 'd MMM yy', { locale: ptBR })}
+                          </span>
+                          <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        ) : sorted.length === 0 ? (
+        ) : (
           <div className="py-16 flex flex-col items-center gap-2 text-gray-400">
             <Search size={28} className="opacity-40" />
             <p className="text-sm">Nenhum paciente encontrado</p>
@@ -178,68 +246,6 @@ export function Clientes() {
                 Limpar busca
               </button>
             )}
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {sorted.map((p) => {
-              const seed = p.nome ?? p.telefone
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => navigate(`/pacientes/${p.id}`)}
-                  className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left items-center group"
-                >
-                  {/* Nome + avatar */}
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0"
-                      style={{ background: avatarGradient(seed) }}
-                    >
-                      {getInitials(p.nome, p.telefone)}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800 truncate">
-                        {p.nome ?? <span className="text-gray-400 italic">Sem nome</span>}
-                      </p>
-                      {p.email && (
-                        <p className="text-xs text-gray-400 truncate">{p.email}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Telefone */}
-                  <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                    <Phone size={13} className="text-gray-400 shrink-0" />
-                    {p.telefone}
-                  </div>
-
-                  {/* CPF */}
-                  <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                    {p.cpf ? (
-                      <>
-                        <CreditCard size={13} className="text-gray-400 shrink-0" />
-                        {formatCpf(p.cpf)}
-                      </>
-                    ) : (
-                      <span className="text-gray-300 text-xs">—</span>
-                    )}
-                  </div>
-
-                  {/* Status */}
-                  <div>
-                    <StatusBadge status={p.status} />
-                  </div>
-
-                  {/* Data + seta */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400">
-                      {format(new Date(p.created_at), 'd MMM yy', { locale: ptBR })}
-                    </span>
-                    <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
-                  </div>
-                </button>
-              )
-            })}
           </div>
         )}
       </div>

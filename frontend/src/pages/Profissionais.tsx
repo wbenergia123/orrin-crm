@@ -162,7 +162,7 @@ export function Profissionais() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-xl font-semibold text-gray-800">Profissionais</h1>
         <Dialog
           open={dialogAberto}

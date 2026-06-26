@@ -191,7 +191,7 @@ export function FichaPaciente() {
       </div>
 
       {/* ── Tab bar ── */}
-      <div className="bg-white rounded-xl border border-gray-100 p-1 flex gap-1">
+      <div className="bg-white rounded-xl border border-gray-100 p-1 flex gap-1 overflow-x-auto">
         {ABAS.map((tab) => {
           const Icon = tab.icon
           const isActive = aba === tab.id
@@ -199,7 +199,7 @@ export function FichaPaciente() {
             <button
               key={tab.id}
               onClick={() => setAba(tab.id)}
-              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap ${
                 isActive
                   ? 'bg-amber-50 text-amber-600'
                   : 'text-gray-500 hover:bg-gray-50'
