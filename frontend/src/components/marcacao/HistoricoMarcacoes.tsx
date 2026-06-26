@@ -1,6 +1,7 @@
 // frontend/src/components/marcacao/HistoricoMarcacoes.tsx
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
 import { api } from '../../api/client'
 import type { Atendimento, InjectionMarking, FotoPaciente } from '../../types'
 import { MarkingList } from './MarkingList'
@@ -11,10 +12,20 @@ interface HistoricoMarcacoesProps {
 
 export function HistoricoMarcacoes({ pacienteId }: HistoricoMarcacoesProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const qc = useQueryClient()
 
   const { data: atendimentos = [], isLoading: carregandoAtendimentos } = useQuery<Atendimento[]>({
     queryKey: ['atendimentos', pacienteId],
     queryFn: async () => (await api.get(`/marcacoes/atendimentos/${pacienteId}`)).data,
+  })
+
+  const { mutate: excluirProtocolo } = useMutation({
+    mutationFn: (visitId: string) => api.delete(`/marcacoes/atendimentos/${visitId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['atendimentos', pacienteId] })
+      qc.invalidateQueries({ queryKey: ['all-markings', pacienteId] })
+      qc.invalidateQueries({ queryKey: ['fotos', pacienteId] })
+    },
   })
 
   const { data: todasMarcacoes = [] } = useQuery<InjectionMarking[]>({
@@ -44,16 +55,29 @@ export function HistoricoMarcacoes({ pacienteId }: HistoricoMarcacoesProps) {
 
         return (
           <div key={sessao.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <button
-              onClick={() => setExpandedId(isOpen ? null : sessao.id)}
-              aria-expanded={isOpen}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50"
-            >
-              <span className="text-sm font-medium text-gray-800">
-                {new Date(sessao.data_atendimento).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-              </span>
-              <span className="text-xs text-gray-400">{isOpen ? '▲' : '▼'}</span>
-            </button>
+            <div className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50">
+              <button
+                onClick={() => setExpandedId(isOpen ? null : sessao.id)}
+                aria-expanded={isOpen}
+                className="flex-1 flex items-center justify-between text-left"
+              >
+                <span className="text-sm font-medium text-gray-800">
+                  {new Date(sessao.data_atendimento).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                </span>
+                <span className="text-xs text-gray-400 mr-3">{isOpen ? '▲' : '▼'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm('Tem certeza que quer excluir o protocolo?')) {
+                    excluirProtocolo(sessao.id)
+                  }
+                }}
+                title="Excluir protocolo"
+                className="text-gray-400 hover:text-red-500 p-1 -mr-1"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
             {isOpen && (
               <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-4">
                 <MarkingList markings={marcacoesDaSessao} />

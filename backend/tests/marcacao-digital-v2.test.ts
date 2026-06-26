@@ -369,3 +369,59 @@ describe('injetaveis.categoria — aceita enzimas', () => {
     expect(categorias).toContain('enzimas')
   })
 })
+
+describe('DELETE /api/marcacoes/atendimentos/:id — excluir protocolo inteiro', () => {
+  let visitId: string
+  let markingId: string
+  let fotoId: string
+
+  beforeAll(async () => {
+    const visit = await request(app)
+      .post('/api/marcacoes/atendimentos')
+      .set(authHeader())
+      .send({ paciente_id: pacienteId })
+    visitId = visit.body.id
+
+    const marking = await request(app)
+      .post('/api/marcacoes')
+      .set(authHeader())
+      .send({
+        visit_id: visitId,
+        paciente_id: pacienteId,
+        view_type: 'face_front',
+        x: 20,
+        y: 20,
+        product_id: injetavelPontoId,
+        quantity: 1,
+      })
+    markingId = marking.body.id
+
+    const { data: foto } = await supabase
+      .from('fotos_paciente')
+      .insert({ paciente_id: pacienteId, tenant_id: tenantId, url: 'https://example.com/del.jpg', tipo: 'geral', visit_id: visitId })
+      .select('id')
+      .single()
+    fotoId = foto!.id
+  })
+
+  afterAll(async () => {
+    await supabase.from('fotos_paciente').delete().eq('id', fotoId)
+  })
+
+  it('apaga as marcações, desvincula (sem apagar) as fotos, e remove a sessão', async () => {
+    const res = await request(app)
+      .delete(`/api/marcacoes/atendimentos/${visitId}`)
+      .set(authHeader())
+    expect(res.status).toBe(200)
+
+    const { data: marcacaoRestante } = await supabase.from('injection_markings').select('id').eq('id', markingId).maybeSingle()
+    expect(marcacaoRestante).toBeNull()
+
+    const { data: fotoRestante } = await supabase.from('fotos_paciente').select('visit_id').eq('id', fotoId).single()
+    expect(fotoRestante).not.toBeNull()
+    expect(fotoRestante!.visit_id).toBeNull()
+
+    const { data: visitaRestante } = await supabase.from('atendimentos').select('id').eq('id', visitId).maybeSingle()
+    expect(visitaRestante).toBeNull()
+  })
+})

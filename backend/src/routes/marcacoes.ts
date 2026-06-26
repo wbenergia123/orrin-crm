@@ -87,6 +87,25 @@ router.patch('/atendimentos/:id', async (req: Request, res: Response) => {
   res.json(data)
 })
 
+// Excluir um protocolo (sessão) inteiro — apaga as marcações, desvincula as
+// fotos (preservadas, só deixam de pertencer a essa sessão) e remove a sessão.
+router.delete('/atendimentos/:id', async (req: Request, res: Response) => {
+  const { id } = req.params
+  const tenantId = req.user!.tenant_id
+
+  await supabaseAdmin.from('injection_markings').delete().eq('visit_id', id).eq('tenant_id', tenantId)
+  await supabaseAdmin.from('fotos_paciente').update({ visit_id: null }).eq('visit_id', id).eq('tenant_id', tenantId)
+
+  const { error } = await supabaseAdmin
+    .from('atendimentos')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+
+  if (error) return res.status(400).json({ error: error.message })
+  res.json({ message: 'Protocolo excluído' })
+})
+
 // ── INJECTION MARKINGS ──
 
 // Listar marcações de um atendimento (opcionalmente por view_type)
