@@ -180,7 +180,20 @@ describe('runFollowups', () => {
     expect(envios?.[0].regra_id).toBe(lembreteRegraId)
     expect(envios?.[0].agendamento_id).toBe(agendamentoId)
 
+    // O follow-up também precisa aparecer na conversa normal — senão não
+    // aparece na tela de Atendimentos nem entra na memória da Ana.
+    const { data: conversasRegistradas } = await supabase
+      .from('conversas_pacientes')
+      .select('mensagem_agente, tipo_remetente, modo_humano')
+      .eq('tenant_id', testTenantId)
+      .eq('paciente_id', pacienteId)
+    expect(conversasRegistradas?.length).toBe(1)
+    expect(conversasRegistradas?.[0].mensagem_agente).toBe(receivedMessages[0].text)
+    expect(conversasRegistradas?.[0].tipo_remetente).toBe('agente')
+    expect(conversasRegistradas?.[0].modo_humano).toBe(false)
+
     await supabase.from('followup_envios').delete().eq('tenant_id', testTenantId)
+    await supabase.from('conversas_pacientes').delete().eq('tenant_id', testTenantId)
     await supabase.from('agendamentos').delete().eq('id', agendamentoId)
   })
 

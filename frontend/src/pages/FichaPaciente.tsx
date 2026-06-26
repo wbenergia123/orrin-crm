@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { ArrowLeft, MessageCircle, Calendar, Phone, Mail, TrendingUp, CheckCircle2, Clock, XCircle, LayoutDashboard, Syringe, History } from 'lucide-react'
 import { api } from '../api/client'
+import { parseUtcTimestamp } from '../lib/utils'
 import type { Paciente, Agendamento, Conversa } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { StatusStepper } from '../components/StatusStepper'
@@ -121,7 +122,7 @@ export function FichaPaciente() {
                   </span>
                 )}
                 <span className="text-sm text-gray-400">
-                  Cliente desde {format(new Date(paciente.created_at), 'MMM yyyy', { locale: ptBR })}
+                  Cliente desde {format(parseUtcTimestamp(paciente.created_at), 'MMM yyyy', { locale: ptBR })}
                 </span>
               </div>
             </div>
@@ -290,7 +291,7 @@ export function FichaPaciente() {
                   <div className="flex justify-start mb-1">
                     <div className="max-w-[75%]">
                       <p className="text-[10px] text-gray-400 mb-0.5 ml-1">
-                        {format(new Date(c.created_at), "d MMM 'às' HH:mm", { locale: ptBR })}
+                        {format(parseUtcTimestamp(c.created_at), "d MMM 'às' HH:mm", { locale: ptBR })}
                       </p>
                       <div className="bg-gray-100 text-gray-800 text-sm px-3 py-2 rounded-2xl rounded-tl-sm">
                         {c.mensagem_paciente}
@@ -322,7 +323,7 @@ export function FichaPaciente() {
 
         {ultimaConversa && (
           <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-50">
-            Última mensagem {format(new Date(ultimaConversa.created_at), "d 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+            Última mensagem {format(parseUtcTimestamp(ultimaConversa.created_at), "d 'de' MMMM 'às' HH:mm", { locale: ptBR })}
           </p>
         )}
       </div>

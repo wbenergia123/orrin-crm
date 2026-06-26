@@ -125,6 +125,18 @@ async function enviar(tenantId: string, regra: FollowupRegra, paciente: any, age
     mensagem,
     enviado_em: agora.toISOString(),
   })
+
+  // Também registra na conversa normal — senão a mensagem chega no WhatsApp do
+  // paciente mas nunca aparece na tela de Atendimentos, e a Ana não tem como
+  // saber depois que esse follow-up já foi enviado.
+  await supabase.from('conversas_pacientes').insert({
+    tenant_id: tenantId,
+    paciente_id: paciente.id,
+    tipo_remetente: 'agente',
+    modo_humano: false,
+    mensagem_agente: mensagem,
+    created_at: agora.toISOString(),
+  })
 }
 
 async function processarNaoRespondeu(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
@@ -180,6 +192,17 @@ async function processarNaoRespondeu(tenantId: string, regra: FollowupRegra, ago
       agendamento_id: null,
       mensagem: respostaAgente,
       enviado_em: agora.toISOString(),
+    })
+
+    // Mesmo motivo do enviar(): sem isso, a mensagem não aparece na tela de
+    // Atendimentos e a Ana esquece que já tentou retomar contato.
+    await supabase.from('conversas_pacientes').insert({
+      tenant_id: tenantId,
+      paciente_id: paciente.id,
+      tipo_remetente: 'agente',
+      modo_humano: false,
+      mensagem_agente: respostaAgente,
+      created_at: agora.toISOString(),
     })
   }
 }

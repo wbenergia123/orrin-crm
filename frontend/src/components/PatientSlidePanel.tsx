@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
+import { parseUtcTimestamp } from '../lib/utils'
 import type { Paciente, StatusPaciente } from '../types'
 import { StatusStepper } from './StatusStepper'
 import { Button } from '@/components/ui/button'
@@ -60,7 +61,7 @@ export function PatientSlidePanel({ paciente, onClose }: Props) {
           <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
             <Clock size={11} />
             Último contato:{' '}
-            {format(new Date(paciente.ultimo_contato_at), "d 'de' MMM 'às' HH:mm", { locale: ptBR })}
+            {format(parseUtcTimestamp(paciente.ultimo_contato_at), "d 'de' MMM 'às' HH:mm", { locale: ptBR })}
           </p>
         )}
       </div>

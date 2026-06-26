@@ -1,5 +1,6 @@
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { parseUtcTimestamp } from '../lib/utils'
 import type { Paciente, StatusPaciente } from '../types'
 
 const AVATAR_CLASS: Record<StatusPaciente, string> = {
@@ -19,7 +20,7 @@ interface PatientCardProps {
 export function PatientCard({ paciente, isSelected, onClick }: PatientCardProps) {
   const initial = (paciente.nome ?? paciente.telefone).charAt(0).toUpperCase()
   const timeAgo = paciente.ultimo_contato_at
-    ? formatDistanceToNow(new Date(paciente.ultimo_contato_at), { locale: ptBR })
+    ? formatDistanceToNow(parseUtcTimestamp(paciente.ultimo_contato_at), { locale: ptBR })
     : null
 
   return (

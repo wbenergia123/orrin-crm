@@ -6,6 +6,7 @@ import { ptBR } from 'date-fns/locale'
 import { Bot, User, Send, ChevronLeft } from 'lucide-react'
 import { api } from '../api/client'
 import { StatusBadge } from '../components/StatusBadge'
+import { parseUtcTimestamp } from '../lib/utils'
 import type { StatusPaciente } from '../types'
 
 interface AtendimentoResumo {
@@ -52,13 +53,13 @@ function avatarGradient(seed: string): string {
 
 function tempoRelativo(iso: string | null): string {
   if (!iso) return ''
-  const diff = Date.now() - new Date(iso).getTime()
+  const diff = Date.now() - parseUtcTimestamp(iso).getTime()
   const mins = Math.floor(diff / 60000)
   if (mins < 1) return 'Agora'
   if (mins < 60) return `${mins} min`
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h`
-  return format(new Date(iso), 'd MMM', { locale: ptBR })
+  return format(parseUtcTimestamp(iso), 'd MMM', { locale: ptBR })
 }
 
 function getInitials(nome: string | null, telefone: string): string {
@@ -359,7 +360,7 @@ export function Atendimentos() {
                             borderRight: '8px solid white', borderTop: '8px solid transparent',
                           }} />
                           <p className="text-[13.5px] text-gray-900 leading-relaxed">{c.mensagem_paciente}</p>
-                          <p className="text-[11px] text-gray-400 text-right mt-0.5">{format(new Date(c.created_at), 'HH:mm')}</p>
+                          <p className="text-[11px] text-gray-400 text-right mt-0.5">{format(parseUtcTimestamp(c.created_at), 'HH:mm')}</p>
                         </div>
                       </div>
                     </div>
@@ -381,7 +382,7 @@ export function Atendimentos() {
                             </p>
                             <p className="text-[13.5px] text-gray-900 leading-relaxed">{c.mensagem_agente}</p>
                             <p className="text-[11px] text-gray-500 text-right mt-0.5 flex items-center justify-end gap-1">
-                              {format(new Date(c.created_at), 'HH:mm')}
+                              {format(parseUtcTimestamp(c.created_at), 'HH:mm')}
                               <svg viewBox="0 0 18 18" fill="#53bdeb" style={{ width: 14, height: 14 }}>
                                 <path d="M17.394 5.035l-.57-.444a.434.434 0 00-.609.076L8.397 15.484l-4.181-3.32a.43.43 0 00-.609.065l-.479.602a.431.431 0 00.066.609l4.918 3.905a.43.43 0 00.609-.065l8.812-11.438a.428.428 0 00-.139-.807z"/>
                                 <path d="M12.694 5.035l-.57-.444a.434.434 0 00-.609.076L5.97 12.15a.428.428 0 00.066.608l.479.602a.43.43 0 00.609-.066l5.639-7.651a.427.427 0 00-.069-.608z"/>

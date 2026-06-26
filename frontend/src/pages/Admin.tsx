@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { useAuth } from '../hooks/useAuth'
+import { parseUtcTimestamp } from '../lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -228,7 +229,7 @@ export function Admin() {
                   <div>
                     <p className="font-medium text-gray-800">{t.nome}</p>
                     <p className="text-xs text-gray-400">
-                      {t.slug}.orrin.com.br · {new Date(t.created_at).toLocaleDateString('pt-BR')}
+                      {t.slug}.orrin.com.br · {parseUtcTimestamp(t.created_at).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

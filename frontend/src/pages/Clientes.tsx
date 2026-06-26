@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Search, UserPlus, ChevronRight, Phone, CreditCard, ArrowUpDown } from 'lucide-react'
 import { api } from '../api/client'
+import { parseUtcTimestamp } from '../lib/utils'
 import type { Paciente } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { NovoPacienteModal } from '../components/NovoPacienteModal'
@@ -53,8 +54,8 @@ function ordenar(lista: Paciente[], ord: Ordenacao): Paciente[] {
     switch (ord) {
       case 'az': return (a.nome ?? a.telefone).localeCompare(b.nome ?? b.telefone, 'pt-BR')
       case 'za': return (b.nome ?? b.telefone).localeCompare(a.nome ?? a.telefone, 'pt-BR')
-      case 'recentes': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      case 'antigos': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'recentes': return parseUtcTimestamp(b.created_at).getTime() - parseUtcTimestamp(a.created_at).getTime()
+      case 'antigos': return parseUtcTimestamp(a.created_at).getTime() - parseUtcTimestamp(b.created_at).getTime()
       case 'status': return (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
     }
   })
@@ -223,7 +224,7 @@ export function Clientes() {
                         {/* Data + seta */}
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-400">
-                            {format(new Date(p.created_at), 'd MMM yy', { locale: ptBR })}
+                            {format(parseUtcTimestamp(p.created_at), 'd MMM yy', { locale: ptBR })}
                           </span>
                           <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
                         </div>

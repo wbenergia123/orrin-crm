@@ -1,6 +1,7 @@
 // frontend/src/components/marcacao/BeforeAfterSlider.tsx
 import { useState, useRef, useCallback } from 'react'
 import { ImageOff, Camera, Loader2, Trash2 } from 'lucide-react'
+import { parseUtcTimestamp } from '../../lib/utils'
 import type { FotoPaciente } from '../../types'
 
 interface BeforeAfterSliderProps {
@@ -242,7 +243,7 @@ function PhotoSelector({
           {opcoes.map((f) => (
             <option key={f.id} value={f.id}>
               {f.tipo === 'antes' ? '📸 ' : f.tipo === 'depois' ? '✨ ' : '🖼️ '}
-              {f.legenda ?? `${f.tipo} — ${new Date(f.created_at).toLocaleDateString('pt-BR')}`}
+              {f.legenda ?? `${f.tipo} — ${parseUtcTimestamp(f.created_at).toLocaleDateString('pt-BR')}`}
             </option>
           ))}
         </select>

@@ -8,6 +8,7 @@ import { api } from '../api/client'
 import type { Paciente, Conversa, StatusPaciente } from '../types'
 import { StatusPills } from './StatusPills'
 import { NovoAgendamentoModal } from './NovoAgendamentoModal'
+import { parseUtcTimestamp } from '../lib/utils'
 
 interface ConversaPanelProps {
   paciente: Paciente
@@ -116,7 +117,7 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
                   {c.mensagem_paciente}
                 </div>
                 <span className="text-[10px] text-gray-400 mt-0.5 px-1">
-                  {format(new Date(c.created_at), 'HH:mm', { locale: ptBR })}
+                  {format(parseUtcTimestamp(c.created_at), 'HH:mm', { locale: ptBR })}
                 </span>
               </div>
             )}
@@ -131,7 +132,7 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
                   {c.mensagem_agente}
                 </div>
                 <span className="text-[10px] text-gray-400 mt-0.5 px-1">
-                  {format(new Date(c.created_at), 'HH:mm', { locale: ptBR })}
+                  {format(parseUtcTimestamp(c.created_at), 'HH:mm', { locale: ptBR })}
                 </span>
               </div>
             )}
