@@ -94,7 +94,7 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
         </div>
         {/* Seletores de foto */}
         {fotos.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
             <PhotoSelector
               label="Antes"
               fotos={fotos}
@@ -181,7 +181,7 @@ export function BeforeAfterSlider({ fotos, antesId, depoisId, onSetAntes, onSetD
       </div>
 
       {/* Seletores de foto */}
-      <div className="grid grid-cols-2 gap-4 mt-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <PhotoSelector
           label="Antes"
           fotos={fotos}

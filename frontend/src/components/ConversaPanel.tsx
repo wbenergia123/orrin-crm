@@ -58,7 +58,7 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
   }
 
   return (
-    <div className="w-[360px] flex-shrink-0 bg-white border-l border-gray-100 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 w-full bg-white border-l border-gray-100 flex flex-col overflow-hidden md:static md:inset-auto md:w-[360px] md:flex-shrink-0 md:z-auto">
       {/* Header */}
       <div className="px-5 py-4 border-b border-gray-100 flex-shrink-0">
         <div className="flex items-center justify-between mb-3">

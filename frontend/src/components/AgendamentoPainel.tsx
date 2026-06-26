@@ -83,7 +83,7 @@ export function AgendamentoPainel({
   }
 
   return (
-    <div className="w-[400px] border-l border-gray-100 bg-white flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 w-full border-l border-gray-100 bg-white flex flex-col overflow-hidden md:static md:inset-auto md:w-[400px] md:z-auto">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
         <h3 className="text-sm font-semibold text-gray-900">Detalhes da consulta</h3>

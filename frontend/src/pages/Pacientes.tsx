@@ -91,7 +91,7 @@ export function Pacientes() {
         {/* Kanban */}
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="flex-1 overflow-auto">
-            <div className="flex gap-4 p-6 h-full min-w-max">
+            <div className="flex gap-4 p-6 h-full min-w-max touch-pan-x">
               {COLUMNS.map((col) => (
                 <div key={col.id} className="flex flex-col w-[220px]">
                   {/* Cabeçalho da coluna */}

@@ -187,7 +187,8 @@ export function Profissionais() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100">
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Nome</th>
@@ -231,7 +232,8 @@ export function Profissionais() {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   )

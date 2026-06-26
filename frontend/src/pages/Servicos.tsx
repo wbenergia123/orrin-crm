@@ -39,7 +39,7 @@ function ServicoDialog({ servico, onClose }: { servico?: Servico; onClose: () =>
         <Label>Nome do procedimento</Label>
         <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Botox" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>Preço (R$)</Label>
           <Input type="text" inputMode="decimal" value={preco} onChange={handlePrecoChange} placeholder="800" />
@@ -101,7 +101,8 @@ export function Servicos() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100">
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Procedimento</th>
@@ -134,7 +135,8 @@ export function Servicos() {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   )
