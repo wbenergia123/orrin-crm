@@ -117,16 +117,19 @@ router.get('/:paciente_id/conversas', async (req, res) => {
     res.status(400).json({ error: 'paciente_id inválido' })
     return
   }
+  // Busca as 100 mais RECENTES (ordem descendente) e depois inverte — senão a
+  // tela fica presa nas 100 mais antigas em conversas longas, sem mostrar o
+  // que aconteceu depois (mesmo bug já corrigido no histórico usado pela Ana).
   const { data, error } = await supabaseAdmin
     .from('conversas_pacientes')
     .select('id, mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, created_at')
     .eq('tenant_id', req.user!.tenant_id)
     .eq('paciente_id', req.params.paciente_id)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(100)
 
   if (error) { res.status(500).json({ error: error.message }); return }
-  res.json(data ?? [])
+  res.json((data ?? []).reverse())
 })
 
 // ─── PATCH /:paciente_id/handoff ──────────────────────────────────────────────
