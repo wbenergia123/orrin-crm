@@ -124,6 +124,26 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
 
     const pacienteId = paciente!.id
 
+    // Mensagem enviada pelo próprio número da clínica direto no WhatsApp (não veio
+    // da Ana nem da caixa de texto do CRM — as duas passam pela API e já são
+    // filtradas no lado do UAZAPI via wasSentByApi). Registra como humano
+    // assumindo a conversa, sem deixar a Ana responder por cima.
+    if (payload.message.fromMe) {
+      await supabaseAdmin.from('conversas_pacientes').insert({
+        tenant_id: tenantId,
+        paciente_id: pacienteId,
+        mensagem_agente: texto,
+        tipo_remetente: 'humano',
+        modo_humano: true,
+      })
+      await supabaseAdmin
+        .from('pacientes')
+        .update({ ultimo_contato_at: new Date().toISOString() })
+        .eq('id', pacienteId)
+      console.log(`[WEBHOOK] Mensagem fromMe (enviada direto pelo WhatsApp) para ${telefone} — modo humano ativado, Ana não responde`)
+      return res.json({ result: 'ok' })
+    }
+
     // Atualiza nome do paciente se vier do contato do WhatsApp e ainda não tiver nome
     const contactName =
       payload.chat?.name ||
