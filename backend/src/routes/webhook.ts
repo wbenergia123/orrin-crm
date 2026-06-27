@@ -126,21 +126,31 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
 
     // Mensagem enviada pelo próprio número da clínica direto no WhatsApp (não veio
     // da Ana nem da caixa de texto do CRM — as duas passam pela API e já são
-    // filtradas no lado do UAZAPI via wasSentByApi). Registra como humano
-    // assumindo a conversa, sem deixar a Ana responder por cima.
+    // filtradas no lado do UAZAPI via wasSentByApi). Só registra a mensagem,
+    // sem deixar a Ana responder por cima — mantém o modo humano como já
+    // estava (não força assumir a conversa).
     if (payload.message.fromMe) {
+      const { data: ultimaConversaAtual } = await supabaseAdmin
+        .from('conversas_pacientes')
+        .select('modo_humano')
+        .eq('paciente_id', pacienteId)
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
       await supabaseAdmin.from('conversas_pacientes').insert({
         tenant_id: tenantId,
         paciente_id: pacienteId,
         mensagem_agente: texto,
         tipo_remetente: 'humano',
-        modo_humano: true,
+        modo_humano: ultimaConversaAtual?.modo_humano ?? false,
       })
       await supabaseAdmin
         .from('pacientes')
         .update({ ultimo_contato_at: new Date().toISOString() })
         .eq('id', pacienteId)
-      console.log(`[WEBHOOK] Mensagem fromMe (enviada direto pelo WhatsApp) para ${telefone} — modo humano ativado, Ana não responde`)
+      console.log(`[WEBHOOK] Mensagem fromMe (enviada direto pelo WhatsApp) para ${telefone} — registrada, Ana não responde a essa mensagem`)
       return res.json({ result: 'ok' })
     }
 
