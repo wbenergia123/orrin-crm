@@ -302,6 +302,31 @@ async function processarLembreteDia(tenantId: string, regra: FollowupRegra, agor
   }
 }
 
+async function processarAniversario(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
+  const agoraLocal = comoTextoLocal(agora, config.timezone)
+  const horaAtual = agoraLocal.substring(11, 16)
+
+  const horarioFixo = (regra.horario_fixo ?? '09:00').substring(0, 5)
+  if (horaAtual < horarioFixo) return
+
+  const hojeMesDia = agoraLocal.substring(5, 10)
+
+  const { data: pacientes } = await supabase
+    .from('pacientes')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .not('data_nascimento', 'is', null)
+
+  for (const paciente of pacientes ?? []) {
+    if (paciente.data_nascimento.substring(5, 10) !== hojeMesDia) continue
+
+    const desdeRegra = new Date(agora.getTime() - 24 * 60 * 60 * 1000)
+    if (await jaEnviou(regra.id, paciente.id, null, desdeRegra)) continue
+
+    await enviar(tenantId, regra, paciente, null, { nome: paciente.nome || 'tudo bem' }, agora)
+  }
+}
+
 async function processarRegra(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
   try {
     switch (regra.gatilho) {
@@ -316,6 +341,9 @@ async function processarRegra(tenantId: string, regra: FollowupRegra, agora: Dat
         break
       case 'lembrete_dia':
         await processarLembreteDia(tenantId, regra, agora, config)
+        break
+      case 'aniversario':
+        await processarAniversario(tenantId, regra, agora, config)
         break
       default:
         console.warn('[followup] Gatilho desconhecido:', regra.gatilho)

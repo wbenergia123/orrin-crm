@@ -20,6 +20,7 @@ export function NovoPacienteModal({ open, onClose, onSuccess }: NovoPacienteModa
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [cpf, setCpf] = useState('')
+  const [dataNascimento, setDataNascimento] = useState('')
 
   const { mutate, isPending, error, reset } = useMutation({
     mutationFn: () =>
@@ -27,11 +28,14 @@ export function NovoPacienteModal({ open, onClose, onSuccess }: NovoPacienteModa
         telefone: telefone.trim(),
         ...(nome.trim() ? { nome: nome.trim() } : {}),
         ...(cpf.trim() ? { cpf: cpf.replace(/\D/g, '') } : {}),
+        ...(dataNascimento ? { data_nascimento: dataNascimento } : {}),
       }),
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['pacientes-kanban'] })
       setNome('')
       setTelefone('')
+      setCpf('')
+      setDataNascimento('')
       reset()
       onSuccess(res.data)
       onClose()
@@ -42,6 +46,7 @@ export function NovoPacienteModal({ open, onClose, onSuccess }: NovoPacienteModa
     setNome('')
     setTelefone('')
     setCpf('')
+    setDataNascimento('')
     reset()
     onClose()
   }
@@ -76,6 +81,14 @@ export function NovoPacienteModal({ open, onClose, onSuccess }: NovoPacienteModa
               value={cpf}
               onChange={(e) => setCpf(e.target.value)}
               placeholder="000.000.000-00"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Data de nascimento</Label>
+            <Input
+              type="date"
+              value={dataNascimento}
+              onChange={(e) => setDataNascimento(e.target.value)}
             />
           </div>
           {error && (

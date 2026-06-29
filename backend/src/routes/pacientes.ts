@@ -44,6 +44,7 @@ const createSchema = z.object({
   nome: z.string().optional(),
   email: z.string().email().optional(),
   cpf: z.string().optional(),
+  data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   status: z.enum(['novo', 'em_conversa', 'consulta_agendada', 'cliente', 'frio']).default('novo'),
 })
 
@@ -65,6 +66,7 @@ router.patch('/:id', async (req, res) => {
     nome: z.string().optional(),
     email: z.string().email().optional(),
     cpf: z.string().optional(),
+    data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   })
   const parsed = updateSchema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }

@@ -13,6 +13,7 @@ let lembreteRegraId: string
 let naoRespondeuRegraId: string
 let noShowRegraId: string
 let lembreteDiaRegraId: string
+let aniversarioRegraId: string
 
 let receivedMessages: { number: string; text: string }[] = []
 let serverUrl: string
@@ -130,6 +131,7 @@ beforeAll(async () => {
     { tenant_id: testTenantId, nome: 'Não respondeu', gatilho: 'nao_respondeu', delay_minutos: 60, template: 'Oi [nome], vi que você entrou em contato. Ainda tem interesse?', ativo: true, ordem_prioridade: 5 },
     { tenant_id: testTenantId, nome: 'No-show', gatilho: 'no_show', delay_minutos: 30, template: 'Oi [nome], vi que não conseguiu vir. Quer remarcar?', ativo: true, ordem_prioridade: 8 },
     { tenant_id: testTenantId, nome: 'Lembrete do dia', gatilho: 'lembrete_dia', horario_fixo: '10:00', template: 'Oi [nome], hoje você tem [servico] às [hora] com [profissional]. Te esperamos!', ativo: true, ordem_prioridade: 12 },
+    { tenant_id: testTenantId, nome: 'Aniversário', gatilho: 'aniversario', horario_fixo: '09:00', template: 'Feliz aniversário, [nome]! 🎉 A equipe deseja um dia incrível! Para comemorar, que tal aproveitar pra cuidar de você?', ativo: true, ordem_prioridade: 15 },
   ]
   const { data: insertedRules } = await supabase.from('followup_regras').insert(rules).select('id,gatilho')
   const ruleMap = Object.fromEntries(insertedRules!.map((r) => [r.gatilho, r.id]))
@@ -137,6 +139,7 @@ beforeAll(async () => {
   naoRespondeuRegraId = ruleMap['nao_respondeu']
   noShowRegraId = ruleMap['no_show']
   lembreteDiaRegraId = ruleMap['lembrete_dia']
+  aniversarioRegraId = ruleMap['aniversario']
 })
 
 afterAll(async () => {
@@ -515,5 +518,78 @@ describe('runFollowups', () => {
     expect(receivedMessages.length).toBe(0)
 
     await supabase.from('agendamentos').delete().eq('id', ag!.id)
+  })
+
+  it('envia mensagem de aniversário no dia certo após o horário fixo', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T09:30:00-03:00')
+
+    await supabase
+      .from('pacientes')
+      .update({ data_nascimento: '1990-06-24' })
+      .eq('id', pacienteId)
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(1)
+    expect(receivedMessages[0].text).toContain('Feliz aniversário')
+    expect(receivedMessages[0].text).toContain('Maria Teste')
+
+    await supabase.from('pacientes').update({ data_nascimento: null }).eq('id', pacienteId)
+    await supabase.from('followup_envios').delete().eq('tenant_id', testTenantId)
+  })
+
+  it('não envia mensagem de aniversário antes do horário fixo', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T08:00:00-03:00')
+
+    await supabase
+      .from('pacientes')
+      .update({ data_nascimento: '1990-06-24' })
+      .eq('id', pacienteId)
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(0)
+
+    await supabase.from('pacientes').update({ data_nascimento: null }).eq('id', pacienteId)
+  })
+
+  it('não envia mensagem de aniversário duas vezes no mesmo dia', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T09:30:00-03:00')
+
+    await supabase
+      .from('pacientes')
+      .update({ data_nascimento: '1990-06-24' })
+      .eq('id', pacienteId)
+
+    await runFollowups(baseTime, testTenantId)
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(1)
+
+    await supabase.from('pacientes').update({ data_nascimento: null }).eq('id', pacienteId)
+    await supabase.from('followup_envios').delete().eq('tenant_id', testTenantId)
+  })
+
+  it('não envia mensagem de aniversário se não for hoje', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T09:30:00-03:00')
+
+    await supabase
+      .from('pacientes')
+      .update({ data_nascimento: '1990-12-25' })
+      .eq('id', pacienteId)
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(0)
+
+    await supabase.from('pacientes').update({ data_nascimento: null }).eq('id', pacienteId)
   })
 })
