@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { X, MessageCircle, CheckCircle, XCircle, Clock, Calendar, User, FileText, CalendarClock } from 'lucide-react'
+import { X, MessageCircle, CheckCircle, XCircle, Clock, Calendar, User, FileText, CalendarClock, ClipboardCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import type { StatusAgendamento } from '../types'
@@ -95,6 +95,7 @@ export function AgendamentoPainel({
   const podeCancelar = ag.status === 'agendado' || ag.status === 'confirmado'
   const podeConfirmar = ag.status === 'agendado'
   const podeRemarcar = ag.status === 'agendado' || ag.status === 'confirmado'
+  const podeConcluir = ag.status === 'agendado' || ag.status === 'confirmado'
   const dataHora = new Date(ag.data_hora)
   const hojeStr = format(new Date(), 'yyyy-MM-dd')
 
@@ -259,6 +260,16 @@ export function AgendamentoPainel({
             </div>
           ) : (
             <>
+              {podeConcluir && (
+                <button
+                  onClick={() => atualizarStatus('concluido')}
+                  disabled={isPending}
+                  className="w-full flex items-center justify-center gap-1.5 bg-violet-600 text-white text-sm font-semibold py-2 rounded-lg hover:bg-violet-700 disabled:opacity-50 transition-colors"
+                >
+                  <ClipboardCheck size={15} />
+                  Concluir atendimento
+                </button>
+              )}
               <div className="flex gap-2">
                 {podeConfirmar && (
                   <button
