@@ -74,6 +74,23 @@ describe('PATCH /api/profissionais/:id', () => {
     expect(res.status).toBe(200)
     expect(res.body.ativo).toBe(false)
   })
+
+  it('atualiza comissao_percentual', async () => {
+    const res = await request(app)
+      .patch(`/api/profissionais/${profissionalId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ comissao_percentual: 15 })
+    expect(res.status).toBe(200)
+    expect(res.body.comissao_percentual).toBe(15)
+  })
+
+  it('rejeita comissao_percentual maior que 100', async () => {
+    const res = await request(app)
+      .patch(`/api/profissionais/${profissionalId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ comissao_percentual: 150 })
+    expect(res.status).toBe(400)
+  })
 })
 
 describe('DELETE /api/profissionais/:id', () => {

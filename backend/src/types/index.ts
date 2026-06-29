@@ -107,6 +107,7 @@ export interface Profissional {
   tenant_id: string
   nome: string
   ativo: boolean
+  comissao_percentual: number
 }
 
 export interface Agendamento {
@@ -153,6 +154,7 @@ export interface Injetavel {
   categoria: CategoriaInjetavel
   cor_hex: string
   unidade: string
+  custo: number
   ativo: boolean
   created_at: string
   updated_at: string

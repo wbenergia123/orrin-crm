@@ -20,6 +20,7 @@ import whatsappRouter from './routes/whatsapp'
 import configuracoesRouter from './routes/configuracoes'
 import followupRouter from './routes/followup'
 import imagensReferenciaRouter from './routes/imagens-referencia'
+import financeiroRouter from './routes/financeiro'
 import { requireAuth, requireTenant, requireSuperAdmin, blockWritesWhenImpersonating } from './middleware/auth'
 
 if (!process.env.JWT_SECRET) {
@@ -62,6 +63,7 @@ export function createApp() {
   app.use('/api/agendamentos', requireAuth, blockWritesWhenImpersonating, requireTenant, agendamentosRouter)
   app.use('/api/atendimentos', requireAuth, blockWritesWhenImpersonating, requireTenant, atendimentosRouter)
   app.use('/api/dashboard', requireAuth, blockWritesWhenImpersonating, dashboardRouter)
+  app.use('/api/financeiro', requireAuth, blockWritesWhenImpersonating, financeiroRouter)
   app.use('/api/whatsapp', requireAuth, blockWritesWhenImpersonating, requireTenant, whatsappRouter)
   app.use('/api/configuracoes', requireAuth, blockWritesWhenImpersonating, configuracoesRouter)
   app.use('/api/followup', requireAuth, blockWritesWhenImpersonating, requireTenant, followupRouter)

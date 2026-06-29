@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import type { Injetavel, CategoriaInjetavel } from '../types'
 
-type Aba = 'whatsapp' | 'clinica' | 'followup'
+type Aba = 'whatsapp' | 'clinica' | 'followup' | 'injetaveis'
 
 interface Configuracao {
   chave: string
@@ -162,6 +163,7 @@ export function Configuracoes() {
           <button className={tabClass('whatsapp')} onClick={() => setAba('whatsapp')}>WhatsApp</button>
           <button className={tabClass('clinica')} onClick={() => setAba('clinica')}>Clínica</button>
           <button className={tabClass('followup')} onClick={() => setAba('followup')}>Follow-up</button>
+          <button className={tabClass('injetaveis')} onClick={() => setAba('injetaveis')}>Injetáveis</button>
         </div>
 
         <div className="p-6">
@@ -312,8 +314,223 @@ export function Configuracoes() {
               )}
             </div>
           )}
+
+          {aba === 'injetaveis' && <InjetaveisManager />}
         </div>
       </div>
+    </div>
+  )
+}
+
+const CATEGORIAS_INJETAVEIS: { value: CategoriaInjetavel; label: string }[] = [
+  { value: 'botox', label: 'Botox' },
+  { value: 'filler', label: 'Filler' },
+  { value: 'pdo_wire', label: 'Fio de PDO' },
+  { value: 'bioestimulador', label: 'Bioestimulador' },
+  { value: 'bioremodelador', label: 'Bioremodelador' },
+  { value: 'skinbooster', label: 'Skinbooster' },
+  { value: 'enzimas', label: 'Enzimas' },
+  { value: 'outro', label: 'Outro' },
+]
+
+function formatarCusto(v: string) {
+  return v.replace(/[^0-9.,]/g, '')
+}
+
+function InjetaveisManager() {
+  const qc = useQueryClient()
+  const [editando, setEditando] = useState<Injetavel | null>(null)
+  const [form, setForm] = useState({ nome: '', categoria: 'botox' as CategoriaInjetavel, cor_hex: '#7c3aed', unidade: '', custo: '' })
+
+  const { data: injetaveis = [], isLoading } = useQuery<Injetavel[]>({
+    queryKey: ['injetaveis'],
+    queryFn: async () => (await api.get('/injetaveis')).data,
+  })
+
+  const criar = useMutation({
+    mutationFn: () =>
+      api.post('/injetaveis', {
+        nome: form.nome,
+        categoria: form.categoria,
+        cor_hex: form.cor_hex,
+        unidade: form.unidade,
+        custo: form.custo ? Number(form.custo.replace(',', '.')) : 0,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['injetaveis'] })
+      setForm({ nome: '', categoria: 'botox', cor_hex: '#7c3aed', unidade: '', custo: '' })
+    },
+  })
+
+  const atualizar = useMutation({
+    mutationFn: () =>
+      api.patch(`/injetaveis/${editando!.id}`, {
+        nome: form.nome,
+        categoria: form.categoria,
+        cor_hex: form.cor_hex,
+        unidade: form.unidade,
+        custo: form.custo ? Number(form.custo.replace(',', '.')) : 0,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['injetaveis'] })
+      setEditando(null)
+      setForm({ nome: '', categoria: 'botox', cor_hex: '#7c3aed', unidade: '', custo: '' })
+    },
+  })
+
+  const desativar = useMutation({
+    mutationFn: (id: string) => api.delete(`/injetaveis/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['injetaveis'] }),
+  })
+
+  function iniciarEdicao(item: Injetavel) {
+    setEditando(item)
+    setForm({
+      nome: item.nome,
+      categoria: item.categoria,
+      cor_hex: item.cor_hex,
+      unidade: item.unidade,
+      custo: item.custo != null ? String(item.custo) : '',
+    })
+  }
+
+  function cancelarEdicao() {
+    setEditando(null)
+    setForm({ nome: '', categoria: 'botox', cor_hex: '#7c3aed', unidade: '', custo: '' })
+  }
+
+  const submit = () => {
+    if (editando) atualizar.mutate()
+    else criar.mutate()
+  }
+
+  return (
+    <div className="space-y-5 max-w-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-700">Nome</label>
+          <input
+            type="text"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            value={form.nome}
+            onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+            placeholder="Ex: Botox 100UI"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-700">Categoria</label>
+          <select
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+            value={form.categoria}
+            onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value as CategoriaInjetavel }))}
+          >
+            {CATEGORIAS_INJETAVEIS.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-700">Cor</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={form.cor_hex}
+              onChange={(e) => setForm((f) => ({ ...f, cor_hex: e.target.value }))}
+              className="w-10 h-10 p-0 border border-gray-200 rounded-lg overflow-hidden"
+            />
+            <span className="text-xs text-gray-500">{form.cor_hex}</span>
+          </div>
+        </div>
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-700">Unidade</label>
+          <input
+            type="text"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            value={form.unidade}
+            onChange={(e) => setForm((f) => ({ ...f, unidade: e.target.value }))}
+            placeholder="Ex: unidade / ml"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="block text-sm font-medium text-gray-700">Custo (R$)</label>
+          <input
+            type="text"
+            inputMode="decimal"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            value={form.custo}
+            onChange={(e) => setForm((f) => ({ ...f, custo: formatarCusto(e.target.value) }))}
+            placeholder="0,00"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button
+          onClick={submit}
+          disabled={!form.nome.trim() || criar.isPending || atualizar.isPending}
+          className="bg-violet-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
+        >
+          {criar.isPending || atualizar.isPending ? 'Salvando...' : editando ? 'Salvar alterações' : 'Adicionar injetável'}
+        </button>
+        {editando && (
+          <button
+            onClick={cancelarEdicao}
+            className="border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-gray-400">Carregando injetáveis...</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 text-left">
+                <th className="py-2 text-xs font-medium text-gray-400 uppercase">Nome</th>
+                <th className="py-2 text-xs font-medium text-gray-400 uppercase">Categoria</th>
+                <th className="py-2 text-xs font-medium text-gray-400 uppercase">Unidade</th>
+                <th className="py-2 text-xs font-medium text-gray-400 uppercase">Custo</th>
+                <th className="py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {injetaveis.filter((i) => i.ativo).map((item) => (
+                <tr key={item.id} className="border-b border-gray-50">
+                  <td className="py-2 flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full" style={{ background: item.cor_hex }} />
+                    {item.nome}
+                  </td>
+                  <td className="py-2 text-gray-500 capitalize">{item.categoria.replace('_', ' ')}</td>
+                  <td className="py-2 text-gray-500">{item.unidade || '—'}</td>
+                  <td className="py-2 text-gray-500">
+                    {item.custo != null && item.custo > 0
+                      ? `R$ ${Number(item.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                      : '—'}
+                  </td>
+                  <td className="py-2">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => iniciarEdicao(item)}
+                        className="text-xs text-violet-600 hover:text-violet-700 font-medium"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => desativar.mutate(item.id)}
+                        className="text-xs text-red-500 hover:text-red-600 font-medium"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

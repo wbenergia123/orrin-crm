@@ -10,6 +10,7 @@ import {
   LogOut,
   Settings,
   Building2,
+  DollarSign,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/profissionais', icon: UserCog, label: 'Profissionais' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/atendimentos', icon: MessageSquare, label: 'Atendimentos' },
+  { to: '/financeiro', icon: DollarSign, label: 'Financeiro', financeiroOnly: true },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
   { to: '/admin', icon: Building2, label: 'Admin', adminOnly: true },
 ]
@@ -30,9 +32,13 @@ const navItems = [
 export function Sidebar() {
   const { logout, usuario } = useAuth()
 
-  const visibleItems = navItems.filter(
-    (item) => !item.adminOnly || usuario?.role === 'super_admin'
-  )
+  const visibleItems = navItems.filter((item) => {
+    if (item.adminOnly && usuario?.role !== 'super_admin') return false
+    if (item.financeiroOnly) {
+      return usuario?.role === 'admin' || usuario?.role === 'super_admin'
+    }
+    return true
+  })
 
   return (
     <aside className="w-16 md:w-56 flex flex-col h-full bg-white border-r border-gray-100 py-6 px-2 md:px-4">

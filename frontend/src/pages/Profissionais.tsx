@@ -103,18 +103,31 @@ function ProfissionalDialog({
 }) {
   const qc = useQueryClient()
   const [nome, setNome] = useState(profissional?.nome ?? '')
+  const [comissao, setComissao] = useState(profissional?.comissao_percentual != null ? String(profissional.comissao_percentual) : '')
+
+  const handleComissaoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value.replace(/[^0-9.,]/g, '')
+    setComissao(v)
+  }
+
+  const comissaoNum = comissao ? Number(comissao.replace(',', '.')) : undefined
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () =>
-      profissional
-        ? api.patch(`/profissionais/${profissional.id}`, { nome })
-        : api.post('/profissionais', { nome }),
+    mutationFn: () => {
+      const body: { nome: string; comissao_percentual?: number } = { nome }
+      if (comissaoNum !== undefined) body.comissao_percentual = comissaoNum
+      return profissional
+        ? api.patch(`/profissionais/${profissional.id}`, body)
+        : api.post('/profissionais', body)
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['profissionais'] })
       qc.invalidateQueries({ queryKey: ['profissionais-ativos'] })
       onClose()
     },
   })
+
+  const comissaoInvalida = comissaoNum !== undefined && (comissaoNum < 0 || comissaoNum > 100)
 
   return (
     <div className="space-y-4 pt-2">
@@ -127,7 +140,18 @@ function ProfissionalDialog({
           placeholder="Ex: Dra. Maria Silva"
         />
       </div>
-      <Button onClick={() => mutate()} disabled={isPending || !nome.trim()} className="w-full">
+      <div className="space-y-1">
+        <Label>Comissão (%)</Label>
+        <Input
+          type="text"
+          inputMode="decimal"
+          value={comissao}
+          onChange={handleComissaoChange}
+          placeholder="Ex: 10"
+        />
+        {comissaoInvalida && <p className="text-xs text-red-500">A comissão deve estar entre 0 e 100.</p>}
+      </div>
+      <Button onClick={() => mutate()} disabled={isPending || !nome.trim() || comissaoInvalida} className="w-full">
         {isPending ? 'Salvando...' : profissional ? 'Salvar alterações' : 'Adicionar profissional'}
       </Button>
     </div>

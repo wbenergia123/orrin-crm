@@ -18,14 +18,14 @@ router.get('/', async (req: Request, res: Response) => {
 
 // Criar injetável
 router.post('/', async (req: Request, res: Response) => {
-  const { nome, categoria, cor_hex, unidade } = req.body
+  const { nome, categoria, cor_hex, unidade, custo } = req.body
   if (!nome || !categoria) {
     return res.status(400).json({ error: 'nome e categoria são obrigatórios' })
   }
 
   const { data, error } = await supabaseAdmin
     .from('injetaveis')
-    .insert({ nome, categoria, cor_hex, unidade, tenant_id: req.user!.tenant_id })
+    .insert({ nome, categoria, cor_hex, unidade, custo, tenant_id: req.user!.tenant_id })
     .select()
     .single()
 

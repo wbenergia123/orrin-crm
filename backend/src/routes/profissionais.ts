@@ -17,7 +17,10 @@ router.get('/', async (req, res) => {
   res.json(data)
 })
 
-const profissionalSchema = z.object({ nome: z.string().min(2) })
+const profissionalSchema = z.object({
+  nome: z.string().min(2),
+  comissao_percentual: z.number().min(0).max(100).optional(),
+})
 
 router.post('/', async (req, res) => {
   const parsed = profissionalSchema.safeParse(req.body)
@@ -35,7 +38,8 @@ router.patch('/:id', async (req, res) => {
   const schema = z.object({
     nome: z.string().min(2).optional(),
     ativo: z.boolean().optional(),
-  }).refine((v) => v.nome !== undefined || v.ativo !== undefined, {
+    comissao_percentual: z.number().min(0).max(100).optional(),
+  }).refine((v) => v.nome !== undefined || v.ativo !== undefined || v.comissao_percentual !== undefined, {
     message: 'At least one field is required',
   })
   const parsed = schema.safeParse(req.body)

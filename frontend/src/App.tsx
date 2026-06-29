@@ -12,6 +12,7 @@ import { Agenda } from './pages/Agenda'
 import { Atendimentos } from './pages/Atendimentos'
 import { Configuracoes } from './pages/Configuracoes'
 import { Clientes } from './pages/Clientes'
+import { Financeiro } from './pages/Financeiro'
 import { Admin } from './pages/Admin'
 import { Impersonar } from './pages/Impersonar'
 
@@ -46,6 +47,7 @@ export default function App() {
               <Route path="/agenda" element={<Agenda />} />
               <Route path="/atendimentos" element={<Atendimentos />} />
               <Route path="/clientes" element={<Clientes />} />
+              <Route path="/financeiro" element={<Financeiro />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/admin" element={<Admin />} />
             </Route>

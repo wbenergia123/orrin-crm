@@ -77,10 +77,10 @@ router.get('/metricas', async (req, res) => {
     supabaseAdmin.from('pacientes').select('*', { count: 'exact', head: true }).eq('tenant_id', req.user!.tenant_id).eq('status', 'cliente'),
   ])
 
-  type FaturamentoRow = { servicos: { preco: number }[] | null }
+  type FaturamentoRow = { servicos: { preco: number } | null }
 
   const somaPreco = (rows: FaturamentoRow[] | null) =>
-    (rows ?? []).reduce((acc, a) => acc + (a.servicos?.[0]?.preco ?? 0), 0)
+    (rows ?? []).reduce((acc, a) => acc + (a.servicos?.preco ?? 0), 0)
 
   const fat = somaPreco(agendamentosConc as FaturamentoRow[] | null)
   const fatAnt = somaPreco(agendamentosConcAnt as FaturamentoRow[] | null)
