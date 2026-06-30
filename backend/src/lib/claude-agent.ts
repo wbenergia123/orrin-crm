@@ -86,6 +86,32 @@ async function getPacienteInfo(pacienteId: string) {
   return data
 }
 
+async function getProfissionaisComServicos(tenantId: string): Promise<{ id: string; nome: string; servico_ids: string[] }[]> {
+  const { data: profs } = await supabase
+    .from('profissionais')
+    .select('id, nome')
+    .eq('tenant_id', tenantId)
+    .eq('ativo', true)
+    .order('nome')
+
+  if (!profs?.length) return []
+
+  const { data: vinculos } = await supabase
+    .from('profissional_servicos')
+    .select('profissional_id, servico_id')
+    .eq('tenant_id', tenantId)
+    .in('profissional_id', profs.map((p) => p.id))
+
+  const mapaVinculos = new Map<string, string[]>()
+  for (const v of vinculos ?? []) {
+    const lista = mapaVinculos.get(v.profissional_id) ?? []
+    lista.push(v.servico_id)
+    mapaVinculos.set(v.profissional_id, lista)
+  }
+
+  return profs.map((p) => ({ ...p, servico_ids: mapaVinculos.get(p.id) ?? [] }))
+}
+
 async function getServicos(tenantId: string): Promise<Servico[]> {
   const { data } = await supabase
     .from('servicos')
@@ -146,10 +172,11 @@ export async function processarComAgente(
   mensagensDoUsuario: string[]
 ): Promise<string> {
   try {
-    const [paciente, historico, servicos, pendentes, promptEditavel, modelo] = await Promise.all([
+    const [paciente, historico, servicos, profissionaisComServicos, pendentes, promptEditavel, modelo] = await Promise.all([
       getPacienteInfo(pacienteId),
       getHistoricoConversa(pacienteId),
       getServicos(tenantId),
+      getProfissionaisComServicos(tenantId),
       getAgendamentosPendentes(pacienteId, tenantId),
       getPromptAna(tenantId),
       getModeloAna(tenantId),
@@ -163,6 +190,8 @@ export async function processarComAgente(
       timeZone: 'America/Sao_Paulo',
     })
 
+    const servicoMap = new Map(servicos.map((s) => [s.id, s.nome]))
+
     const servicosInfo = servicos.length > 0
       ? servicos.map((s) => {
           const precoStr = s.ocultar_preco ? 'preço: sob avaliação (NUNCA informe valor ao paciente)' : `R$ ${s.preco.toFixed(2)}`
@@ -170,6 +199,15 @@ export async function processarComAgente(
           return `- ${s.nome} (id: ${s.id}): ${precoStr}, ${s.duracao_minutos} min${avaliacaoStr}`
         }).join('\n')
       : '(nenhum serviço cadastrado — avise que ainda não é possível agendar)'
+
+    const profissionaisInfo = profissionaisComServicos.length > 0
+      ? profissionaisComServicos.map((p) => {
+          const servicosDoProf = p.servico_ids.length > 0
+            ? p.servico_ids.map((sid) => servicoMap.get(sid) ?? sid).join(', ')
+            : 'realiza todos os serviços'
+          return `- ${p.nome} (id: ${p.id}): ${servicosDoProf}`
+        }).join('\n')
+      : '(nenhum profissional ativo)'
 
     const pendentesText = pendentes.length > 0
       ? pendentes.map((ag) => {
@@ -209,6 +247,9 @@ Diretrizes para confirmação/remarcação/cancelamento:
 - Se o paciente pedir pra mudar o dia/horário de uma consulta já marcada: use verificar_slots pra achar um novo horário, confirme explicitamente com o paciente, e SÓ ENTÃO chame remarcar_agendamento com o ID do agendamento original e a nova data_hora. Nunca diga que remarcou sem ter chamado essa ferramenta.
 - Se o paciente cancelar (sem querer remarcar): chame cancelar_agendamento, responda com empatia ("Que pena, espero que esteja tudo bem!"), pergunte se quer marcar outro dia. Se quiser, use verificar_slots e criar_agendamento normalmente.
 - Se houver 2+ agendamentos pendentes e a resposta for ambígua: liste-os e pergunte qual o paciente quer confirmar/remarcar/cancelar.
+
+Profissionais ativos e seus serviços (use estes IDs nas ferramentas):
+${profissionaisInfo}
 
 Serviços disponíveis (use estes IDs nas ferramentas):
 ${servicosInfo}`
