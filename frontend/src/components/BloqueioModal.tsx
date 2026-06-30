@@ -37,7 +37,7 @@ export function BloqueioModal({ open, profissional, dataInicial, onClose, onSuce
   const calcularFim = () => {
     const d = new Date(inicio)
     d.setMinutes(d.getMinutes() + duracaoMin)
-    return d.toISOString().slice(0, 16)
+    return formatDateTimeLocal(d)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
