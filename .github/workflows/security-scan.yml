@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 6 * * 1'  # toda segunda às 06:00 UTC (~03:00 em Brasília)
+    - cron: '0 6 1 * *'  # todo dia 1 do mês às 06:00 UTC (~03:00 em Brasília)
   workflow_dispatch: {}
 
 jobs:
