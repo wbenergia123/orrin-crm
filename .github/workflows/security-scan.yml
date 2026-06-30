@@ -62,8 +62,6 @@ jobs:
   zap-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Pula se os secrets de staging não estiverem configurados
-    if: ${{ secrets.STAGING_SUPABASE_URL != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
