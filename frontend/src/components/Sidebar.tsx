@@ -64,7 +64,7 @@ export function Sidebar() {
             }
           >
             <Icon size={18} className="shrink-0" />
-            <span className="hidden md:inline">{label}</span>
+            <span className="hidden md:inline" translate="no">{label}</span>
           </NavLink>
         ))}
       </nav>

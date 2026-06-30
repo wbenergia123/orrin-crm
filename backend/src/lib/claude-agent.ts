@@ -58,6 +58,8 @@ interface Servico {
   nome: string
   preco: number
   duracao_minutos: number
+  requer_avaliacao: boolean
+  ocultar_preco: boolean
 }
 
 export async function getHistoricoConversa(pacienteId: string): Promise<ConversaHistorico[]> {
@@ -87,7 +89,7 @@ async function getPacienteInfo(pacienteId: string) {
 async function getServicos(tenantId: string): Promise<Servico[]> {
   const { data } = await supabase
     .from('servicos')
-    .select('id, nome, preco, duracao_minutos')
+    .select('id, nome, preco, duracao_minutos, requer_avaliacao, ocultar_preco')
     .eq('tenant_id', tenantId)
     .eq('ativo', true)
     .order('nome')
@@ -162,7 +164,11 @@ export async function processarComAgente(
     })
 
     const servicosInfo = servicos.length > 0
-      ? servicos.map((s) => `- ${s.nome} (id: ${s.id}): R$ ${s.preco.toFixed(2)}, ${s.duracao_minutos} min`).join('\n')
+      ? servicos.map((s) => {
+          const precoStr = s.ocultar_preco ? 'preço: sob avaliação (NUNCA informe valor ao paciente)' : `R$ ${s.preco.toFixed(2)}`
+          const avaliacaoStr = s.requer_avaliacao ? ' | REQUER AVALIAÇÃO PRESENCIAL (30 min) antes de agendar o procedimento' : ''
+          return `- ${s.nome} (id: ${s.id}): ${precoStr}, ${s.duracao_minutos} min${avaliacaoStr}`
+        }).join('\n')
       : '(nenhum serviço cadastrado — avise que ainda não é possível agendar)'
 
     const pendentesText = pendentes.length > 0
