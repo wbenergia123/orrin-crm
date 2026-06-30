@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import { supabaseAdmin } from '../services/supabase'
+import { verificarBloqueio, registrarFalha, registrarSucesso } from '../lib/rate-limiter'
 
 const router = Router()
 
@@ -12,20 +13,32 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Email e senha são obrigatórios' })
   }
 
+  const emailNorm = email.toLowerCase().trim()
+
+  // Verifica bloqueio por tentativas
+  const bloqueio = verificarBloqueio(emailNorm)
+  if (bloqueio.bloqueado) {
+    return res.status(429).json({
+      error: `Muitas tentativas incorretas. Tente novamente em ${bloqueio.segundosRestantes} segundos.`,
+    })
+  }
+
   // Busca usuário pelo email
   const { data: usuario, error } = await supabaseAdmin
     .from('usuarios')
     .select('id, email, senha_hash, role, tenant_id, ativo')
-    .eq('email', email.toLowerCase().trim())
+    .eq('email', emailNorm)
     .single()
 
   if (error || !usuario) {
+    registrarFalha(emailNorm)
     return res.status(401).json({ error: 'Email ou senha inválidos' })
   }
 
   // Verifica a senha
   const senhaValida = await bcrypt.compare(senha, usuario.senha_hash)
   if (!senhaValida) {
+    registrarFalha(emailNorm)
     return res.status(401).json({ error: 'Email ou senha inválidos' })
   }
 
@@ -44,6 +57,8 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Esta clínica está desativada. Entre em contato com o suporte.' })
     }
   }
+
+  registrarSucesso(emailNorm)
 
   // Gera JWT
   const token = jwt.sign(
