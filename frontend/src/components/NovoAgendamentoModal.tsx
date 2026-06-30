@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { api } from '../api/client'
@@ -79,11 +79,22 @@ export function NovoAgendamentoModal({
     enabled: open,
   })
 
+  const { data: profAptos } = useQuery<string[] | null>({
+    queryKey: ['profissionais-por-servico', servicoId],
+    queryFn: async () => (await api.get(`/profissionais/por-servico?servico_id=${servicoId}`)).data,
+    enabled: !!servicoId,
+  })
+
+  const profissionaisFiltrados = useMemo(() => {
+    if (!profAptos) return profissionais
+    return profissionais.filter((p) => profAptos.includes(p.id))
+  }, [profissionais, profAptos])
+
   interface Slot { iso: string; hora: string; disponivel: boolean }
   const { data: slots = [] } = useQuery<Slot[]>({
-    queryKey: ['slots', profissionalId, data],
+    queryKey: ['slots', profissionalId, data, servicoId],
     queryFn: async () =>
-      (await api.get(`/agendamentos/slots-disponiveis?data=${data}&profissional_id=${profissionalId}`)).data,
+      (await api.get(`/agendamentos/slots-disponiveis?data=${data}&profissional_id=${profissionalId}&servico_id=${servicoId}`)).data,
     enabled: !!profissionalId && !!data,
   })
 
@@ -176,7 +187,7 @@ export function NovoAgendamentoModal({
                 </label>
                 <select
                   value={servicoId}
-                  onChange={(e) => setServicoId(e.target.value)}
+                  onChange={(e) => { setServicoId(e.target.value); setProfissionalId(''); setSlotSelecionado(null) }}
                   className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-400 bg-white ${servicoId ? 'text-violet-700 font-medium' : 'text-gray-400'}`}
                 >
                   <option value="">Selecione...</option>
@@ -195,7 +206,7 @@ export function NovoAgendamentoModal({
                   className={`w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-400 bg-white ${profissionalId ? 'text-violet-700 font-medium' : 'text-gray-400'}`}
                 >
                   <option value="">Selecione...</option>
-                  {profissionais.map((p) => (
+                  {profissionaisFiltrados.map((p) => (
                     <option key={p.id} value={p.id}>{p.nome}</option>
                   ))}
                 </select>

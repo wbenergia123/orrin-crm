@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Pencil, ToggleLeft, ToggleRight, Camera } from 'lucide-react'
 import { getAvatarUrl, getAvatarFallback } from '../lib/avatar'
 import { api } from '../api/client'
-import type { Profissional } from '../types'
+import type { Profissional, Servico } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -104,6 +104,22 @@ function ProfissionalDialog({
   const qc = useQueryClient()
   const [nome, setNome] = useState(profissional?.nome ?? '')
   const [comissao, setComissao] = useState(profissional?.comissao_percentual != null ? String(profissional.comissao_percentual) : '')
+  const [servicosSelecionados, setServicosSelecionados] = useState<Set<string>>(new Set())
+  const [servicosCarregados, setServicosCarregados] = useState(false)
+
+  const { data: todosServicos = [] } = useQuery<Servico[]>({
+    queryKey: ['servicos'],
+    queryFn: async () => (await api.get('/servicos')).data,
+    enabled: !!profissional,
+  })
+
+  useEffect(() => {
+    if (!profissional) return
+    api.get(`/profissionais/${profissional.id}/servicos`).then((res) => {
+      setServicosSelecionados(new Set(res.data))
+      setServicosCarregados(true)
+    })
+  }, [profissional?.id])
 
   const handleComissaoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value.replace(/[^0-9.,]/g, '')
@@ -113,12 +129,18 @@ function ProfissionalDialog({
   const comissaoNum = comissao ? Number(comissao.replace(',', '.')) : undefined
 
   const { mutate, isPending } = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const body: { nome: string; comissao_percentual?: number } = { nome }
       if (comissaoNum !== undefined) body.comissao_percentual = comissaoNum
-      return profissional
-        ? api.patch(`/profissionais/${profissional.id}`, body)
-        : api.post('/profissionais', body)
+
+      if (profissional) {
+        await api.patch(`/profissionais/${profissional.id}`, body)
+        await api.put(`/profissionais/${profissional.id}/servicos`, {
+          servico_ids: Array.from(servicosSelecionados),
+        })
+      } else {
+        await api.post('/profissionais', body)
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['profissionais'] })
@@ -151,6 +173,37 @@ function ProfissionalDialog({
         />
         {comissaoInvalida && <p className="text-xs text-red-500">A comissão deve estar entre 0 e 100.</p>}
       </div>
+      {profissional && todosServicos.length > 0 && (
+        <div className="space-y-2">
+          <Label>Serviços que realiza</Label>
+          {!servicosCarregados ? (
+            <p className="text-xs text-gray-400">Carregando...</p>
+          ) : (
+            <div className="border border-gray-100 rounded-lg p-3 space-y-2 max-h-52 overflow-y-auto">
+              {todosServicos.filter((s) => s.ativo).map((s) => (
+                <label key={s.id} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={servicosSelecionados.has(s.id)}
+                    onChange={(e) => {
+                      const next = new Set(servicosSelecionados)
+                      if (e.target.checked) next.add(s.id)
+                      else next.delete(s.id)
+                      setServicosSelecionados(next)
+                    }}
+                    className="rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  />
+                  <span className="text-sm text-gray-700">{s.nome}</span>
+                </label>
+              ))}
+            </div>
+          )}
+          {todosServicos.filter((s) => s.ativo).length === 0 && (
+            <p className="text-xs text-gray-400">Nenhum serviço cadastrado.</p>
+          )}
+        </div>
+      )}
+
       <Button onClick={() => mutate()} disabled={isPending || !nome.trim() || comissaoInvalida} className="w-full">
         {isPending ? 'Salvando...' : profissional ? 'Salvar alterações' : 'Adicionar profissional'}
       </Button>

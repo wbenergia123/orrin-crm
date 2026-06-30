@@ -8,6 +8,7 @@ export interface VerificarSlotsInput {
   data_inicio: string
   data_fim: string
   profissional_id?: string
+  servico_id?: string
 }
 
 export interface CriarAgendamentoInput {
@@ -79,6 +80,10 @@ export const TOOLS: Anthropic.Tool[] = [
         profissional_id: {
           type: 'string',
           description: 'UUID do profissional (opcional)',
+        },
+        servico_id: {
+          type: 'string',
+          description: 'UUID do serviço desejado (opcional) — filtra apenas profissionais que realizam esse serviço',
         },
       },
       required: ['data_inicio', 'data_fim'],
@@ -185,7 +190,23 @@ export async function executarVerificarSlots(
   if (profError) throw profError
   if (!profissionais?.length) return { disponibilidade: [] }
 
-  const profIds = profissionais.map((p) => p.id)
+  // Filtra profissionais que fazem o serviço (se informado e se há vínculos cadastrados)
+  let profissionaisFiltrados = profissionais
+  if (input.servico_id) {
+    const { data: vinculos } = await supabase
+      .from('profissional_servicos')
+      .select('profissional_id')
+      .eq('tenant_id', tenantId)
+      .eq('servico_id', input.servico_id)
+
+    if (vinculos && vinculos.length > 0) {
+      const aptos = new Set(vinculos.map((v) => v.profissional_id))
+      profissionaisFiltrados = profissionais.filter((p) => aptos.has(p.id))
+    }
+    // Se não há vínculos cadastrados para esse serviço, não filtra (mostra todos)
+  }
+
+  const profIds = profissionaisFiltrados.map((p) => p.id)
 
   const { data: ocupados, error: agError } = await supabase
     .from('agendamentos')
@@ -245,7 +266,7 @@ export async function executarVerificarSlots(
   const inicio = new Date(`${input.data_inicio}T00:00:00`)
   const fim = new Date(`${input.data_fim}T00:00:00`)
 
-  for (const prof of profissionais) {
+  for (const prof of profissionaisFiltrados) {
     const current = new Date(inicio.getTime())
     while (current <= fim) {
       const dateStr = current.toISOString().substring(0, 10)

@@ -33,13 +33,37 @@ function normalizarTextoLocal(dataHora: string): string {
 
 // IMPORTANT: /slots-disponiveis must be defined BEFORE /:id so Express doesn't treat "slots-disponiveis" as an id
 router.get('/slots-disponiveis', async (req, res) => {
-  const { data: dataParam, profissional_id } = req.query
+  const { data: dataParam, profissional_id, servico_id } = req.query
   if (!dataParam || !profissional_id) {
     res.status(400).json({ error: 'data e profissional_id são obrigatórios' })
     return
   }
 
   const dataStr = dataParam as string
+
+  // Se servico_id fornecido, verifica se este profissional realiza o serviço
+  if (servico_id) {
+    const { data: vinculo } = await supabaseAdmin
+      .from('profissional_servicos')
+      .select('profissional_id')
+      .eq('profissional_id', profissional_id as string)
+      .eq('servico_id', servico_id as string)
+      .eq('tenant_id', req.user!.tenant_id)
+      .maybeSingle()
+
+    const { data: temQualquerServico } = await supabaseAdmin
+      .from('profissional_servicos')
+      .select('profissional_id')
+      .eq('profissional_id', profissional_id as string)
+      .eq('tenant_id', req.user!.tenant_id)
+      .limit(1)
+
+    if (!vinculo && (temQualquerServico ?? []).length > 0) {
+      const todos = gerarSlots(dataStr)
+      res.json(todos.map((s) => ({ iso: `${s.textoLocal}-03:00`, hora: s.hora, disponivel: false })))
+      return
+    }
+  }
 
   const { data: ocupados } = await supabaseAdmin
     .from('agendamentos')
