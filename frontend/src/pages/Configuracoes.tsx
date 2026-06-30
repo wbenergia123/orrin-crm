@@ -105,6 +105,7 @@ export function Configuracoes() {
 
   // Aba Follow-up
   const { data: regras = [], isLoading: carregandoRegras } = useFollowupRegras()
+  const [regrasDelay, setRegrasDelay] = useState<Record<string, number>>({})
   const [regrasEditadas, setRegrasEditadas] = useState<Record<string, string>>({})
 
   useEffect(() => {
@@ -114,8 +115,8 @@ export function Configuracoes() {
   }, [regras])
 
   const salvarRegra = useMutation({
-    mutationFn: ({ id, template, ativo }: { id: string; template: string; ativo: boolean }) =>
-      api.patch(`/followup/regras/${id}`, { template, ativo }),
+    mutationFn: ({ id, template, ativo, delay_minutos }: { id: string; template: string; ativo: boolean; delay_minutos?: number }) =>
+      api.patch(`/followup/regras/${id}`, { template, ativo, ...(delay_minutos !== undefined ? { delay_minutos } : {}) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['followup-regras'] }),
   })
 
@@ -275,7 +276,9 @@ export function Configuracoes() {
                 <p className="text-sm text-gray-400">Carregando regras...</p>
               ) : (
                 <div className="space-y-4">
-                  {regras.map((regra) => (
+                  {regras.map((regra) => {
+                    const delayEditado = regrasDelay[regra.id] ?? regra.delay_minutos ?? 60
+                    return (
                     <div key={regra.id} className="border border-gray-100 rounded-lg p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-gray-800">
@@ -287,11 +290,26 @@ export function Configuracoes() {
                             type="checkbox"
                             className="sr-only peer"
                             checked={regra.ativo}
-                            onChange={(e) => salvarRegra.mutate({ id: regra.id, template: regrasEditadas[regra.id] ?? regra.template, ativo: e.target.checked })}
+                            onChange={(e) => salvarRegra.mutate({ id: regra.id, template: regrasEditadas[regra.id] ?? regra.template, ativo: e.target.checked, delay_minutos: regra.gatilho === 'pos_atendimento' ? delayEditado : undefined })}
                           />
                           <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-violet-600" />
                         </label>
                       </div>
+                      {regra.gatilho === 'pos_atendimento' && (
+                        <div>
+                          <p className="text-xs text-gray-400 mb-1">Enviar após o atendimento</p>
+                          <select
+                            className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            value={delayEditado}
+                            onChange={(e) => setRegrasDelay((prev) => ({ ...prev, [regra.id]: Number(e.target.value) }))}
+                          >
+                            <option value={60}>1 hora</option>
+                            <option value={120}>2 horas</option>
+                            <option value={180}>3 horas</option>
+                            <option value={240}>4 horas</option>
+                          </select>
+                        </div>
+                      )}
                       <div>
                         <p className="text-xs text-gray-400 mb-1">Mensagem</p>
                         <textarea
@@ -302,14 +320,15 @@ export function Configuracoes() {
                         />
                       </div>
                       <button
-                        onClick={() => salvarRegra.mutate({ id: regra.id, template: regrasEditadas[regra.id] ?? regra.template, ativo: regra.ativo })}
+                        onClick={() => salvarRegra.mutate({ id: regra.id, template: regrasEditadas[regra.id] ?? regra.template, ativo: regra.ativo, delay_minutos: regra.gatilho === 'pos_atendimento' ? delayEditado : undefined })}
                         disabled={salvarRegra.isPending}
                         className="bg-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-violet-700 disabled:opacity-50 transition-colors"
                       >
                         {salvarRegra.isPending ? 'Salvando...' : 'Salvar'}
                       </button>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

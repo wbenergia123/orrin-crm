@@ -334,10 +334,12 @@ export function Agenda() {
       )}
 
       {menuSlot && (
-        <div
-          className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-52"
-          style={{ top: menuSlot.y, left: menuSlot.x }}
-        >
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuSlot(null)} />
+          <div
+            className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-52"
+            style={{ top: menuSlot.y, left: menuSlot.x }}
+          >
           <button
             onClick={handleCriarAgendamento}
             className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-violet-50 flex items-center gap-2"
@@ -357,6 +359,7 @@ export function Agenda() {
             <X size={14} /> Cancelar
           </button>
         </div>
+        </>
       )}
     </div>
   )

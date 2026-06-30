@@ -302,6 +302,35 @@ async function processarLembreteDia(tenantId: string, regra: FollowupRegra, agor
   }
 }
 
+async function processarPosAtendimento(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
+  const agoraLocal = comoTextoLocal(agora, config.timezone)
+  const desde = somarMinutosTextoLocal(agoraLocal, -(regra.delay_minutos! + 10))
+  const ate = somarMinutosTextoLocal(agoraLocal, -(regra.delay_minutos! - 10))
+
+  const { data: agendamentos } = await supabase
+    .from('agendamentos')
+    .select('*, paciente:pacientes(*), servico:servicos(*), profissional:profissionais(*)')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'concluido')
+    .gte('data_hora', desde)
+    .lte('data_hora', ate)
+
+  for (const ag of agendamentos ?? []) {
+    const paciente = (ag as any).paciente
+    const servico = (ag as any).servico
+    if (!paciente) continue
+
+    const desdeRegra = new Date(agora.getTime() - 24 * 60 * 60 * 1000)
+    if (await jaEnviou(regra.id, paciente.id, ag.id, desdeRegra)) continue
+    if (await pacienteEmCooldown(tenantId, paciente.id, agora)) continue
+
+    await enviar(tenantId, regra, paciente, ag, {
+      nome: paciente.nome || 'tudo bem',
+      servico: servico?.nome || 'seu procedimento',
+    }, agora)
+  }
+}
+
 async function processarAniversario(tenantId: string, regra: FollowupRegra, agora: Date, config: TenantConfig) {
   const agoraLocal = comoTextoLocal(agora, config.timezone)
   const horaAtual = agoraLocal.substring(11, 16)
@@ -344,6 +373,9 @@ async function processarRegra(tenantId: string, regra: FollowupRegra, agora: Dat
         break
       case 'aniversario':
         await processarAniversario(tenantId, regra, agora, config)
+        break
+      case 'pos_atendimento':
+        await processarPosAtendimento(tenantId, regra, agora, config)
         break
       default:
         console.warn('[followup] Gatilho desconhecido:', regra.gatilho)

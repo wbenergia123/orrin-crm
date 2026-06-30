@@ -218,30 +218,16 @@ export async function executarVerificarSlots(
     .lte('data_hora', `${input.data_fim}T23:59:59`)
   if (agError) throw agError
 
-  // Tolerância à migration 022 ainda não aplicada: só busca bloqueios se a tabela existir.
-  const { data: tabelaExiste } = await supabase
-    .from('information_schema.tables')
-    .select('table_name')
-    .eq('table_schema', 'public')
-    .eq('table_name', 'bloqueios_agenda')
-    .maybeSingle()
-
-  let bloqueios: { profissional_id: string; data_hora_inicio: string; data_hora_fim: string }[] | null = null
-  if (tabelaExiste) {
-    const { data, error: blError } = await supabase
-      .from('bloqueios_agenda')
-      .select('profissional_id, data_hora_inicio, data_hora_fim')
-      .eq('tenant_id', tenantId)
-      .in('profissional_id', profIds)
-      .lte('data_hora_inicio', `${input.data_fim}T23:59:59`)
-      .gte('data_hora_fim', `${input.data_inicio}T00:00:00`)
-    if (blError) throw blError
-    bloqueios = data
-  }
+  const { data: bloqueios } = await supabase
+    .from('bloqueios_agenda')
+    .select('profissional_id, data_hora_inicio, data_hora_fim')
+    .eq('tenant_id', tenantId)
+    .in('profissional_id', profIds)
+    .lte('data_hora_inicio', `${input.data_fim}T23:59:59`)
+    .gte('data_hora_fim', `${input.data_inicio}T00:00:00`)
 
   // Monta set de slots ocupados: "profissional_id|YYYY-MM-DD|HH"
-  // data_hora é uma coluna TIMESTAMP (sem timezone) — o texto salvo já é o horário
-  // de Brasília literal, sem precisar de nenhuma conversão.
+  // data_hora é TIMESTAMP local (Brasília) — sem conversão de timezone.
   const occupiedSet = new Set<string>()
   for (const a of ocupados ?? []) {
     const dateStr = a.data_hora.substring(0, 10)
@@ -249,16 +235,23 @@ export async function executarVerificarSlots(
     occupiedSet.add(`${a.profissional_id}|${dateStr}|${hourStr}`)
   }
 
-  // Bloqueios podem cobrir vários slots — marca cada slot cujo início cai no intervalo.
+  // Bloqueios: itera hora a hora usando as strings locais diretamente (sem toISOString).
   const blockedSet = new Set<string>()
   for (const b of bloqueios ?? []) {
-    let current = new Date(`${b.data_hora_inicio.substring(0, 10)}T${b.data_hora_inicio.substring(11, 13)}:00:00`)
-    const end = new Date(`${b.data_hora_fim.substring(0, 10)}T${b.data_hora_fim.substring(11, 13)}:00:00`)
-    while (current < end) {
-      const dateStr = current.toISOString().substring(0, 10)
-      const hourStr = current.toISOString().substring(11, 13)
-      blockedSet.add(`${b.profissional_id}|${dateStr}|${hourStr}`)
-      current.setHours(current.getHours() + 1)
+    let dateStr = b.data_hora_inicio.substring(0, 10)
+    let h = parseInt(b.data_hora_inicio.substring(11, 13), 10)
+    const endDateStr = b.data_hora_fim.substring(0, 10)
+    const endH = parseInt(b.data_hora_fim.substring(11, 13), 10)
+
+    while (dateStr < endDateStr || (dateStr === endDateStr && h < endH)) {
+      blockedSet.add(`${b.profissional_id}|${dateStr}|${String(h).padStart(2, '0')}`)
+      h++
+      if (h >= 24) {
+        h = 0
+        const next = new Date(dateStr + 'T12:00:00Z')
+        next.setUTCDate(next.getUTCDate() + 1)
+        dateStr = next.toISOString().substring(0, 10)
+      }
     }
   }
 
