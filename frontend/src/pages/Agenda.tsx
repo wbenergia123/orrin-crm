@@ -1,14 +1,15 @@
 import { useState, useMemo } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { Calendar, dateFnsLocalizer, type View } from 'react-big-calendar'
 import { format, parse, startOfWeek, getDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
-import { Plus } from 'lucide-react'
+import { Plus, X, Ban } from 'lucide-react'
 import { api } from '../api/client'
-import type { Agendamento, Profissional } from '../types'
+import type { Agendamento, BloqueioAgenda, Profissional } from '../types'
 import { NovoAgendamentoModal } from '../components/NovoAgendamentoModal'
 import { AgendamentoPainel } from '../components/AgendamentoPainel'
+import { BloqueioModal } from '../components/BloqueioModal'
 import { getAvatarUrl, getAvatarFallback } from '../lib/avatar'
 
 const locales = { 'pt-BR': ptBR }
@@ -32,8 +33,18 @@ const messages = {
   showMore: (count: number) => `+${count} mais`,
 }
 
-function EventoCalendario({ event }: { event: { resource: Agendamento } }) {
-  const ag = event.resource
+function EventoCalendario({ event }: { event: { resource: Agendamento | BloqueioAgenda } }) {
+  const r = event.resource
+  if ('motivo' in r) {
+    return (
+      <div className="px-1.5 py-1 h-full overflow-hidden">
+        <div className="font-semibold text-xs leading-tight truncate">
+          {r.motivo || 'Bloqueado'}
+        </div>
+      </div>
+    )
+  }
+  const ag = r as Agendamento
   return (
     <div className="px-1.5 py-1 h-full overflow-hidden">
       <div className="font-semibold text-xs leading-tight truncate">
@@ -104,6 +115,10 @@ export function Agenda() {
   const [modalAberto, setModalAberto] = useState(false)
   const [dataHoraInicial, setDataHoraInicial] = useState<Date | null>(null)
 
+  const [menuSlot, setMenuSlot] = useState<{ x: number; y: number; start: Date } | null>(null)
+  const [modalBloqueio, setModalBloqueio] = useState(false)
+  const [dataBloqueio, setDataBloqueio] = useState<Date | null>(null)
+
   const { data: todosAgendamentos = [] } = useQuery<Agendamento[]>({
     queryKey: ['agendamentos-agenda'],
     queryFn: async () => (await api.get('/agendamentos')).data,
@@ -113,6 +128,21 @@ export function Agenda() {
   const { data: todosProfissionais = [] } = useQuery<Profissional[]>({
     queryKey: ['profissionais-todos'],
     queryFn: async () => (await api.get('/profissionais')).data,
+  })
+
+  const { data: bloqueios = [] } = useQuery<BloqueioAgenda[]>({
+    queryKey: ['bloqueios-agenda'],
+    queryFn: async () => (await api.get('/bloqueios')).data,
+  })
+
+  const excluirBloqueio = useMutation({
+    mutationFn: async (id: string) => {
+      await api.delete(`/bloqueios/${id}`)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bloqueios-agenda'] })
+      qc.invalidateQueries({ queryKey: ['agendamentos-agenda'] })
+    },
   })
 
   const agora = new Date()
@@ -151,7 +181,7 @@ export function Agenda() {
 
   const eventos = useMemo(() => {
     if (!profissionalSelecionado) return []
-    return todosAgendamentos
+    const agendamentos = todosAgendamentos
       .filter((ag) => ag.profissional_id === profissionalSelecionado.id)
       .map((ag) => ({
         id: ag.id,
@@ -163,11 +193,42 @@ export function Agenda() {
         ),
         resource: ag,
       }))
-  }, [todosAgendamentos, profissionalSelecionado])
 
-  const handleSelectSlot = ({ start }: { start: Date }) => {
-    setDataHoraInicial(start)
+    const bloqueiosProf = bloqueios
+      .filter((b) => b.profissional_id === profissionalSelecionado.id)
+      .map((b) => ({
+        id: b.id,
+        title: b.motivo || 'Bloqueado',
+        start: new Date(b.data_hora_inicio),
+        end: new Date(b.data_hora_fim),
+        resource: b,
+      }))
+
+    return [...agendamentos, ...bloqueiosProf]
+  }, [todosAgendamentos, bloqueios, profissionalSelecionado])
+
+  const handleSelectSlot = ({ start, box }: { start: Date; box?: { x: number; y: number } }) => {
+    if (!box) return
+    setMenuSlot({ x: box.x, y: box.y, start })
+  }
+
+  const handleCriarAgendamento = () => {
+    if (!menuSlot) return
+    setDataHoraInicial(menuSlot.start)
+    setMenuSlot(null)
     setModalAberto(true)
+  }
+
+  const handleCriarBloqueio = () => {
+    if (!menuSlot || !profissionalSelecionado) return
+    setDataBloqueio(menuSlot.start)
+    setMenuSlot(null)
+    setModalBloqueio(true)
+  }
+
+  const handleExcluirBloqueio = (bloqueio: BloqueioAgenda) => {
+    if (!confirm(`Remover bloqueio "${bloqueio.motivo || 'Bloqueado'}"?`)) return
+    excluirBloqueio.mutate(bloqueio.id)
   }
 
   const painelAberto = agendamentoAberto !== null
@@ -211,13 +272,30 @@ export function Agenda() {
               onNavigate={setDate}
               messages={messages}
               culture="pt-BR"
-              onSelectEvent={(event) => setAgendamentoAberto((event.resource as Agendamento).id)}
+              onSelectEvent={(event) => {
+                const r = event.resource as Agendamento | BloqueioAgenda
+                if ('motivo' in r) {
+                  handleExcluirBloqueio(r)
+                } else {
+                  setAgendamentoAberto(r.id)
+                }
+              }}
               selectable
               onSelectSlot={handleSelectSlot}
               min={new Date(0, 0, 0, 7, 0)}
               max={new Date(0, 0, 0, 19, 0)}
               scrollToTime={new Date(0, 0, 0, 8, 0)}
               components={{ event: EventoCalendario }}
+              eventPropGetter={(event) => {
+                const r = event.resource as Agendamento | BloqueioAgenda
+                if ('motivo' in r) {
+                  return {
+                    style: { backgroundColor: '#9ca3af', borderColor: '#6b7280', color: '#fff' },
+                    className: 'cursor-pointer',
+                  }
+                }
+                return {}
+              }}
               style={{ height: '100%' }}
             />
           ) : (
@@ -241,6 +319,45 @@ export function Agenda() {
         onClose={() => { setModalAberto(false); setDataHoraInicial(null) }}
         dataHoraInicial={dataHoraInicial}
       />
+
+      {modalBloqueio && profissionalSelecionado && dataBloqueio && (
+        <BloqueioModal
+          open={modalBloqueio}
+          profissional={profissionalSelecionado}
+          dataInicial={dataBloqueio}
+          onClose={() => { setModalBloqueio(false); setDataBloqueio(null) }}
+          onSucesso={() => {
+            qc.invalidateQueries({ queryKey: ['bloqueios-agenda'] })
+            qc.invalidateQueries({ queryKey: ['agendamentos-agenda'] })
+          }}
+        />
+      )}
+
+      {menuSlot && (
+        <div
+          className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-100 py-1 w-52"
+          style={{ top: menuSlot.y, left: menuSlot.x }}
+        >
+          <button
+            onClick={handleCriarAgendamento}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-violet-50 flex items-center gap-2"
+          >
+            <Plus size={14} /> Novo agendamento
+          </button>
+          <button
+            onClick={handleCriarBloqueio}
+            className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-violet-50 flex items-center gap-2"
+          >
+            <Ban size={14} /> Bloquear horário
+          </button>
+          <button
+            onClick={() => setMenuSlot(null)}
+            className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-2 border-t border-gray-100"
+          >
+            <X size={14} /> Cancelar
+          </button>
+        </div>
+      )}
     </div>
   )
 }

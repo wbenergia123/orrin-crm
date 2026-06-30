@@ -50,17 +50,35 @@ router.get('/slots-disponiveis', async (req, res) => {
     .gte('data_hora', `${dataStr}T00:00:00`)
     .lte('data_hora', `${dataStr}T23:59:59`)
 
+  const { data: bloqueios } = await supabaseAdmin
+    .from('bloqueios_agenda')
+    .select('data_hora_inicio, data_hora_fim')
+    .eq('tenant_id', req.user!.tenant_id)
+    .eq('profissional_id', profissional_id)
+    .gte('data_hora_inicio', `${dataStr}T00:00:00`)
+    .lte('data_hora_inicio', `${dataStr}T23:59:59`)
+
   const horariosOcupados = new Set(
     (ocupados ?? []).map((a) => a.data_hora.substring(11, 16))
   )
 
+  const bloqueioIntervalos = (bloqueios ?? []).map((b) => ({
+    inicio: b.data_hora_inicio,
+    fim: b.data_hora_fim,
+  }))
+
   const todos = gerarSlots(dataStr)
 
-  res.json(todos.map((s) => ({
-    iso: `${s.textoLocal}-03:00`,
-    hora: s.hora,
-    disponivel: !horariosOcupados.has(s.hora),
-  })))
+  res.json(todos.map((s) => {
+    const bloqueado = bloqueioIntervalos.some(
+      (b) => s.textoLocal >= b.inicio && s.textoLocal < b.fim
+    )
+    return {
+      iso: `${s.textoLocal}-03:00`,
+      hora: s.hora,
+      disponivel: !horariosOcupados.has(s.hora) && !bloqueado,
+    }
+  }))
 })
 
 router.get('/', async (req, res) => {

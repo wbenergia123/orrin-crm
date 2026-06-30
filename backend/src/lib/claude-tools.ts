@@ -197,6 +197,27 @@ export async function executarVerificarSlots(
     .lte('data_hora', `${input.data_fim}T23:59:59`)
   if (agError) throw agError
 
+  // Tolerância à migration 022 ainda não aplicada: só busca bloqueios se a tabela existir.
+  const { data: tabelaExiste } = await supabase
+    .from('information_schema.tables')
+    .select('table_name')
+    .eq('table_schema', 'public')
+    .eq('table_name', 'bloqueios_agenda')
+    .maybeSingle()
+
+  let bloqueios: { profissional_id: string; data_hora_inicio: string; data_hora_fim: string }[] | null = null
+  if (tabelaExiste) {
+    const { data, error: blError } = await supabase
+      .from('bloqueios_agenda')
+      .select('profissional_id, data_hora_inicio, data_hora_fim')
+      .eq('tenant_id', tenantId)
+      .in('profissional_id', profIds)
+      .lte('data_hora_inicio', `${input.data_fim}T23:59:59`)
+      .gte('data_hora_fim', `${input.data_inicio}T00:00:00`)
+    if (blError) throw blError
+    bloqueios = data
+  }
+
   // Monta set de slots ocupados: "profissional_id|YYYY-MM-DD|HH"
   // data_hora é uma coluna TIMESTAMP (sem timezone) — o texto salvo já é o horário
   // de Brasília literal, sem precisar de nenhuma conversão.
@@ -205,6 +226,19 @@ export async function executarVerificarSlots(
     const dateStr = a.data_hora.substring(0, 10)
     const hourStr = a.data_hora.substring(11, 13)
     occupiedSet.add(`${a.profissional_id}|${dateStr}|${hourStr}`)
+  }
+
+  // Bloqueios podem cobrir vários slots — marca cada slot cujo início cai no intervalo.
+  const blockedSet = new Set<string>()
+  for (const b of bloqueios ?? []) {
+    let current = new Date(`${b.data_hora_inicio.substring(0, 10)}T${b.data_hora_inicio.substring(11, 13)}:00:00`)
+    const end = new Date(`${b.data_hora_fim.substring(0, 10)}T${b.data_hora_fim.substring(11, 13)}:00:00`)
+    while (current < end) {
+      const dateStr = current.toISOString().substring(0, 10)
+      const hourStr = current.toISOString().substring(11, 13)
+      blockedSet.add(`${b.profissional_id}|${dateStr}|${hourStr}`)
+      current.setHours(current.getHours() + 1)
+    }
   }
 
   const disponibilidade: DisponibilidadeItem[] = []
@@ -219,7 +253,8 @@ export async function executarVerificarSlots(
 
       for (let h = 8; h < 18; h++) {
         const hourStr = h.toString().padStart(2, '0')
-        if (!occupiedSet.has(`${prof.id}|${dateStr}|${hourStr}`)) {
+        const key = `${prof.id}|${dateStr}|${hourStr}`
+        if (!occupiedSet.has(key) && !blockedSet.has(key)) {
           slots.push(`${hourStr}:00`)
         }
       }

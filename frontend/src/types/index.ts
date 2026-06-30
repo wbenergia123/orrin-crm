@@ -42,6 +42,18 @@ export interface Agendamento {
   paciente?: { id: string; nome: string | null; telefone: string }
 }
 
+export interface BloqueioAgenda {
+  id: string
+  tenant_id: string
+  profissional_id: string
+  data_hora_inicio: string
+  data_hora_fim: string
+  motivo: string | null
+  created_by: string | null
+  created_at: string
+  profissional?: { id: string; nome: string }
+}
+
 export interface Conversa {
   id: string
   paciente_id: string
