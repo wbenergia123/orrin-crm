@@ -79,7 +79,7 @@ jobs:
 
       - name: Seed ZAP test user
         working-directory: backend
-        run: node ../.zap/seed-zap-user.mjs
+        run: cp ../.zap/seed-zap-user.mjs . && node seed-zap-user.mjs
         env:
           SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
@@ -106,16 +106,16 @@ jobs:
           cmd_options: '-z "-configfile /zap/wrk/.zap/orrin-context.yaml"'
           fail_action: false   # não quebra o job, mas capturamos o resultado manualmente
 
-      - name: Verificar resultado ZAP e enviar email
+      - name: Verificar resultado ZAP
+        id: check-findings
         if: always()
         run: |
-          # ZAP gera report_html.html — verifica se tem alertas de risco médio ou alto
           if [ -f report_html.html ]; then
             HIGH=$(grep -c 'riskcode.*[23]' report_html.html 2>/dev/null || echo "0")
             echo "Alertas médio/alto encontrados: $HIGH"
-            echo "ZAP_FINDINGS=$HIGH" >> $GITHUB_ENV
+            echo "findings=$HIGH" >> $GITHUB_OUTPUT
           else
-            echo "ZAP_FINDINGS=0" >> $GITHUB_ENV
+            echo "findings=0" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload ZAP report
@@ -127,7 +127,7 @@ jobs:
           retention-days: 30
 
       - name: Enviar email se achar vulnerabilidades
-        if: always() && env.ZAP_FINDINGS != '0'
+        if: always() && steps.check-findings.outputs.findings != '0'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
@@ -135,11 +135,11 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "⚠️ Orrin CRM — ZAP encontrou ${{ env.ZAP_FINDINGS }} vulnerabilidade(s)"
+          subject: "⚠️ Orrin CRM — ZAP encontrou ${{ steps.check-findings.outputs.findings }} vulnerabilidade(s)"
           to: batttista@gmail.com
           from: Orrin Security <${{ secrets.MAIL_USERNAME }}>
           body: |
-            O scan ZAP encontrou ${{ env.ZAP_FINDINGS }} alerta(s) de risco médio ou alto na API do Orrin CRM.
+            O scan ZAP encontrou ${{ steps.check-findings.outputs.findings }} alerta(s) de risco médio ou alto na API do Orrin CRM.
 
             Acesse o relatório completo (artifact "zap-report"):
             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
