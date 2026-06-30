@@ -1,0 +1,123 @@
+name: Security Scan (ZAP + Strix)
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # toda segunda às 06:00 UTC (~03:00 em Brasília)
+  workflow_dispatch: {}
+
+jobs:
+
+  strix-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Strix
+        run: curl -sSL https://strix.ai/install | bash
+
+      - name: Run Strix (white-box scan)
+        env:
+          STRIX_LLM: ${{ secrets.STRIX_LLM }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          strix --target ./ \
+            --scan-mode standard \
+            --instruction "Aplicação multi-tenant (React + Express + Supabase + RLS). Foque especialmente em: (1) IDOR e vazamento de dados entre tenants — qualquer query que use tenant_id deve ser checada quanto a validação de origem; (2) bypass de autorização no JWT; (3) endpoints da Ana (agente WhatsApp) quanto a prompt injection que possa vazar dados de outro tenant ou contornar regras de negócio; (4) exposição de segredos/chaves de API no código ou em respostas de erro."
+
+      - name: Upload Strix report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: strix-report
+          path: strix_runs/
+          retention-days: 30
+
+      - name: Enviar email se achar vulnerabilidades
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "⚠️ Orrin CRM — Vulnerabilidade encontrada pelo Strix"
+          to: batttista@gmail.com
+          from: Orrin Security <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            O scan de segurança (Strix) encontrou vulnerabilidades no repositório orrin-crm.
+
+            Acesse o relatório completo em:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
+
+  zap-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+
+      - name: Start backend
+        run: |
+          cd backend && npm run build && node dist/index.js &
+          npx wait-on http://localhost:3001/api/health --timeout 60000
+        env:
+          PORT: 3001
+          SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+          ANTHROPIC_API_KEY: ${{ secrets.STAGING_ANTHROPIC_API_KEY }}
+
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: 'http://localhost:3001/api'
+          cmd_options: '-a'
+          fail_action: false
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: report_html.html
+          retention-days: 30
+
+      - name: Enviar email se achar vulnerabilidades
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "⚠️ Orrin CRM — Vulnerabilidade encontrada pelo ZAP"
+          to: batttista@gmail.com
+          from: Orrin Security <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            O scan de segurança (ZAP) encontrou vulnerabilidades na API do orrin-crm.
+
+            Acesse o relatório completo em:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Commit: ${{ github.sha }}
+            Branch: ${{ github.ref_name }}
