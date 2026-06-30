@@ -1,0 +1,28 @@
+env:
+  contexts:
+    - name: "Orrin CRM API"
+      urls:
+        - "http://localhost:3001"
+      authentication:
+        method: "json"
+        parameters:
+          loginUrl: "http://localhost:3001/api/auth/login"
+          loginRequestData: '{"email":"zap-test@orrin-staging.com","senha":"ZapTest2026!"}'
+          loginPageUrl: "http://localhost:3001/api/auth/login"
+        verification:
+          method: "response"
+          loggedInRegex: "\"token\":"
+          loggedOutRegex: "\"error\":"
+      sessionManagement:
+        method: "httpAuthSessionManagement"
+        parameters:
+          headerName: "Authorization"
+          headerValue: "Bearer {%json:token%}"
+      users:
+        - name: "admin-test"
+          credentials:
+            username: "zap-test@orrin-staging.com"
+            password: "ZapTest2026!"
+  parameters:
+    failOnError: true
+    progressToStdout: true
