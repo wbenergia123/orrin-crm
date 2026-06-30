@@ -204,7 +204,7 @@ export interface FollowupRegra {
   id: string
   tenant_id: string
   nome: string
-  gatilho: 'nao_respondeu' | 'lembrete_agendamento' | 'no_show' | 'lembrete_dia' | 'aniversario'
+  gatilho: 'nao_respondeu' | 'lembrete_agendamento' | 'no_show' | 'lembrete_dia' | 'aniversario' | 'pos_atendimento'
   delay_minutos: number | null
   horario_fixo: string | null
   template: string
