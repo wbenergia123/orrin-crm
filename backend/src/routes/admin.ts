@@ -69,6 +69,7 @@ router.post('/tenants', async (req: Request, res: Response) => {
     { tenant_id: org.id, nome: 'Não respondeu', gatilho: 'nao_respondeu', delay_minutos: 60, template: 'Oi [nome], vi que você entrou em contato. Ainda tem interesse em marcar?', ativo: true, ordem_prioridade: 5 },
     { tenant_id: org.id, nome: 'No-show', gatilho: 'no_show', delay_minutos: 30, template: 'Oi [nome], vi que não conseguiu vir hoje. Quer remarcar?', ativo: true, ordem_prioridade: 8 },
     { tenant_id: org.id, nome: 'Lembrete do dia', gatilho: 'lembrete_dia', horario_fixo: '08:00', template: 'Oi [nome], hoje você tem [servico] às [hora] com [profissional]. Te esperamos!', ativo: true, ordem_prioridade: 12 },
+    { tenant_id: org.id, nome: 'Pós-atendimento', gatilho: 'pos_atendimento', delay_minutos: 60, template: 'Oi [nome]! 😊 Esperamos que tenha gostado do [servico] hoje. Ficamos à disposição sempre que precisar! 💛', ativo: false, ordem_prioridade: 6 },
   ])
 
   const configRows: { tenant_id: string; chave: string; valor: string }[] = []
