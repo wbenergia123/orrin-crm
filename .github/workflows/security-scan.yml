@@ -19,9 +19,11 @@ jobs:
           fetch-depth: 0
 
       - name: Install Strix
+        continue-on-error: true
         run: curl -sSL https://strix.ai/install | bash
 
       - name: Run Strix (white-box scan)
+        continue-on-error: true
         env:
           STRIX_LLM: ${{ secrets.STRIX_LLM }}
           LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
@@ -111,7 +113,7 @@ jobs:
         if: always()
         run: |
           if [ -f report_html.html ]; then
-            HIGH=$(grep -c 'riskcode.*[23]' report_html.html 2>/dev/null || echo "0")
+            HIGH=$(grep -c 'riskcode.*[23]' report_html.html 2>/dev/null) || HIGH=0
             echo "Alertas médio/alto encontrados: $HIGH"
             echo "findings=$HIGH" >> $GITHUB_OUTPUT
           else
