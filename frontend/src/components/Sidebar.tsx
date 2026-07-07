@@ -19,7 +19,7 @@ import orrinIcon from '../assets/orrin-icon.png'
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/pacientes', icon: Kanban, label: 'Pipeline' },
-  { to: '/clientes', icon: Users, label: 'Pacientes' },
+  { to: '/clientes', icon: Users, label: 'Clientes' },
   { to: '/servicos', icon: Scissors, label: 'Serviços' },
   { to: '/profissionais', icon: UserCog, label: 'Profissionais' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
