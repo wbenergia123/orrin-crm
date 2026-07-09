@@ -33,12 +33,14 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Usuário desativado. Entre em contato com o suporte.' })
   }
 
+  let org: { ativo: boolean; studio_3d_ativo: boolean } | null = null
   if (usuario.role !== 'super_admin' && usuario.tenant_id) {
-    const { data: org } = await supabaseAdmin
+    const { data } = await supabaseAdmin
       .from('organizacoes')
-      .select('ativo')
+      .select('ativo, studio_3d_ativo')
       .eq('id', usuario.tenant_id)
       .single()
+    org = data
 
     if (!org || !org.ativo) {
       return res.status(401).json({ error: 'Esta clínica está desativada. Entre em contato com o suporte.' })
@@ -54,7 +56,12 @@ router.post('/login', async (req: Request, res: Response) => {
 
   res.json({
     token,
-    usuario: { id: usuario.id, email: usuario.email, role: usuario.role },
+    usuario: {
+      id: usuario.id,
+      email: usuario.email,
+      role: usuario.role,
+      studio_3d_ativo: usuario.role === 'super_admin' ? true : (org?.studio_3d_ativo ?? false),
+    },
   })
 })
 
@@ -76,7 +83,17 @@ router.get('/me', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Usuário inválido ou desativado' })
     }
 
-    res.json({ usuario })
+    let studio3d = usuario.role === 'super_admin'
+    if (usuario.role !== 'super_admin' && usuario.tenant_id) {
+      const { data: org } = await supabaseAdmin
+        .from('organizacoes')
+        .select('studio_3d_ativo')
+        .eq('id', usuario.tenant_id)
+        .single()
+      studio3d = org?.studio_3d_ativo ?? false
+    }
+
+    res.json({ usuario: { ...usuario, studio_3d_ativo: studio3d } })
   } catch {
     res.status(401).json({ error: 'Token inválido ou expirado' })
   }

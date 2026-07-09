@@ -86,6 +86,45 @@ describe('POST /api/auth/login - clínica desativada', () => {
   })
 })
 
+describe('POST /api/auth/login - studio_3d_ativo', () => {
+  let orgId: string
+  let host: string
+  const EMAIL = 'sec_studio3d_auth@clinica.com'
+
+  beforeAll(async () => {
+    const { data: org } = await supabase
+      .from('organizacoes')
+      .insert({ slug: `auth-studio3d-${Date.now()}`, nome: 'Org Teste Studio3D', ativo: true, studio_3d_ativo: true })
+      .select()
+      .single()
+    orgId = org!.id
+    host = `${org!.slug}.orrin.com.br`
+
+    const senhaHash = await bcrypt.hash('senha123', 10)
+    await supabase
+      .from('usuarios')
+      .upsert(
+        { email: EMAIL, senha_hash: senhaHash, role: 'secretaria', tenant_id: orgId },
+        { onConflict: 'email' }
+      )
+  })
+
+  afterAll(async () => {
+    await supabase.from('usuarios').delete().eq('tenant_id', orgId)
+    await supabase.from('organizacoes').delete().eq('id', orgId)
+  })
+
+  it('login retorna studio_3d_ativo da clínica', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .set('Host', host)
+      .send({ email: EMAIL, senha: 'senha123' })
+    expect(res.status).toBe(200)
+    expect(typeof res.body.usuario.studio_3d_ativo).toBe('boolean')
+    expect(res.body.usuario.studio_3d_ativo).toBe(true)
+  })
+})
+
 describe('GET /api/auth/me', () => {
   it('retorna dados do usuário com token válido', async () => {
     const loginRes = await request(app)
