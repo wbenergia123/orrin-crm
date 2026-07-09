@@ -31,6 +31,7 @@ export async function consultarTask(taskId: string): Promise<MeshyTaskStatus> {
 }
 
 export async function baixarArquivo(url: string): Promise<Buffer> {
-  const { data } = await axios.get(url, { responseType: 'arraybuffer', maxContentLength: 30 * 1024 * 1024 })
+  // 100MB: GLB real da Meshy já veio com 33MB; 30MB estourava e travava o polling
+  const { data } = await axios.get(url, { responseType: 'arraybuffer', maxContentLength: 100 * 1024 * 1024 })
   return Buffer.from(data)
 }

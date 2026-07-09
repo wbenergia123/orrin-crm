@@ -94,8 +94,10 @@ router.get('/:id', async (req: Request, res: Response) => {
           atual = data
         }
       }
-    } catch {
+    } catch (e) {
       // erro transitório de rede com a Meshy: mantém o estado, o front tenta de novo no próximo poll
+      // (logado porque um erro persistente aqui — ex: GLB maior que o limite — trava o polling em silêncio)
+      console.error(`[simulacoes] polling ${sim.id} falhou:`, e instanceof Error ? e.message : e)
     }
   }
 
