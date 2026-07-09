@@ -26,8 +26,13 @@ export class MotorDeformacao {
   // índice de vértices dentro do raio, calculado uma vez por âncora
   // (malha Meshy tem >100k vértices; o slider itera só os poucos mil indexados)
   private indices = new Map<string, number[]>()
+  private original: Float32Array
+  private diagonal: number
 
-  constructor(private original: Float32Array, private diagonal: number) {}
+  constructor(original: Float32Array, diagonal: number) {
+    this.original = original
+    this.diagonal = diagonal
+  }
 
   private indicesPara(chave: string, pos: Vec3, raio: number): number[] {
     const cached = this.indices.get(chave)
