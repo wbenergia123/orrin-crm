@@ -20,24 +20,42 @@ let tenantId: string
 let pacienteId: string
 
 const EMAIL = 'sec_studio3d@clinica.com'
+const ORG_SLUG = 'studio3d-sim-test'
 
 beforeAll(async () => {
-  // sec2@clinica.com (fixture usada em servicos.test.ts) está com tenant_id null —
-  // esse teste antigo já está quebrado por não setar Host (ignorado, ver instruções).
-  // Usamos e-mail dedicado e setamos tenant_id explicitamente no upsert, como faz
-  // o padrão que funciona em profissionais.test.ts (fixture "Foto do profissional").
-  const { data: org } = await supabase
+  // Org dedicada (não escolhida aleatoriamente entre as ativas) para não ser
+  // afetada por outros arquivos de teste rodando em paralelo (ex: admin.test.ts
+  // desativa/soft-deleta orgs durante a suite). Reaproveita a linha se sobrou
+  // de uma execução anterior abortada.
+  const orgState = { ativo: true, studio_3d_ativo: true, studio_3d_limite_creditos_mes: 150 }
+  const { data: existente } = await supabase
     .from('organizacoes')
     .select('id, slug')
-    .eq('ativo', true)
-    .limit(1)
-    .single()
-  tenantId = org!.id
-  host = `${org!.slug}.orrin.com.br`
+    .eq('slug', ORG_SLUG)
+    .maybeSingle()
+
+  let org: { id: string; slug: string }
+  if (existente) {
+    const { data: atualizada } = await supabase
+      .from('organizacoes')
+      .update({ ...orgState, deleted_at: null })
+      .eq('id', existente.id)
+      .select('id, slug')
+      .single()
+    org = atualizada!
+  } else {
+    const { data: criada } = await supabase
+      .from('organizacoes')
+      .insert({ slug: ORG_SLUG, nome: 'Clínica Studio3D Test', ...orgState })
+      .select('id, slug')
+      .single()
+    org = criada!
+  }
+  tenantId = org.id
+  host = `${org.slug}.orrin.com.br`
 
   const hash = await bcrypt.hash('senha123', 10)
-  await supabase.from('usuarios').upsert({ email: EMAIL, senha_hash: hash, role: 'secretaria', tenant_id: tenantId }, { onConflict: 'email' })
-  await supabase.from('organizacoes').update({ studio_3d_ativo: true }).eq('id', tenantId)
+  await supabase.from('usuarios').upsert({ email: EMAIL, senha_hash: hash, role: 'secretaria', tenant_id: tenantId, ativo: true }, { onConflict: 'email' })
 
   const login = await request(app).post('/api/auth/login').set('Host', host).send({ email: EMAIL, senha: 'senha123' })
   token = login.body.token
@@ -54,6 +72,17 @@ afterAll(async () => {
   // gerados por simulação real (fotos_N, modelo.glb por sim.id aleatório) ficam
   // órfãos no bucket — listar recursivamente por tenant é custoso para um teste.
   await supabase.storage.from('simulacoes-3d').remove([`${tenantId}/clone-origem/modelo.glb`])
+  await supabase.from('usuarios').delete().eq('email', EMAIL)
+
+  const { error } = await supabase.from('organizacoes').delete().eq('id', tenantId)
+  if (error) {
+    // sobrou algo referenciando o tenant (ex: rodada anterior abortada) — limpa e tenta de novo
+    await supabase.from('followup_regras').delete().eq('tenant_id', tenantId)
+    await supabase.from('configuracoes').delete().eq('tenant_id', tenantId)
+    await supabase.from('organizacoes').delete().eq('id', tenantId)
+    // ponytail: se ainda falhar (outro leftover inesperado), deixa a org pra próxima
+    // rodada reaproveitar via upsert-by-slug acima — não derruba o teste por isso.
+  }
 })
 
 describe('gate studio_3d_ativo', () => {
