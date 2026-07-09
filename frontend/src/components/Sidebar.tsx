@@ -11,6 +11,8 @@ import {
   Settings,
   Building2,
   DollarSign,
+  Box,
+  Lock,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -25,6 +27,7 @@ const navItems = [
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/atendimentos', icon: MessageSquare, label: 'Atendimentos' },
   { to: '/financeiro', icon: DollarSign, label: 'Financeiro', financeiroOnly: true },
+  { to: '/studio-3d', icon: Box, label: 'Studio 3D', studio3d: true },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
   { to: '/admin', icon: Building2, label: 'Admin', adminOnly: true },
 ]
@@ -40,6 +43,8 @@ export function Sidebar() {
     return true
   })
 
+  const studioLiberado = usuario?.role === 'super_admin' || usuario?.studio_3d_ativo === true
+
   return (
     <aside className="w-16 md:w-56 flex flex-col h-full bg-white border-r border-gray-100 py-6 px-2 md:px-4">
       <div className="mb-8 px-2 hidden md:flex items-center gap-2">
@@ -50,23 +55,38 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1">
-        {visibleItems.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-gray-100 text-gray-900'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-              )
-            }
-          >
-            <Icon size={18} className="shrink-0" />
-            <span className="hidden md:inline" translate="no">{label}</span>
-          </NavLink>
-        ))}
+        {visibleItems.map(({ to, icon: Icon, label, studio3d }) => {
+          if (studio3d && !studioLiberado) {
+            return (
+              <div
+                key={to}
+                title="Recurso não habilitado para sua clínica — fale com o suporte"
+                className="flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm font-medium text-gray-300 cursor-not-allowed select-none"
+              >
+                <Icon size={18} className="shrink-0" />
+                <span className="hidden md:inline" translate="no">{label}</span>
+                <Lock size={12} className="hidden md:block ml-auto" />
+              </div>
+            )
+          }
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-gray-100 text-gray-900'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                )
+              }
+            >
+              <Icon size={18} className="shrink-0" />
+              <span className="hidden md:inline" translate="no">{label}</span>
+            </NavLink>
+          )
+        })}
       </nav>
 
       <button

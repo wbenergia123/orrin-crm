@@ -13,6 +13,7 @@ import { Atendimentos } from './pages/Atendimentos'
 import { Configuracoes } from './pages/Configuracoes'
 import { Clientes } from './pages/Clientes'
 import { Financeiro } from './pages/Financeiro'
+import { Studio3D } from './pages/Studio3D'
 import { Admin } from './pages/Admin'
 import { Impersonar } from './pages/Impersonar'
 
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="/atendimentos" element={<Atendimentos />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/financeiro" element={<Financeiro />} />
+              <Route path="/studio-3d" element={<Studio3D />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/admin" element={<Admin />} />
             </Route>

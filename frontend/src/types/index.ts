@@ -144,3 +144,18 @@ export interface FotoPaciente {
   visit_id: string | null
   created_at: string
 }
+
+export interface Simulacao3D {
+  id: string
+  paciente_id: string
+  status: 'pending' | 'processing' | 'succeeded' | 'failed'
+  criado_em: string
+  atualizado_em: string
+  notas: string | null
+  progress?: number
+  ancoras?: Record<string, { x: number; y: number; z: number }>
+  sliders?: Record<string, number>
+  modelo_glb_url?: string | null
+  thumbnail_url?: string | null
+  screenshot_url?: string | null
+}
