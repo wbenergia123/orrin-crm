@@ -140,3 +140,50 @@ describe('POST /api/simulacoes', () => {
     await supabase.from('simulacoes_3d').delete().eq('id', origem!.id)
   })
 })
+
+describe('GET /api/simulacoes/:id (polling)', () => {
+  async function plantarProcessing(extra: Record<string, unknown> = {}) {
+    const { data } = await supabase.from('simulacoes_3d').insert({
+      tenant_id: tenantId, paciente_id: pacienteId, status: 'processing',
+      meshy_task_id: 'task-poll', creditos_consumidos: 30, ...extra,
+    }).select('id').single()
+    return data!.id
+  }
+
+  it('SUCCEEDED na Meshy → baixa GLB, salva no bucket e marca succeeded', async () => {
+    const id = await plantarProcessing()
+    ;(meshy.consultarTask as any).mockResolvedValueOnce({
+      status: 'SUCCEEDED', progress: 100,
+      model_urls: { glb: 'https://assets.meshy.ai/fake/modelo.glb' },
+      thumbnail_url: 'https://assets.meshy.ai/fake/thumb.png',
+    })
+    const res = await request(app).get(`/api/simulacoes/${id}`)
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+    expect(res.status).toBe(200)
+    expect(res.body.status).toBe('succeeded')
+    expect(res.body.modelo_glb_url).toContain('modelo.glb')  // signed URL do NOSSO bucket
+    expect(res.body.modelo_glb_url).not.toContain('meshy.ai')
+    expect(meshy.baixarArquivo).toHaveBeenCalled()
+    await supabase.from('simulacoes_3d').delete().eq('id', id)
+  })
+
+  it('FAILED na Meshy → failed com créditos zerados', async () => {
+    const id = await plantarProcessing()
+    ;(meshy.consultarTask as any).mockResolvedValueOnce({ status: 'FAILED' })
+    const res = await request(app).get(`/api/simulacoes/${id}`)
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+    expect(res.body.status).toBe('failed')
+    expect(res.body.creditos_consumidos).toBe(0)
+    await supabase.from('simulacoes_3d').delete().eq('id', id)
+  })
+
+  it('processing há mais de 10 min sem resposta → failed', async () => {
+    const antiga = new Date(Date.now() - 11 * 60 * 1000).toISOString()
+    const id = await plantarProcessing({ criado_em: antiga })
+    ;(meshy.consultarTask as any).mockResolvedValueOnce({ status: 'IN_PROGRESS', progress: 40 })
+    const res = await request(app).get(`/api/simulacoes/${id}`)
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+    expect(res.body.status).toBe('failed')
+    await supabase.from('simulacoes_3d').delete().eq('id', id)
+  })
+})

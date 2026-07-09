@@ -4,11 +4,12 @@ import { Router, Request, Response } from 'express'
 import multer from 'multer'
 import { z } from 'zod'
 import { supabaseAdmin } from '../services/supabase'
-import { criarTask } from '../lib/meshy'
+import { criarTask, consultarTask, baixarArquivo } from '../lib/meshy'
 
 const router = Router()
 const BUCKET = 'simulacoes-3d'
 const CREDITOS_POR_GERACAO = 30
+const TIMEOUT_GERACAO_MS = 10 * 60 * 1000
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
 const TIPOS_FOTO = ['image/jpeg', 'image/png']
 
@@ -37,6 +38,72 @@ router.get('/', async (req: Request, res: Response) => {
     screenshot_url: await signedUrl(s.screenshot_path),
   })))
   res.json(comUrls)
+})
+
+router.get('/:id', async (req: Request, res: Response) => {
+  const { data: sim, error } = await supabaseAdmin.from('simulacoes_3d')
+    .select('*').eq('id', req.params.id).eq('tenant_id', req.user!.tenant_id).single()
+  if (error || !sim) { res.status(404).json({ error: 'Simulação não encontrada' }); return }
+
+  let atual = sim
+  let progress: number | undefined
+
+  if ((sim.status === 'pending' || sim.status === 'processing') && sim.meshy_task_id) {
+    try {
+      const task = await consultarTask(sim.meshy_task_id)
+      progress = task.progress
+
+      if (task.status === 'SUCCEEDED' && task.model_urls?.glb) {
+        // Baixa AGORA (URL da Meshy expira) e persiste no nosso bucket ANTES de marcar succeeded
+        const glb = await baixarArquivo(task.model_urls.glb)
+        const glbPath = `${sim.tenant_id}/${sim.id}/modelo.glb`
+        const { error: upErr } = await supabaseAdmin.storage.from(BUCKET)
+          .upload(glbPath, glb, { contentType: 'model/gltf-binary', upsert: true })
+        if (upErr) throw new Error(upErr.message)
+
+        let thumbPath: string | null = null
+        if (task.thumbnail_url) {
+          try {
+            const thumb = await baixarArquivo(task.thumbnail_url)
+            thumbPath = `${sim.tenant_id}/${sim.id}/thumbnail.png`
+            await supabaseAdmin.storage.from(BUCKET).upload(thumbPath, thumb, { contentType: 'image/png', upsert: true })
+          } catch { /* thumbnail é opcional */ }
+        }
+
+        const { data } = await supabaseAdmin.from('simulacoes_3d')
+          .update({ status: 'succeeded', modelo_glb_path: glbPath, thumbnail_path: thumbPath, atualizado_em: new Date().toISOString() })
+          .eq('id', sim.id).select().single()
+        atual = data
+      } else if (task.status === 'FAILED') {
+        const { data } = await supabaseAdmin.from('simulacoes_3d')
+          .update({ status: 'failed', creditos_consumidos: 0, atualizado_em: new Date().toISOString() })
+          .eq('id', sim.id).select().single()
+        atual = data
+      } else {
+        // ainda gerando — timeout de segurança
+        const idade = Date.now() - new Date(sim.criado_em).getTime()
+        if (idade > TIMEOUT_GERACAO_MS) {
+          const { data } = await supabaseAdmin.from('simulacoes_3d')
+            .update({ status: 'failed', atualizado_em: new Date().toISOString() }).eq('id', sim.id).select().single()
+          atual = data
+        } else if (sim.status === 'pending') {
+          const { data } = await supabaseAdmin.from('simulacoes_3d')
+            .update({ status: 'processing' }).eq('id', sim.id).select().single()
+          atual = data
+        }
+      }
+    } catch {
+      // erro transitório de rede com a Meshy: mantém o estado, o front tenta de novo no próximo poll
+    }
+  }
+
+  res.json({
+    ...atual,
+    progress,
+    modelo_glb_url: await signedUrl(atual.modelo_glb_path),
+    thumbnail_url: await signedUrl(atual.thumbnail_path),
+    screenshot_url: await signedUrl(atual.screenshot_path),
+  })
 })
 
 router.post('/', (req: Request, res: Response, next) => {
