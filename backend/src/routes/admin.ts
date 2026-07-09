@@ -12,7 +12,7 @@ const router = Router()
 router.get('/tenants', async (req: Request, res: Response) => {
   const { data, error } = await supabaseAdmin
     .from('organizacoes')
-    .select('id, slug, nome, ativo, created_at')
+    .select('id, slug, nome, ativo, created_at, studio_3d_ativo, studio_3d_limite_creditos_mes')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
@@ -100,22 +100,28 @@ router.post('/tenants', async (req: Request, res: Response) => {
 
 router.patch('/tenants/:id', async (req: Request, res: Response) => {
   const { id } = req.params
-  const { ativo } = req.body
+  const { ativo, studio_3d_ativo, studio_3d_limite_creditos_mes } = req.body
 
-  if (typeof ativo !== 'boolean') {
-    return res.status(400).json({ error: 'Campo ativo (boolean) é obrigatório' })
+  const updates: Record<string, unknown> = {}
+  if (typeof ativo === 'boolean') updates.ativo = ativo
+  if (typeof studio_3d_ativo === 'boolean') updates.studio_3d_ativo = studio_3d_ativo
+  if (Number.isInteger(studio_3d_limite_creditos_mes) && studio_3d_limite_creditos_mes >= 0) {
+    updates.studio_3d_limite_creditos_mes = studio_3d_limite_creditos_mes
+  }
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'Nenhum campo válido para atualizar' })
   }
 
   const { data, error } = await supabaseAdmin
     .from('organizacoes')
-    .update({ ativo })
+    .update(updates)
     .eq('id', id)
     .select()
     .single()
 
   if (error) return res.status(400).json({ error: error.message })
 
-  await logAdminAction(req.user!.id, ativo ? 'activate_org' : 'deactivate_org', id)
+  await logAdminAction(req.user!.id, 'update_org', id, updates)
 
   res.json(data)
 })

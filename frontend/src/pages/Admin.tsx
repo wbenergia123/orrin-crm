@@ -15,6 +15,7 @@ interface Tenant {
   nome: string
   ativo: boolean
   created_at: string
+  studio_3d_ativo: boolean
 }
 
 export function Admin() {
@@ -69,6 +70,12 @@ export function Admin() {
   const { mutate: toggle } = useMutation({
     mutationFn: ({ id, ativo }: { id: string; ativo: boolean }) =>
       api.patch(`/admin/tenants/${id}`, { ativo }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-tenants'] }),
+  })
+
+  const { mutate: toggleStudio3d } = useMutation({
+    mutationFn: ({ id, studio_3d_ativo }: { id: string; studio_3d_ativo: boolean }) =>
+      api.patch(`/admin/tenants/${id}`, { studio_3d_ativo }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-tenants'] }),
   })
 
@@ -267,6 +274,16 @@ export function Admin() {
                           }
                         >
                           {t.ativo ? 'Desativar' : 'Ativar'}
+                        </button>
+                        <button
+                          onClick={() => toggleStudio3d({ id: t.id, studio_3d_ativo: !t.studio_3d_ativo })}
+                          className={
+                            t.studio_3d_ativo
+                              ? 'text-xs font-medium px-2.5 py-1 rounded-md border border-violet-200 text-violet-700 hover:bg-violet-50'
+                              : 'text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50'
+                          }
+                        >
+                          {t.studio_3d_ativo ? 'Studio 3D: ON' : 'Studio 3D: OFF'}
                         </button>
                         {t.ativo && (
                           <>
