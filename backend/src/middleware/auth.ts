@@ -132,3 +132,19 @@ export async function logAdminAction(
     metadata,
   })
 }
+
+// Gate do Studio 3D: só passa se a org do usuário tem o recurso habilitado.
+// Precisa rodar depois de requireAuth. Super_admin passa sempre.
+// ponytail: sem cache — 1 select por request; adicionar cache se virar hot path
+export async function requireStudio3d(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.role === 'super_admin') return next()
+  const { data } = await supabaseAdmin
+    .from('organizacoes')
+    .select('studio_3d_ativo')
+    .eq('id', req.user!.tenant_id)
+    .single()
+  if (!data?.studio_3d_ativo) {
+    return res.status(403).json({ error: 'Studio 3D não habilitado para esta clínica.' })
+  }
+  next()
+}
