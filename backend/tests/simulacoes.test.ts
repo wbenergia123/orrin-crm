@@ -187,3 +187,48 @@ describe('GET /api/simulacoes/:id (polling)', () => {
     await supabase.from('simulacoes_3d').delete().eq('id', id)
   })
 })
+
+describe('PATCH /api/simulacoes/:id', () => {
+  it('persiste âncoras e sliders', async () => {
+    const { data: sim } = await supabase.from('simulacoes_3d').insert({
+      tenant_id: tenantId, paciente_id: pacienteId, status: 'succeeded',
+    }).select('id').single()
+    const res = await request(app).patch(`/api/simulacoes/${sim!.id}`)
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+      .send({ ancoras: { nariz_ponta: { x: 0.1, y: 0.2, z: 0.3 } }, sliders: { nariz_ponta: 0.5 }, notas: 'teste' })
+    expect(res.status).toBe(200)
+    expect(res.body.sliders.nariz_ponta).toBe(0.5)
+    await supabase.from('simulacoes_3d').delete().eq('id', sim!.id)
+  })
+
+  it('rejeita slider fora de -1..1', async () => {
+    const { data: sim } = await supabase.from('simulacoes_3d').insert({
+      tenant_id: tenantId, paciente_id: pacienteId, status: 'succeeded',
+    }).select('id').single()
+    const res = await request(app).patch(`/api/simulacoes/${sim!.id}`)
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+      .send({ sliders: { nariz_ponta: 5 } })
+    expect(res.status).toBe(400)
+    await supabase.from('simulacoes_3d').delete().eq('id', sim!.id)
+  })
+})
+
+describe('screenshot e delete', () => {
+  it('salva screenshot png e depois deleta a simulação', async () => {
+    const { data: sim } = await supabase.from('simulacoes_3d').insert({
+      tenant_id: tenantId, paciente_id: pacienteId, status: 'succeeded',
+    }).select('id').single()
+    const png = fotoPng('shot.png')
+    const up = await request(app).post(`/api/simulacoes/${sim!.id}/screenshot`)
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+      .attach('imagem', png.buffer, png.nome)
+    expect(up.status).toBe(200)
+    expect(up.body.screenshot_url).toBeTruthy()
+
+    const del = await request(app).delete(`/api/simulacoes/${sim!.id}`)
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+    expect(del.status).toBe(200)
+    const { data: some } = await supabase.from('simulacoes_3d').select('id').eq('id', sim!.id).maybeSingle()
+    expect(some).toBeNull()
+  })
+})

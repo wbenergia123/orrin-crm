@@ -11,7 +11,9 @@ const BUCKET = 'simulacoes-3d'
 const CREDITOS_POR_GERACAO = 30
 const TIMEOUT_GERACAO_MS = 10 * 60 * 1000
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
+const uploadScreenshot = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } })
 const TIPOS_FOTO = ['image/jpeg', 'image/png']
+const vec3Schema = z.object({ x: z.number(), y: z.number(), z: z.number() })
 
 async function signedUrl(path: string | null): Promise<string | null> {
   if (!path) return null
@@ -209,6 +211,55 @@ router.post('/', (req: Request, res: Response, next) => {
   const { data: final } = await supabaseAdmin.from('simulacoes_3d')
     .update({ meshy_task_id: taskId, fotos_paths: fotosPaths }).eq('id', sim.id).select().single()
   res.status(201).json(final)
+})
+
+router.patch('/:id', async (req: Request, res: Response) => {
+  const parsed = z.object({
+    ancoras: z.record(z.string(), vec3Schema).optional(),
+    sliders: z.record(z.string(), z.number().min(-1).max(1)).optional(),
+    notas: z.string().max(2000).optional(),
+  }).safeParse(req.body)
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
+
+  const { data, error } = await supabaseAdmin.from('simulacoes_3d')
+    .update({ ...parsed.data, atualizado_em: new Date().toISOString() })
+    .eq('id', req.params.id).eq('tenant_id', req.user!.tenant_id)
+    .select().single()
+  if (error) { res.status(404).json({ error: 'Simulação não encontrada' }); return }
+  res.json(data)
+})
+
+router.post('/:id/screenshot', uploadScreenshot.single('imagem'), async (req: Request, res: Response) => {
+  if (!req.file || req.file.mimetype !== 'image/png') {
+    res.status(400).json({ error: 'Envie um PNG no campo "imagem"' }); return
+  }
+  const { data: sim } = await supabaseAdmin.from('simulacoes_3d')
+    .select('id').eq('id', req.params.id).eq('tenant_id', req.user!.tenant_id).single()
+  if (!sim) { res.status(404).json({ error: 'Simulação não encontrada' }); return }
+
+  const path = `${req.user!.tenant_id}/${sim.id}/screenshot.png`
+  const { error: upErr } = await supabaseAdmin.storage.from(BUCKET)
+    .upload(path, req.file.buffer, { contentType: 'image/png', upsert: true })
+  if (upErr) { res.status(500).json({ error: upErr.message }); return }
+
+  await supabaseAdmin.from('simulacoes_3d')
+    .update({ screenshot_path: path, atualizado_em: new Date().toISOString() }).eq('id', sim.id)
+  res.json({ screenshot_url: await signedUrl(path) })
+})
+
+router.delete('/:id', async (req: Request, res: Response) => {
+  const tenantId = req.user!.tenant_id
+  const { data: sim } = await supabaseAdmin.from('simulacoes_3d')
+    .select('id').eq('id', req.params.id).eq('tenant_id', tenantId).single()
+  if (!sim) { res.status(404).json({ error: 'Simulação não encontrada' }); return }
+
+  const { data: arquivos } = await supabaseAdmin.storage.from(BUCKET).list(`${tenantId}/${sim.id}`)
+  if (arquivos?.length) {
+    await supabaseAdmin.storage.from(BUCKET).remove(arquivos.map((a) => `${tenantId}/${sim.id}/${a.name}`))
+  }
+  const { error } = await supabaseAdmin.from('simulacoes_3d').delete().eq('id', sim.id)
+  if (error) { res.status(400).json({ error: error.message }); return }
+  res.json({ message: 'Simulação removida' })
 })
 
 export default router
