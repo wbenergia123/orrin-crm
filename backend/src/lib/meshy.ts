@@ -19,7 +19,8 @@ export interface MeshyTaskStatus {
 export async function criarTask(imageUrls: string[]): Promise<string> {
   const { data } = await axios.post(
     BASE,
-    { image_urls: imageUrls, should_texture: true, target_formats: ['glb'] },
+    // hd_texture (4K) + PBR melhoram bastante a pele; remove_lighting já é default no meshy-6
+    { image_urls: imageUrls, should_texture: true, enable_pbr: true, hd_texture: true, target_formats: ['glb'] },
     { headers: headers() }
   )
   return data.result
