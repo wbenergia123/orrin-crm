@@ -50,6 +50,10 @@ beforeAll(async () => {
 afterAll(async () => {
   await supabase.from('simulacoes_3d').delete().eq('paciente_id', pacienteId)
   await supabase.from('pacientes').delete().eq('id', pacienteId)
+  // ponytail: só limpa o prefixo fixo plantado pelo teste de clone; os paths
+  // gerados por simulação real (fotos_N, modelo.glb por sim.id aleatório) ficam
+  // órfãos no bucket — listar recursivamente por tenant é custoso para um teste.
+  await supabase.storage.from('simulacoes-3d').remove([`${tenantId}/clone-origem/modelo.glb`])
 })
 
 describe('gate studio_3d_ativo', () => {
@@ -74,5 +78,65 @@ describe('GET /api/simulacoes', () => {
     const res = await request(app).get('/api/simulacoes')
       .set('Host', host).set('Authorization', `Bearer ${token}`)
     expect(res.status).toBe(400)
+  })
+})
+
+function fotoPng(nome: string) {
+  // PNG 1x1 válido
+  return { buffer: Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000' +
+    '1f15c4890000000d49444154789c626001000000ffff03000006000557bfabd40000000049454e44ae426082', 'hex'), nome }
+}
+
+describe('POST /api/simulacoes', () => {
+  it('retorna 400 com menos de 2 fotos', async () => {
+    const f = fotoPng('frontal.png')
+    const res = await request(app).post('/api/simulacoes')
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+      .field('paciente_id', pacienteId)
+      .attach('fotos', f.buffer, f.nome)
+    expect(res.status).toBe(400)
+  })
+
+  it('retorna 422 quando o teto de créditos do mês estourou', async () => {
+    await supabase.from('organizacoes').update({ studio_3d_limite_creditos_mes: 0 }).eq('id', tenantId)
+    const f1 = fotoPng('a.png'); const f2 = fotoPng('b.png')
+    const res = await request(app).post('/api/simulacoes')
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+      .field('paciente_id', pacienteId)
+      .attach('fotos', f1.buffer, f1.nome).attach('fotos', f2.buffer, f2.nome)
+    expect(res.status).toBe(422)
+    await supabase.from('organizacoes').update({ studio_3d_limite_creditos_mes: 150 }).eq('id', tenantId)
+  })
+
+  it('cria simulação pending e dispara a Meshy', async () => {
+    const f1 = fotoPng('a.png'); const f2 = fotoPng('b.png')
+    const res = await request(app).post('/api/simulacoes')
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+      .field('paciente_id', pacienteId)
+      .attach('fotos', f1.buffer, f1.nome).attach('fotos', f2.buffer, f2.nome)
+    expect(res.status).toBe(201)
+    expect(res.body.status).toBe('pending')
+    expect(res.body.meshy_task_id).toBe('task-mock-123')
+    expect(meshy.criarTask).toHaveBeenCalled()
+  })
+
+  it('clona modelo existente sem chamar a Meshy', async () => {
+    const glbPath = `${tenantId}/clone-origem/modelo.glb`
+    await supabase.storage.from('simulacoes-3d').upload(glbPath, Buffer.from('glb-fake'), { contentType: 'model/gltf-binary', upsert: true })
+    const { data: origem } = await supabase.from('simulacoes_3d').insert({
+      tenant_id: tenantId, paciente_id: pacienteId, status: 'succeeded',
+      modelo_glb_path: glbPath, ancoras: { nariz_ponta: { x: 0, y: 0.1, z: 0.05 } },
+    }).select('id').single()
+
+    const chamadasAntes = (meshy.criarTask as any).mock.calls.length
+    const res = await request(app).post('/api/simulacoes')
+      .set('Host', host).set('Authorization', `Bearer ${token}`)
+      .field('paciente_id', pacienteId)
+    expect(res.status).toBe(201)
+    expect(res.body.status).toBe('succeeded')
+    expect(res.body.ancoras).toEqual({ nariz_ponta: { x: 0, y: 0.1, z: 0.05 } })
+    expect((meshy.criarTask as any).mock.calls.length).toBe(chamadasAntes)
+
+    await supabase.from('simulacoes_3d').delete().eq('id', origem!.id)
   })
 })
