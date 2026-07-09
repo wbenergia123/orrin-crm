@@ -6,6 +6,7 @@ import { supabaseAdmin } from '../services/supabase'
 import { validarSlug } from '../lib/slug'
 import { logAdminAction } from '../middleware/auth'
 import { invalidarCachePrompt } from '../lib/claude-agent'
+import { desbloquearEmail, statusEmail } from '../lib/rate-limiter'
 
 const router = Router()
 
@@ -302,6 +303,23 @@ router.post('/tenants/:id/impersonate', async (req: Request, res: Response) => {
     token,
     org: { id: org.id, slug: org.slug, nome: org.nome },
   })
+})
+
+// Verifica status de bloqueio de um email
+router.get('/login-status/:email', async (req: Request, res: Response) => {
+  const email = decodeURIComponent(req.params.email).toLowerCase().trim()
+  res.json(statusEmail(email))
+})
+
+// Desbloqueia manualmente um email bloqueado
+router.delete('/login-status/:email', async (req: Request, res: Response) => {
+  const email = decodeURIComponent(req.params.email).toLowerCase().trim()
+  const desbloqueado = desbloquearEmail(email)
+  if (!desbloqueado) {
+    return res.status(404).json({ error: 'Email não está bloqueado' })
+  }
+  await logAdminAction(req.user!.id, 'desbloquear_login', undefined, { email })
+  res.json({ ok: true, email })
 })
 
 export default router

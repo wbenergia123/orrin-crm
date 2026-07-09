@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Building2, Plus, Trash2 } from 'lucide-react'
+import { Building2, Plus, Trash2, ShieldOff } from 'lucide-react'
 
 interface Tenant {
   id: string
@@ -39,6 +39,31 @@ export function Admin() {
   const [promptAna, setPromptAna] = useState('')
   const [anaModel, setAnaModel] = useState('')
   const [carregandoPromptId, setCarregandoPromptId] = useState<string | null>(null)
+
+  const [emailBloqueio, setEmailBloqueio] = useState('')
+  const [statusBloqueio, setStatusBloqueio] = useState<{ tentativas: number; bloqueadoAte: string | null } | null>(null)
+  const [carregandoBloqueio, setCarregandoBloqueio] = useState(false)
+
+  const verificarBloqueio = async () => {
+    if (!emailBloqueio.trim()) return
+    setCarregandoBloqueio(true)
+    try {
+      const { data } = await api.get(`/admin/login-status/${encodeURIComponent(emailBloqueio.trim())}`)
+      setStatusBloqueio(data)
+    } catch {
+      alert('Erro ao verificar status.')
+    } finally {
+      setCarregandoBloqueio(false)
+    }
+  }
+
+  const { mutate: desbloquear, isPending: desbloqueando } = useMutation({
+    mutationFn: () => api.delete(`/admin/login-status/${encodeURIComponent(emailBloqueio.trim())}`),
+    onSuccess: () => {
+      setStatusBloqueio({ tentativas: 0, bloqueadoAte: null })
+    },
+    onError: () => alert('Erro ao desbloquear.'),
+  })
 
   const { data: tenants = [], isLoading } = useQuery<Tenant[]>({
     queryKey: ['admin-tenants'],
@@ -420,6 +445,47 @@ export function Admin() {
                 )}
               </div>
             ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-0 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+            <ShieldOff size={16} />
+            Desbloquear login
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-gray-400">Após 5 tentativas erradas o usuário é bloqueado por 15 minutos. Use aqui para desbloquear manualmente.</p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="email@clinica.com"
+              value={emailBloqueio}
+              onChange={(e) => { setEmailBloqueio(e.target.value); setStatusBloqueio(null) }}
+              className="flex-1"
+            />
+            <Button variant="outline" onClick={verificarBloqueio} disabled={carregandoBloqueio || !emailBloqueio.trim()}>
+              {carregandoBloqueio ? 'Verificando...' : 'Verificar'}
+            </Button>
+          </div>
+
+          {statusBloqueio && (
+            <div className={`rounded-lg p-3 text-sm border ${statusBloqueio.bloqueadoAte ? 'bg-red-50 border-red-100 text-red-800' : 'bg-emerald-50 border-emerald-100 text-emerald-800'}`}>
+              {statusBloqueio.bloqueadoAte ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">Usuário bloqueado</p>
+                    <p className="text-xs mt-0.5">{statusBloqueio.tentativas} tentativas · liberação automática às {new Date(statusBloqueio.bloqueadoAte).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <Button size="sm" onClick={() => desbloquear()} disabled={desbloqueando} className="bg-red-600 hover:bg-red-700 text-white shrink-0">
+                    {desbloqueando ? 'Desbloqueando...' : 'Desbloquear agora'}
+                  </Button>
+                </div>
+              ) : (
+                <p>Usuário não está bloqueado{statusBloqueio.tentativas > 0 ? ` (${statusBloqueio.tentativas} tentativa${statusBloqueio.tentativas > 1 ? 's' : ''} errada${statusBloqueio.tentativas > 1 ? 's' : ''})` : ''}.</p>
+              )}
             </div>
           )}
         </CardContent>
