@@ -13,8 +13,9 @@ import { MarcacaoDigital } from '../components/marcacao/MarcacaoDigital'
 import { HistoricoMarcacoes } from '../components/marcacao/HistoricoMarcacoes'
 
 type Aba = 'visao_geral' | 'marcacao_digital' | 'historico'
+type IconeIndicador = React.ComponentType<{ size?: number; className?: string }>
 
-const ABAS: { id: Aba; label: string; icon: React.ElementType }[] = [
+const ABAS: { id: Aba; label: string; icon: IconeIndicador }[] = [
   { id: 'visao_geral', label: 'Visão Geral', icon: LayoutDashboard },
   { id: 'marcacao_digital', label: 'Marcação Digital', icon: Syringe },
   { id: 'historico', label: 'Histórico', icon: History },
@@ -39,7 +40,7 @@ function getInitials(nome: string | null, telefone: string) {
   return telefone.replace(/\D/g, '').slice(-2)
 }
 
-const STATUS_AG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
+const STATUS_AG: Record<string, { label: string; color: string; icon: IconeIndicador }> = {
   concluido:  { label: 'Concluído',  color: 'text-emerald-600 bg-emerald-50', icon: CheckCircle2 },
   confirmado: { label: 'Confirmado', color: 'text-blue-600 bg-blue-50',       icon: CheckCircle2 },
   agendado:   { label: 'Agendado',   color: 'text-amber-600 bg-amber-50',     icon: Clock },
