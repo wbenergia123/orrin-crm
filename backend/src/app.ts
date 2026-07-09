@@ -22,7 +22,8 @@ import followupRouter from './routes/followup'
 import imagensReferenciaRouter from './routes/imagens-referencia'
 import financeiroRouter from './routes/financeiro'
 import bloqueiosRouter from './routes/bloqueios'
-import { requireAuth, requireTenant, requireSuperAdmin, blockWritesWhenImpersonating } from './middleware/auth'
+import simulacoesRouter from './routes/simulacoes'
+import { requireAuth, requireTenant, requireSuperAdmin, blockWritesWhenImpersonating, requireStudio3d } from './middleware/auth'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET é obrigatório. Defina a variável no .env ou no painel do host.')
@@ -70,6 +71,7 @@ export function createApp() {
   app.use('/api/followup', requireAuth, blockWritesWhenImpersonating, requireTenant, followupRouter)
   app.use('/api/imagens-referencia', requireAuth, blockWritesWhenImpersonating, requireTenant, imagensReferenciaRouter)
   app.use('/api/bloqueios', requireAuth, blockWritesWhenImpersonating, requireTenant, bloqueiosRouter)
+  app.use('/api/simulacoes', requireAuth, blockWritesWhenImpersonating, requireTenant, requireStudio3d, simulacoesRouter)
 
   // Rotas super admin
   app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)
