@@ -94,7 +94,7 @@ export function EditorSimulacao({ simulacao, onVoltar }: Props) {
                 onReset={() => { setValores({}); viewer.current?.aplicarSliders(ancoras, {}, REGIOES) }}
               />
               <button
-                onClick={() => { setAncoras({}); setValores({}) }}
+                onClick={() => { setAncoras({}); setValores({}); setUltimoClique(null) }}
                 className="mt-4 text-xs text-gray-400 underline"
               >
                 Reposicionar âncoras

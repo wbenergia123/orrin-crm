@@ -1,6 +1,6 @@
 // frontend/src/pages/Studio3D.tsx
 import { useEffect, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
 import type { Simulacao3D } from '../types'
 import { UploadFotos } from '../components/simulacao/UploadFotos'
@@ -15,6 +15,7 @@ export function Studio3D() {
   const [paciente, setPaciente] = useState<PacienteBusca | null>(null)
   const [simulacaoAtiva, setSimulacaoAtiva] = useState<Simulacao3D | null>(null)
   const [criando, setCriando] = useState(false)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     const t = setTimeout(() => setBuscaDebounced(busca), 300)
@@ -38,6 +39,16 @@ export function Studio3D() {
     const { data } = await api.get<Simulacao3D>(`/simulacoes/${id}`)
     setSimulacaoAtiva(data)
   }
+
+  const temModeloPronto = simulacoes?.some((s) => s.status === 'succeeded') ?? false
+
+  const { mutate: clonar, isPending: clonando } = useMutation({
+    mutationFn: async () => (await api.post<Simulacao3D>('/simulacoes', { paciente_id: paciente!.id })).data,
+    onSuccess: (sim) => {
+      queryClient.invalidateQueries({ queryKey: ['simulacoes', paciente?.id] })
+      setSimulacaoAtiva(sim)
+    },
+  })
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -68,8 +79,19 @@ export function Studio3D() {
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-gray-700">{paciente.nome}</p>
             <div className="flex gap-2">
-              <button onClick={() => setCriando(true)}
-                className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm">Nova simulação</button>
+              {temModeloPronto ? (
+                <>
+                  <button onClick={() => clonar()} disabled={clonando}
+                    className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm disabled:opacity-40">
+                    {clonando ? 'Criando…' : 'Nova simulação'}
+                  </button>
+                  <button onClick={() => setCriando(true)}
+                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600">Novo modelo (fotos novas)</button>
+                </>
+              ) : (
+                <button onClick={() => setCriando(true)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-sm">Nova simulação</button>
+              )}
               <button onClick={() => { setPaciente(null); setBusca('') }}
                 className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600">Trocar paciente</button>
             </div>

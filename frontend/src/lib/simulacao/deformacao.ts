@@ -35,7 +35,8 @@ export class MotorDeformacao {
   }
 
   private indicesPara(chave: string, pos: Vec3, raio: number): number[] {
-    const cached = this.indices.get(chave)
+    const chaveCache = `${chave}:${raio}`
+    const cached = this.indices.get(chaveCache)
     if (cached) return cached
     const idx: number[] = []
     const r = raio * this.diagonal
@@ -46,7 +47,7 @@ export class MotorDeformacao {
       const dz = this.original[i * 3 + 2] - pos.z
       if (dx * dx + dy * dy + dz * dz <= r2) idx.push(i)
     }
-    this.indices.set(chave, idx)
+    this.indices.set(chaveCache, idx)
     return idx
   }
 

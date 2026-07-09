@@ -143,7 +143,11 @@ router.post('/', (req: Request, res: Response, next) => {
       }).select().single()
       if (error) { res.status(400).json({ error: error.message }); return }
       const novoGlb = `${tenantId}/${nova.id}/modelo.glb`
-      await supabaseAdmin.storage.from(BUCKET).copy(origem.modelo_glb_path!, novoGlb)
+      const { error: copyErr } = await supabaseAdmin.storage.from(BUCKET).copy(origem.modelo_glb_path!, novoGlb)
+      if (copyErr) {
+        await supabaseAdmin.from('simulacoes_3d').delete().eq('id', nova.id)
+        res.status(502).json({ error: 'Falha ao clonar o modelo existente. Tente gerar um novo.' }); return
+      }
       let novoThumb: string | null = null
       if (origem.thumbnail_path) {
         novoThumb = `${tenantId}/${nova.id}/thumbnail.png`
@@ -152,7 +156,12 @@ router.post('/', (req: Request, res: Response, next) => {
       const { data: atualizada } = await supabaseAdmin.from('simulacoes_3d')
         .update({ modelo_glb_path: novoGlb, thumbnail_path: novoThumb })
         .eq('id', nova.id).select().single()
-      res.status(201).json(atualizada); return
+      res.status(201).json({
+        ...atualizada,
+        modelo_glb_url: await signedUrl(atualizada.modelo_glb_path),
+        thumbnail_url: await signedUrl(atualizada.thumbnail_path),
+        screenshot_url: null,
+      }); return
     }
   }
 

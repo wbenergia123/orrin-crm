@@ -165,6 +165,8 @@ describe('POST /api/simulacoes', () => {
     expect(res.body.status).toBe('succeeded')
     expect(res.body.ancoras).toEqual({ nariz_ponta: { x: 0, y: 0.1, z: 0.05 } })
     expect((meshy.criarTask as any).mock.calls.length).toBe(chamadasAntes)
+    expect(res.body.modelo_glb_url).toContain('modelo.glb')
+    expect(res.body.modelo_glb_url).not.toContain('meshy.ai')
 
     await supabase.from('simulacoes_3d').delete().eq('id', origem!.id)
   })

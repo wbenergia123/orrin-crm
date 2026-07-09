@@ -17,7 +17,9 @@ export function WizardAncoras({ simulacaoId, ancorasIniciais, onPontoPendente, u
   const [ancoras, setAncoras] = useState(ancorasIniciais)
   const [passo, setPasso] = useState(0)
   const concluido = passo >= ANCORAS_WIZARD.length
-  const cliqueProcessado = useRef<Vec3 | null>(null)
+  // inicializa com o valor atual da prop (não null) para ignorar um clique
+  // já "gasto" de antes do wizard remontar (ex: fluxo de reposicionar âncoras)
+  const cliqueProcessado = useRef<Vec3 | null>(ultimoClique)
 
   const { mutate: salvar, isPending } = useMutation({
     mutationFn: async (ancorasFinais: Record<string, Vec3>) => {

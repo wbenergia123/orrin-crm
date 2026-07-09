@@ -55,4 +55,17 @@ describe('MotorDeformacao', () => {
     expect(destino[3]).toBeLessThan(-0.05)     // direito empurrado pra fora (−x)
     expect(destino[0] - 0.05).toBeCloseTo(-(destino[3] + 0.05)) // simétrico
   })
+
+  it('mesma âncora com raios diferentes não compartilha índice em cache', () => {
+    // v0 na âncora; v1 a 0.075 da âncora — dentro do raio 0.1, fora do raio 0.05
+    const orig = new Float32Array([0, 0, 0, 0.075, 0, 0])
+    const motor = new MotorDeformacao(orig, 1)
+    const destino = new Float32Array(orig.length)
+    const raioPequeno: RegiaoConfig = { id: 'a', label: 'A', grupo: 'queixo', ancora: 'queixo', eixo: 'z', raio: 0.05, intensidadeMax: 0.02 }
+    const raioGrande: RegiaoConfig = { id: 'b', label: 'B', grupo: 'queixo', ancora: 'queixo', eixo: 'z', raio: 0.1, intensidadeMax: 0.02 }
+    const ancoras2 = { queixo: { x: 0, y: 0, z: 0 } }
+    motor.aplicar(destino, ancoras2, { a: 1 }, [raioPequeno])   // popula cache com raio pequeno
+    motor.aplicar(destino, ancoras2, { b: 1 }, [raioGrande])    // NÃO pode reusar o índice truncado
+    expect(destino[5]).not.toBe(0) // v1.z deve se mover no raio grande
+  })
 })
