@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import type { Simulacao3D } from '../types'
 import { UploadFotos } from '../components/simulacao/UploadFotos'
 import { ProgressoGeracao } from '../components/simulacao/ProgressoGeracao'
+import { EditorSimulacao } from '../components/simulacao/EditorSimulacao'
 
 interface PacienteBusca { id: string; nome: string }
 
@@ -99,11 +100,9 @@ export function Studio3D() {
         <ProgressoGeracao simulacaoId={simulacaoAtiva.id} onPronta={(sim) => setSimulacaoAtiva(sim)} />
       )}
 
-      {simulacaoAtiva?.status === 'succeeded' && (
+      {simulacaoAtiva?.status === 'succeeded' && simulacaoAtiva.modelo_glb_url && (
         <div className="mt-6">
-          {/* Editor 3D entra na Task 16 */}
-          <p className="text-sm text-gray-500">Modelo pronto — editor 3D na próxima task.</p>
-          <button onClick={() => setSimulacaoAtiva(null)} className="mt-2 text-sm text-gray-600 underline">Voltar</button>
+          <EditorSimulacao simulacao={simulacaoAtiva} onVoltar={() => setSimulacaoAtiva(null)} />
         </div>
       )}
     </div>
