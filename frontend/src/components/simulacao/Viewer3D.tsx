@@ -4,7 +4,22 @@ import type { ThreeEvent } from '@react-three/fiber'
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Center } from '@react-three/drei'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { MotorDeformacao, type Vec3, type RegiaoConfig } from '../../lib/simulacao/deformacao'
+
+// Iluminação por ambiente (IBL): texturas PBR/4K da Meshy precisam de um mapa de
+// ambiente pra parecerem pele real. Sem isso, ficam plastificadas e com brilho
+// estourado. RoomEnvironment é um estúdio procedural (sem baixar HDRI externo).
+function AmbienteEstudio() {
+  const { scene, gl } = useThree()
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl)
+    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+    scene.environment = envTex
+    return () => { envTex.dispose(); pmrem.dispose() }
+  }, [scene, gl])
+  return null
+}
 
 export interface Viewer3DHandle {
   aplicarSliders: (ancoras: Record<string, Vec3>, valores: Record<string, number>, configs: RegiaoConfig[]) => void
@@ -104,9 +119,14 @@ export const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D(prop
 
   return (
     <div className="w-full h-[480px] bg-gray-50 rounded-xl overflow-hidden relative">
-      <Canvas gl={{ preserveDrawingBuffer: true }} camera={{ position: [0, 0, 2.2], fov: 40 }}>
-        <ambientLight intensity={0.7} />
-        <directionalLight position={[1, 2, 3]} intensity={1.2} />
+      <Canvas
+        gl={{ preserveDrawingBuffer: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
+        camera={{ position: [0, 0, 2.2], fov: 40 }}
+      >
+        <AmbienteEstudio />
+        {/* Luz de preenchimento suave — o grosso da iluminação vem do ambiente (IBL) */}
+        <ambientLight intensity={0.25} />
+        <directionalLight position={[1, 2, 3]} intensity={0.5} />
         <Suspense fallback={null}>
           <Modelo
             {...props}
