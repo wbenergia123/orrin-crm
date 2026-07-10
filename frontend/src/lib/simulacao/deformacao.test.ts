@@ -68,4 +68,50 @@ describe('MotorDeformacao', () => {
     motor.aplicar(destino, ancoras2, { b: 1 }, [raioGrande])    // NÃO pode reusar o índice truncado
     expect(destino[5]).not.toBe(0) // v1.z deve se mover no raio grande
   })
+
+  it('com o conjunto completo de âncoras, desloca nos eixos ANATÔMICOS (GLB rotacionado)', () => {
+    // Modelo com eixos rotacionados (como o GLB real da Meshy): lateral = +Y do
+    // espaço local, vertical (pra cima) = −X. Slider "y" (vertical) deve mover
+    // o vértice ao longo de −X, não do Y local.
+    const orig = new Float32Array([0, 0, 0.5]) // vértice na ponta do nariz
+    const motor = new MotorDeformacao(orig, 10) // diagonal grande de propósito: não pode ser usada
+    const destino = new Float32Array(orig.length)
+    const ancorasAnat = {
+      nariz_ponta: { x: 0, y: 0, z: 0.5 },
+      malar_e: { x: 0, y: 0.1, z: 0.4 },   // lateral ao longo de +Y
+      malar_d: { x: 0, y: -0.1, z: 0.4 },
+      nariz_dorso: { x: -0.05, y: 0, z: 0.45 }, // "cima" = −X
+      queixo: { x: 0.05, y: 0, z: 0.45 },
+    }
+    const elevacao: RegiaoConfig = {
+      id: 'elev', label: 'Elevação', grupo: 'nariz', ancora: 'nariz_ponta',
+      eixo: 'y', raio: 0.2, intensidadeMax: 0.02,
+    }
+    motor.aplicar(destino, ancorasAnat, { elev: 1 }, [elevacao])
+    // unidade = largura do rosto (0.2); deslocamento = 1 * 0.02 * 0.2 = 0.004 ao longo de "cima" (−X)
+    expect(destino[0]).toBeCloseTo(-0.004)
+    expect(destino[1]).toBeCloseTo(0)
+    expect(destino[2]).toBeCloseTo(0.5)
+  })
+
+  it('âncoras degeneradas (lateral ~paralelo à vertical) caem no fallback dos eixos locais', () => {
+    const orig = new Float32Array([0, 0, 0])
+    const motor = new MotorDeformacao(orig, 1)
+    const destino = new Float32Array(orig.length)
+    const ancorasRuins = {
+      nariz_ponta: { x: 0, y: 0, z: 0 },
+      malar_e: { x: 0, y: 0.1, z: 0 },
+      malar_d: { x: 0, y: -0.1, z: 0 },
+      nariz_dorso: { x: 0, y: 0.05, z: 0 }, // vertical paralela à lateral — inválido
+      queixo: { x: 0, y: -0.05, z: 0 },
+    }
+    const cfg: RegiaoConfig = {
+      id: 'p', label: 'P', grupo: 'nariz', ancora: 'nariz_ponta',
+      eixo: 'z', raio: 0.2, intensidadeMax: 0.02,
+    }
+    motor.aplicar(destino, ancorasRuins, { p: 1 }, [cfg])
+    // fallback: eixo z local; unidade ainda é a largura do rosto (0.2)
+    expect(destino[2]).toBeCloseTo(0.004)
+    expect(destino[0]).toBeCloseTo(0)
+  })
 })

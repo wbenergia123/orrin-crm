@@ -1,5 +1,5 @@
 // frontend/src/components/simulacao/Viewer3D.tsx
-import { forwardRef, useImperativeHandle, useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { forwardRef, useCallback, useImperativeHandle, useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Center } from '@react-three/drei'
@@ -47,8 +47,14 @@ function Modelo({ glbUrl, onCliqueMalha, registrar }: Props & {
     return encontrada
   }, [scene])
 
+  // BUG CORRIGIDO: este efeito re-executava a cada re-render do pai (a prop
+  // `registrar` era uma arrow nova por render) e recapturava a malha JÁ DEFORMADA
+  // como novo "original" — deformações compunham em bola de neve e "Zerar"
+  // restaurava o estado estufado. O guard garante UMA captura por malha.
+  const malhaRegistrada = useRef<THREE.Mesh | null>(null)
   useEffect(() => {
-    if (!mesh) return
+    if (!mesh || malhaRegistrada.current === mesh) return
+    malhaRegistrada.current = mesh
     const posAttr = mesh.geometry.attributes.position
     const original = new Float32Array(posAttr.array as Float32Array) // clone — NUNCA modificado
     mesh.geometry.computeBoundingBox()
@@ -91,6 +97,14 @@ export const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D(prop
   const capturaRef = useRef<(() => Promise<Blob | null>) | null>(null)
   const [pronto, setPronto] = useState(false)
 
+  // identidade estável — evita que o efeito de captura do Modelo re-execute a cada render
+  const registrar = useCallback((mesh: THREE.Mesh, motor: MotorDeformacao, original: Float32Array) => {
+    meshRef.current = mesh
+    motorRef.current = motor
+    originalRef.current = original
+    setPronto(true)
+  }, [])
+
   useImperativeHandle(ref, () => ({
     aplicarSliders(ancoras, valores, configs) {
       const mesh = meshRef.current, motor = motorRef.current, original = originalRef.current
@@ -128,15 +142,7 @@ export const Viewer3D = forwardRef<Viewer3DHandle, Props>(function Viewer3D(prop
         <ambientLight intensity={0.25} />
         <directionalLight position={[1, 2, 3]} intensity={0.5} />
         <Suspense fallback={null}>
-          <Modelo
-            {...props}
-            registrar={(mesh, motor, original) => {
-              meshRef.current = mesh
-              motorRef.current = motor
-              originalRef.current = original
-              setPronto(true)
-            }}
-          />
+          <Modelo {...props} registrar={registrar} />
         </Suspense>
         <OrbitControls enablePan={false} minDistance={1} maxDistance={5} />
         <Captura registrarCaptura={(fn) => { capturaRef.current = fn }} />
