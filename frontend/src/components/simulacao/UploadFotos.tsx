@@ -30,7 +30,8 @@ export function UploadFotos({ pacienteId, onCriada }: Props) {
   return (
     <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
       <p className="text-sm text-gray-600 font-medium">Fotos do paciente (2 a 4)</p>
-      <p className="text-xs text-gray-400 mt-1">Frontal + perfil esquerdo + perfil direito = melhor resultado</p>
+      <p className="text-xs text-gray-400 mt-1">Melhor resultado: 4 fotos — frontal + perfil esquerdo + perfil direito + de baixo (submento)</p>
+      <p className="text-[11px] text-gray-400 mt-0.5">Cabelo preso, luz uniforme de frente, expressão neutra, sem óculos</p>
       <input
         type="file" accept="image/jpeg,image/png" multiple
         className="mt-4 text-sm"
