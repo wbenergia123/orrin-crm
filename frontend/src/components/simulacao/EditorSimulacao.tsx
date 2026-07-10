@@ -90,6 +90,7 @@ export function EditorSimulacao({ simulacao, onVoltar }: Props) {
             <>
               <PainelSliders
                 valores={valores}
+                ancoras={ancoras}
                 onChange={aoMudarSlider}
                 onReset={() => { setValores({}); viewer.current?.aplicarSliders(ancoras, {}, REGIOES) }}
               />

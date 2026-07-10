@@ -15,7 +15,7 @@ export interface Vec3 { x: number; y: number; z: number }
 export interface RegiaoConfig {
   id: string
   label: string
-  grupo: 'nariz' | 'labios' | 'queixo' | 'malar'
+  grupo: 'nariz' | 'labios' | 'queixo' | 'malar' | 'mandibula'
   ancora: string           // chave no objeto de âncoras
   ancoraEspelho?: string   // par E/D — espelha o deslocamento lateral
   eixo: 'x' | 'y' | 'z'    // x=lateral, y=vertical, z=profundidade (anatômicos)
