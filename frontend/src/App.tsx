@@ -16,6 +16,7 @@ import { Atendimentos } from './pages/Atendimentos'
 import { Configuracoes } from './pages/Configuracoes'
 import { Clientes } from './pages/Clientes'
 import { Financeiro } from './pages/Financeiro'
+import { FinanceiroAgro } from './pages/FinanceiroAgro'
 import { Studio3D } from './pages/Studio3D'
 import { Admin } from './pages/Admin'
 import { Impersonar } from './pages/Impersonar'
@@ -24,6 +25,11 @@ import { useAuth } from './hooks/useAuth'
 function AgendaPorVertical() {
   const { usuario } = useAuth()
   return usuario?.vertical === 'agro' ? <AgendaAgro /> : <Agenda />
+}
+
+function FinanceiroPorVertical() {
+  const { usuario } = useAuth()
+  return usuario?.vertical === 'agro' ? <FinanceiroAgro /> : <Financeiro />
 }
 
 const queryClient = new QueryClient({
@@ -63,7 +69,7 @@ export default function App() {
               <Route path="/agenda" element={<AgendaPorVertical />} />
               <Route path="/atendimentos" element={<Atendimentos />} />
               <Route path="/clientes" element={<Clientes />} />
-              <Route path="/financeiro" element={<Financeiro />} />
+              <Route path="/financeiro" element={<FinanceiroPorVertical />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
               <Route path="/admin" element={<Admin />} />
             </Route>
