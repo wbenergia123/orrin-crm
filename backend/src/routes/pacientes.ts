@@ -5,7 +5,10 @@ import { StatusPaciente } from '../types'
 
 const router = Router()
 
-const statusValidos: StatusPaciente[] = ['novo', 'em_conversa', 'consulta_agendada', 'cliente', 'frio']
+const STATUS_CLINICA = ['novo', 'em_conversa', 'consulta_agendada', 'cliente', 'frio'] as const
+const STATUS_AGRO = ['reuniao_agendada', 'orcamento_enviado', 'negociacao', 'fechado', 'perdido'] as const
+const TODOS_STATUS = [...STATUS_CLINICA, ...STATUS_AGRO] as const
+const statusValidos = TODOS_STATUS
 
 router.get('/', async (req, res) => {
   let query = supabaseAdmin
@@ -45,7 +48,7 @@ const createSchema = z.object({
   email: z.string().email().optional(),
   cpf: z.string().optional(),
   data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  status: z.enum(['novo', 'em_conversa', 'consulta_agendada', 'cliente', 'frio']).default('novo'),
+  status: z.enum(TODOS_STATUS).default('novo'),
 })
 
 router.post('/', async (req, res) => {
@@ -84,7 +87,7 @@ router.patch('/:id', async (req, res) => {
 
 router.patch('/:id/status', async (req, res) => {
   const schema = z.object({
-    status: z.enum(['novo', 'em_conversa', 'consulta_agendada', 'cliente', 'frio']),
+    status: z.enum(TODOS_STATUS),
   })
   const parsed = schema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }

@@ -1,4 +1,6 @@
-export type StatusPaciente = 'novo' | 'em_conversa' | 'consulta_agendada' | 'cliente' | 'frio'
+export type StatusPaciente =
+  | 'novo' | 'em_conversa' | 'consulta_agendada' | 'cliente' | 'frio'
+  | 'reuniao_agendada' | 'orcamento_enviado' | 'negociacao' | 'fechado' | 'perdido'
 export type StatusAgendamento = 'agendado' | 'confirmado' | 'cancelado' | 'concluido'
 
 export interface Paciente {
@@ -8,6 +10,13 @@ export interface Paciente {
   email: string | null
   cpf: string | null
   status: StatusPaciente
+  produto_interesse_id: string | null
+  valor_estimado: number | null
+  valor_fechado: number | null
+  data_fechamento: string | null
+  cidade: string | null
+  atividade: string | null
+  maquinas: string | null
   ultimo_contato_at: string | null
   created_at: string
   updated_at: string

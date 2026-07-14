@@ -7,6 +7,11 @@ const labels: Record<StatusPaciente, string> = {
   consulta_agendada: 'Consulta Agendada',
   cliente: 'Cliente',
   frio: 'Frio',
+  reuniao_agendada: 'Reunião Agendada',
+  orcamento_enviado: 'Orçamento Enviado',
+  negociacao: 'Negociação',
+  fechado: 'Fechado',
+  perdido: 'Perdido',
 }
 
 const colors: Record<StatusPaciente, string> = {
@@ -15,6 +20,11 @@ const colors: Record<StatusPaciente, string> = {
   consulta_agendada: 'bg-emerald-100 text-emerald-700',
   cliente: 'bg-purple-100 text-purple-700',
   frio: 'bg-gray-100 text-gray-500',
+  reuniao_agendada: 'bg-blue-100 text-blue-700',
+  orcamento_enviado: 'bg-amber-100 text-amber-700',
+  negociacao: 'bg-indigo-100 text-indigo-700',
+  fechado: 'bg-emerald-100 text-emerald-700',
+  perdido: 'bg-gray-100 text-gray-500',
 }
 
 interface Props {
