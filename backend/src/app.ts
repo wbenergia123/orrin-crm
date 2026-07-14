@@ -11,6 +11,7 @@ import authRouter from './routes/auth'
 import injetaveisRouter from './routes/injetaveis'
 import marcacoesRouter from './routes/marcacoes'
 import pacientesRouter from './routes/pacientes'
+import produtosRouter from './routes/produtos'
 import servicosRouter from './routes/servicos'
 import profissionaisRouter from './routes/profissionais'
 import agendamentosRouter from './routes/agendamentos'
@@ -60,6 +61,7 @@ export function createApp() {
 
   // Rotas da clínica (super_admin sem tenant recebe [] para não dar 500)
   app.use('/api/pacientes', requireAuth, blockWritesWhenImpersonating, requireTenant, pacientesRouter)
+  app.use('/api/produtos', requireAuth, blockWritesWhenImpersonating, requireTenant, produtosRouter)
   app.use('/api/servicos', requireAuth, blockWritesWhenImpersonating, requireTenant, servicosRouter)
   app.use('/api/profissionais', requireAuth, blockWritesWhenImpersonating, requireTenant, profissionaisRouter)
   app.use('/api/agendamentos', requireAuth, blockWritesWhenImpersonating, requireTenant, agendamentosRouter)
