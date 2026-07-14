@@ -8,7 +8,7 @@ interface ImpersonatingOrg {
 
 interface AuthState {
   token: string | null
-  usuario: { id: string; email: string; role: string; studio_3d_ativo?: boolean } | null
+  usuario: { id: string; email: string; role: string; studio_3d_ativo?: boolean; vertical?: 'clinica' | 'agro' } | null
   impersonatingOrg: ImpersonatingOrg | null
   login: (token: string, usuario: AuthState['usuario'], impersonatingOrg?: ImpersonatingOrg | null) => void
   logout: () => void

@@ -12,22 +12,26 @@ import {
   Building2,
   DollarSign,
   Box,
+  Package,
   Lock,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { cn } from '@/lib/utils'
 import orrinIcon from '../assets/orrin-icon.png'
 
-const navItems = [
+type NavItem = { to: string; icon: typeof LayoutDashboard; label: string; vertical?: 'clinica' | 'agro'; labelAgro?: string; adminOnly?: boolean; financeiroOnly?: boolean; studio3d?: boolean }
+
+const navItems: NavItem[] = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/pacientes', icon: Kanban, label: 'Pipeline' },
   { to: '/clientes', icon: Users, label: 'Clientes' },
-  { to: '/servicos', icon: Scissors, label: 'Serviços' },
-  { to: '/profissionais', icon: UserCog, label: 'Profissionais' },
+  { to: '/produtos', icon: Package, label: 'Produtos', vertical: 'agro' },
+  { to: '/servicos', icon: Scissors, label: 'Serviços', vertical: 'clinica' },
+  { to: '/profissionais', icon: UserCog, label: 'Profissionais', labelAgro: 'Vendedores' },
   { to: '/agenda', icon: CalendarDays, label: 'Agenda' },
   { to: '/atendimentos', icon: MessageSquare, label: 'Atendimentos' },
   { to: '/financeiro', icon: DollarSign, label: 'Financeiro', financeiroOnly: true },
-  { to: '/studio-3d', icon: Box, label: 'Studio 3D', studio3d: true },
+  { to: '/studio-3d', icon: Box, label: 'Studio 3D', studio3d: true, vertical: 'clinica' },
   { to: '/configuracoes', icon: Settings, label: 'Configurações' },
   { to: '/admin', icon: Building2, label: 'Admin', adminOnly: true },
 ]
@@ -35,7 +39,9 @@ const navItems = [
 export function Sidebar() {
   const { logout, usuario } = useAuth()
 
+  const meuVertical = usuario?.role === 'super_admin' ? 'clinica' : (usuario?.vertical ?? 'clinica')
   const visibleItems = navItems.filter((item) => {
+    if (item.vertical && item.vertical !== meuVertical) return false
     if (item.adminOnly && usuario?.role !== 'super_admin') return false
     if (item.financeiroOnly) {
       return usuario?.role === 'admin' || usuario?.role === 'super_admin'
@@ -55,7 +61,9 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1">
-        {visibleItems.map(({ to, icon: Icon, label, studio3d }) => {
+        {visibleItems.map((item) => {
+          const { to, icon: Icon, studio3d } = item
+          const label = meuVertical === 'agro' && item.labelAgro ? item.labelAgro : item.label
           if (studio3d && !studioLiberado) {
             return (
               <div
