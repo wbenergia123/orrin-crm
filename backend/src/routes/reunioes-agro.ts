@@ -19,12 +19,12 @@ router.get('/', async (req: Request, res: Response) => {
 
 const reuniaoSchema = z.object({
   paciente_id: z.string().uuid(),
-  profissional_id: z.string().uuid().optional(),
+  profissional_id: z.string().uuid().nullable().optional(),
   data_hora: z.string().min(16),
   tipo: z.enum(['presencial', 'virtual']).default('presencial'),
-  link_reuniao: z.string().optional(),
-  local: z.string().optional(),
-  notas: z.string().optional(),
+  link_reuniao: z.string().nullable().optional(),
+  local: z.string().nullable().optional(),
+  notas: z.string().nullable().optional(),
 }).refine((r) => r.tipo !== 'virtual' || !!r.link_reuniao?.trim(), {
   message: 'Reunião virtual exige link_reuniao',
 })

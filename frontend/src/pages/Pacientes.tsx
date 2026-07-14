@@ -205,7 +205,7 @@ export function Pacientes() {
               onClick={async () => {
                 await api.patch(`/pacientes/${fechando.id}`, {
                   valor_fechado: Number(valorFechado),
-                  data_fechamento: new Date().toISOString().slice(0, 10),
+                  data_fechamento: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }),
                 })
                 atualizarStatus({ id: fechando.id, status: 'fechado' })
                 qc.setQueryData<Paciente[]>(['pacientes-kanban'], (prev = []) =>

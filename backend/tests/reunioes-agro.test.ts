@@ -81,3 +81,12 @@ describe('PATCH /api/reunioes-agro/:id', () => {
     expect(res.body.status).toBe('confirmada')
   })
 })
+
+describe('POST /api/reunioes-agro (campos null do modal)', () => {
+  it('cria presencial com local/notas null e sem vendedor (como o modal envia)', async () => {
+    const res = await auth(request(app).post('/api/reunioes-agro'))
+      .send({ paciente_id: pacienteId, profissional_id: null, data_hora: '2026-07-25T10:00:00', tipo: 'presencial', link_reuniao: null, local: null, notas: null })
+    expect(res.status).toBe(201)
+    expect(res.body.tipo).toBe('presencial')
+  })
+})
