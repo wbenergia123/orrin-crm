@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Pacientes } from './pages/Pacientes'
 import { FichaPaciente } from './pages/FichaPaciente'
 import { Servicos } from './pages/Servicos'
+import { Produtos } from './pages/Produtos'
 import { Profissionais } from './pages/Profissionais'
 import { Agenda } from './pages/Agenda'
 import { Atendimentos } from './pages/Atendimentos'
@@ -47,6 +48,9 @@ export default function App() {
                 <Route path="/pacientes/:id" element={<FichaPaciente />} />
                 <Route path="/servicos" element={<Servicos />} />
                 <Route path="/studio-3d" element={<Studio3D />} />
+              </Route>
+              <Route element={<VerticalRoute vertical="agro" />}>
+                <Route path="/produtos" element={<Produtos />} />
               </Route>
               <Route path="/profissionais" element={<Profissionais />} />
               <Route path="/agenda" element={<Agenda />} />

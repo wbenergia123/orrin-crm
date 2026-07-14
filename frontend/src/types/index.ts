@@ -30,6 +30,15 @@ export interface Servico {
   ativo: boolean
 }
 
+export interface Produto {
+  id: string
+  nome: string
+  categoria: string | null
+  descricao: string | null
+  foto_url: string | null
+  ativo: boolean
+}
+
 export interface Profissional {
   id: string
   nome: string
