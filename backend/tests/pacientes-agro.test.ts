@@ -57,3 +57,26 @@ describe('statuses agro em /pacientes', () => {
     expect(res.status).toBe(201)
   })
 })
+
+describe('PATCH /pacientes/:id campos agro', () => {
+  it('aceita valor_fechado e data_fechamento', async () => {
+    const { data: p } = await supabase.from('pacientes')
+      .insert({ tenant_id: tenantId, telefone: '5545999990055' }).select('id').single()
+    const res = await request(app)
+      .patch(`/api/pacientes/${p!.id}`)
+      .set('Authorization', `Bearer ${token}`).set('Host', host)
+      .send({ valor_fechado: 45000, data_fechamento: '2026-07-14' })
+    expect(res.status).toBe(200)
+    await supabase.from('pacientes').delete().eq('id', p!.id)
+  })
+  it('aceita cidade, atividade, maquinas, produto_interesse_id null', async () => {
+    const { data: p } = await supabase.from('pacientes')
+      .insert({ tenant_id: tenantId, telefone: '5545999990056' }).select('id').single()
+    const res = await request(app)
+      .patch(`/api/pacientes/${p!.id}`)
+      .set('Authorization', `Bearer ${token}`).set('Host', host)
+      .send({ cidade: 'Cascavel', atividade: 'soja', maquinas: 'John Deere 6110J', produto_interesse_id: null })
+    expect(res.status).toBe(200)
+    await supabase.from('pacientes').delete().eq('id', p!.id)
+  })
+})

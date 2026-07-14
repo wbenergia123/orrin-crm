@@ -70,6 +70,13 @@ router.patch('/:id', async (req, res) => {
     email: z.string().email().optional(),
     cpf: z.string().optional(),
     data_nascimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    valor_estimado: z.number().nullable().optional(),
+    valor_fechado: z.number().nullable().optional(),
+    data_fechamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    cidade: z.string().nullable().optional(),
+    atividade: z.string().nullable().optional(),
+    maquinas: z.string().nullable().optional(),
+    produto_interesse_id: z.string().uuid().nullable().optional(),
   })
   const parsed = updateSchema.safeParse(req.body)
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
