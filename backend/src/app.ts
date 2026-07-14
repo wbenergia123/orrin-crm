@@ -25,6 +25,7 @@ import financeiroRouter from './routes/financeiro'
 import bloqueiosRouter from './routes/bloqueios'
 import simulacoesRouter from './routes/simulacoes'
 import despesasRouter from './routes/despesas'
+import reunioesAgroRouter from './routes/reunioes-agro'
 import { requireAdminOuSuperAdmin } from './routes/financeiro'
 import { requireAuth, requireTenant, requireSuperAdmin, blockWritesWhenImpersonating, requireStudio3d } from './middleware/auth'
 
@@ -77,6 +78,7 @@ export function createApp() {
   app.use('/api/bloqueios', requireAuth, blockWritesWhenImpersonating, requireTenant, bloqueiosRouter)
   app.use('/api/simulacoes', requireAuth, blockWritesWhenImpersonating, requireTenant, requireStudio3d, simulacoesRouter)
   app.use('/api/despesas', requireAuth, blockWritesWhenImpersonating, requireTenant, requireAdminOuSuperAdmin, despesasRouter)
+  app.use('/api/reunioes-agro', requireAuth, blockWritesWhenImpersonating, requireTenant, reunioesAgroRouter)
 
   // Rotas super admin
   app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)
