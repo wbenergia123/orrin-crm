@@ -16,7 +16,16 @@ interface Metricas {
   leadsNovos: number
   taxaConversao: number
   deltas: { faturamento: number | null; agendamentos: number | null; leads: number | null }
+  // agro
+  vertical?: 'agro'
+  leadsNovosMes?: number
+  reunioesSemana?: number
+  negociosFechadosMes?: number
+  valorFechadoMes?: number
 }
+
+const brl = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
 
 interface PontoDiario { data: string; agendamentos: number; mensagens: number }
 interface StatusItem { status: string; nome: string; count: number; percentual: number; cor: string }
@@ -121,6 +130,38 @@ export function Dashboard() {
 
   // Top 2 status for the donut center
   const topStatus = statusData?.itens[0]
+
+  if (data?.vertical === 'agro') {
+    const agroCards = [
+      { title: 'Leads novos (mês)', value: String(data.leadsNovosMes ?? 0) },
+      { title: 'Reuniões da semana', value: String(data.reunioesSemana ?? 0) },
+      { title: 'Negócios fechados (mês)', value: String(data.negociosFechadosMes ?? 0) },
+      { title: 'Valor fechado (mês)', value: brl(data.valorFechadoMes ?? 0) },
+    ]
+    return (
+      <div className="space-y-5">
+        <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
+          {agroCards.map((card) => (
+            <Card key={card.title} className="border-0 shadow-sm overflow-hidden min-w-0">
+              <CardHeader className="pb-1 pt-4 px-5">
+                <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wide">
+                  {card.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-4">
+                <p className="text-2xl font-bold text-gray-900">
+                  {isLoading
+                    ? <span className="inline-block w-24 h-7 bg-gray-100 animate-pulse rounded" />
+                    : card.value}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">

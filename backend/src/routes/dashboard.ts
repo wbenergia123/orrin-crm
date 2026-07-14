@@ -1,6 +1,7 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { supabaseAdmin } from '../services/supabase'
 import { agoraComoTextoLocal, somarMinutosTextoLocal } from '../lib/datetime-local'
+import { getVerticalDoTenant } from '../lib/vertical'
 
 const router = Router()
 
@@ -39,8 +40,44 @@ function limitesDoMes() {
   return { local, utc }
 }
 
+async function metricasAgro(req: Request, res: Response) {
+  const tenant = req.user!.tenant_id!
+  const { local, utc } = limitesDoMes()
+
+  const hoje = new Date(agoraComoTextoLocal())
+  const diaSemana = (hoje.getDay() + 6) % 7
+  const segunda = new Date(hoje); segunda.setDate(hoje.getDate() - diaSemana)
+  const domingo = new Date(segunda); domingo.setDate(segunda.getDate() + 6)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+
+  const [leads, reunioes, fechados] = await Promise.all([
+    supabaseAdmin.from('pacientes').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenant).gte('created_at', utc.inicioMes).lte('created_at', utc.fimMes),
+    supabaseAdmin.from('reunioes_agro').select('id')
+      .eq('tenant_id', tenant).neq('status', 'cancelada')
+      .gte('data_hora', `${fmt(segunda)}T00:00:00`).lte('data_hora', `${fmt(domingo)}T23:59:59`),
+    supabaseAdmin.from('pacientes').select('valor_fechado')
+      .eq('tenant_id', tenant).eq('status', 'fechado')
+      .gte('data_fechamento', local.inicioMes.slice(0, 10)).lte('data_fechamento', local.fimMes.slice(0, 10)),
+  ])
+
+  const valorFechadoMes = (fechados.data ?? []).reduce((s, p) => s + Number(p.valor_fechado ?? 0), 0)
+
+  res.json({
+    vertical: 'agro',
+    leadsNovosMes: leads.count ?? 0,
+    reunioesSemana: (reunioes.data ?? []).length,
+    negociosFechadosMes: (fechados.data ?? []).length,
+    valorFechadoMes,
+  })
+}
+
 router.get('/metricas', async (req, res) => {
   if (!req.user!.tenant_id) { res.json(emptyMetrics); return }
+
+  const vertical = await getVerticalDoTenant(req.user!.tenant_id)
+  if (vertical === 'agro') return metricasAgro(req, res)
 
   const { local, utc } = limitesDoMes()
   const { inicioMes, fimMes, inicioMesAnt, fimMesAnt } = local
