@@ -72,6 +72,20 @@ export interface BloqueioAgenda {
   profissional?: { id: string; nome: string }
 }
 
+export interface ReuniaoAgro {
+  id: string
+  paciente_id: string
+  profissional_id: string | null
+  data_hora: string
+  tipo: 'presencial' | 'virtual'
+  link_reuniao: string | null
+  local: string | null
+  status: 'agendada' | 'confirmada' | 'cancelada' | 'realizada'
+  notas: string | null
+  pacientes?: { id: string; nome: string | null; telefone: string }
+  profissionais?: { id: string; nome: string }
+}
+
 export interface Conversa {
   id: string
   paciente_id: string

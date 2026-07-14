@@ -11,6 +11,7 @@ import { Servicos } from './pages/Servicos'
 import { Produtos } from './pages/Produtos'
 import { Profissionais } from './pages/Profissionais'
 import { Agenda } from './pages/Agenda'
+import { AgendaAgro } from './pages/AgendaAgro'
 import { Atendimentos } from './pages/Atendimentos'
 import { Configuracoes } from './pages/Configuracoes'
 import { Clientes } from './pages/Clientes'
@@ -18,6 +19,12 @@ import { Financeiro } from './pages/Financeiro'
 import { Studio3D } from './pages/Studio3D'
 import { Admin } from './pages/Admin'
 import { Impersonar } from './pages/Impersonar'
+import { useAuth } from './hooks/useAuth'
+
+function AgendaPorVertical() {
+  const { usuario } = useAuth()
+  return usuario?.vertical === 'agro' ? <AgendaAgro /> : <Agenda />
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,7 +60,7 @@ export default function App() {
                 <Route path="/produtos" element={<Produtos />} />
               </Route>
               <Route path="/profissionais" element={<Profissionais />} />
-              <Route path="/agenda" element={<Agenda />} />
+              <Route path="/agenda" element={<AgendaPorVertical />} />
               <Route path="/atendimentos" element={<Atendimentos />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/financeiro" element={<Financeiro />} />
