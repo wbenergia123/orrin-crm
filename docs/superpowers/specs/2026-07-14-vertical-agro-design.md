@@ -1,7 +1,7 @@
 # Vertical Agro (tenant Agrokhan) — Orrin CRM
 
 **Data:** 2026-07-14
-**Status:** Em avaliação (rev. 2 — corrigida após revisão de código: agro roda sobre `pacientes`, não sobre a tabela vestigial `clientes`)
+**Status:** Implementado (v1) — branch `feat/vertical-agro`. 10 arquivos de teste novos passando; suíte sem falhas novas em relação ao baseline.
 **Decisão base:** NÃO clonar o repo. A Agrokhan entra como tenant do vertical `agro` no mesmo codebase multi-tenant.
 
 ---
