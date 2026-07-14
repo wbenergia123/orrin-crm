@@ -24,6 +24,8 @@ import imagensReferenciaRouter from './routes/imagens-referencia'
 import financeiroRouter from './routes/financeiro'
 import bloqueiosRouter from './routes/bloqueios'
 import simulacoesRouter from './routes/simulacoes'
+import despesasRouter from './routes/despesas'
+import { requireAdminOuSuperAdmin } from './routes/financeiro'
 import { requireAuth, requireTenant, requireSuperAdmin, blockWritesWhenImpersonating, requireStudio3d } from './middleware/auth'
 
 if (!process.env.JWT_SECRET) {
@@ -74,6 +76,7 @@ export function createApp() {
   app.use('/api/imagens-referencia', requireAuth, blockWritesWhenImpersonating, requireTenant, imagensReferenciaRouter)
   app.use('/api/bloqueios', requireAuth, blockWritesWhenImpersonating, requireTenant, bloqueiosRouter)
   app.use('/api/simulacoes', requireAuth, blockWritesWhenImpersonating, requireTenant, requireStudio3d, simulacoesRouter)
+  app.use('/api/despesas', requireAuth, blockWritesWhenImpersonating, requireTenant, requireAdminOuSuperAdmin, despesasRouter)
 
   // Rotas super admin
   app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)
