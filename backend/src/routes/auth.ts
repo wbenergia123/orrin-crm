@@ -46,11 +46,11 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Usuário desativado. Entre em contato com o suporte.' })
   }
 
-  let org: { ativo: boolean; studio_3d_ativo: boolean } | null = null
+  let org: { ativo: boolean; studio_3d_ativo: boolean; vertical: string } | null = null
   if (usuario.role !== 'super_admin' && usuario.tenant_id) {
     const { data } = await supabaseAdmin
       .from('organizacoes')
-      .select('ativo, studio_3d_ativo')
+      .select('ativo, studio_3d_ativo, vertical')
       .eq('id', usuario.tenant_id)
       .single()
     org = data
@@ -76,6 +76,7 @@ router.post('/login', async (req: Request, res: Response) => {
       email: usuario.email,
       role: usuario.role,
       studio_3d_ativo: usuario.role === 'super_admin' ? true : (org?.studio_3d_ativo ?? false),
+      vertical: usuario.role === 'super_admin' ? 'clinica' : (org?.vertical ?? 'clinica'),
     },
   })
 })
@@ -99,16 +100,18 @@ router.get('/me', async (req: Request, res: Response) => {
     }
 
     let studio3d = usuario.role === 'super_admin'
+    let vertical = 'clinica'
     if (usuario.role !== 'super_admin' && usuario.tenant_id) {
       const { data: org } = await supabaseAdmin
         .from('organizacoes')
-        .select('studio_3d_ativo')
+        .select('studio_3d_ativo, vertical')
         .eq('id', usuario.tenant_id)
         .single()
       studio3d = org?.studio_3d_ativo ?? false
+      vertical = org?.vertical ?? 'clinica'
     }
 
-    res.json({ usuario: { ...usuario, studio_3d_ativo: studio3d } })
+    res.json({ usuario: { ...usuario, studio_3d_ativo: studio3d, vertical } })
   } catch {
     res.status(401).json({ error: 'Token inválido ou expirado' })
   }
