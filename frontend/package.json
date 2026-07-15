@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",
+    "@fontsource/poppins": "^5.2.7",
     "@hello-pangea/dnd": "^18.0.1",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",

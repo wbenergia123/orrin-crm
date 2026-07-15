@@ -1,5 +1,8 @@
 @import "tw-animate-css";
-@import "@fontsource-variable/geist";
+@import "@fontsource/poppins/400.css";
+@import "@fontsource/poppins/500.css";
+@import "@fontsource/poppins/600.css";
+@import "@fontsource/poppins/700.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,7 +10,7 @@
 @layer base {
   .theme {
     --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif
+    --font-sans: 'Poppins', sans-serif
   }
   :root {
     --background: oklch(1 0 0);
