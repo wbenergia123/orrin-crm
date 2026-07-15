@@ -1,14 +1,16 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Search, UserPlus, ChevronRight, Phone, CreditCard, ArrowUpDown } from 'lucide-react'
 import { api } from '../api/client'
 import { parseUtcTimestamp } from '../lib/utils'
-import type { Paciente } from '../types'
+import type { Paciente, StatusPaciente } from '../types'
 import { StatusBadge } from '../components/StatusBadge'
 import { NovoPacienteModal } from '../components/NovoPacienteModal'
+import { ConversaPanel } from '../components/ConversaPanel'
+import { useAuth } from '../hooks/useAuth'
 
 const GRADIENTS = [
   ['#7c3aed', '#a855f7'], ['#2563eb', '#60a5fa'], ['#059669', '#34d399'],
@@ -63,11 +65,21 @@ function ordenar(lista: Paciente[], ord: Ordenacao): Paciente[] {
 
 export function Clientes() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
+  const { usuario } = useAuth()
   const [busca, setBusca] = useState('')
   const [buscaAtiva, setBuscaAtiva] = useState('')
   const [novoOpen, setNovoOpen] = useState(false)
   const [ordenacao, setOrdenacao] = useState<Ordenacao>('recentes')
   const [dropdownOrdem, setDropdownOrdem] = useState(false)
+  const [selecionado, setSelecionado] = useState<Paciente | null>(null)
+
+  const handleStatusChange = (status: StatusPaciente) => {
+    if (!selecionado) return
+    api.patch(`/pacientes/${selecionado.id}/status`, { status })
+    setSelecionado((prev) => (prev ? { ...prev, status } : null))
+    qc.invalidateQueries({ queryKey: ['clientes'] })
+  }
 
   const { data: pacientes = [], isLoading } = useQuery<Paciente[]>({
     queryKey: ['clientes', buscaAtiva],
@@ -177,7 +189,7 @@ export function Clientes() {
                     return (
                       <button
                         key={p.id}
-                        onClick={() => navigate(`/pacientes/${p.id}`)}
+                        onClick={() => usuario?.vertical === 'agro' ? setSelecionado(p) : navigate(`/pacientes/${p.id}`)}
                         className="w-full grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors text-left items-center group"
                       >
                         {/* Nome + avatar */}
@@ -256,6 +268,14 @@ export function Clientes() {
         onClose={() => setNovoOpen(false)}
         onSuccess={() => setNovoOpen(false)}
       />
+
+      {selecionado && (
+        <ConversaPanel
+          paciente={selecionado}
+          onClose={() => setSelecionado(null)}
+          onStatusChange={handleStatusChange}
+        />
+      )}
     </div>
   )
 }

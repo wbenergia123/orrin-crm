@@ -1,4 +1,6 @@
-export type StatusPaciente = 'novo' | 'em_conversa' | 'consulta_agendada' | 'cliente' | 'frio'
+export type StatusPaciente =
+  | 'novo' | 'em_conversa' | 'consulta_agendada' | 'cliente' | 'frio'
+  | 'reuniao_agendada' | 'orcamento_enviado' | 'negociacao' | 'fechado' | 'perdido'
 export type StatusAgendamento = 'agendado' | 'confirmado' | 'cancelado' | 'concluido'
 
 export interface Paciente {
@@ -8,6 +10,13 @@ export interface Paciente {
   email: string | null
   cpf: string | null
   status: StatusPaciente
+  produto_interesse_id: string | null
+  valor_estimado: number | null
+  valor_fechado: number | null
+  data_fechamento: string | null
+  cidade: string | null
+  atividade: string | null
+  maquinas: string | null
   ultimo_contato_at: string | null
   created_at: string
   updated_at: string
@@ -18,6 +27,15 @@ export interface Servico {
   nome: string
   preco: number
   duracao_minutos: number
+  ativo: boolean
+}
+
+export interface Produto {
+  id: string
+  nome: string
+  categoria: string | null
+  descricao: string | null
+  foto_url: string | null
   ativo: boolean
 }
 
@@ -52,6 +70,20 @@ export interface BloqueioAgenda {
   created_by: string | null
   created_at: string
   profissional?: { id: string; nome: string }
+}
+
+export interface ReuniaoAgro {
+  id: string
+  paciente_id: string
+  profissional_id: string | null
+  data_hora: string
+  tipo: 'presencial' | 'virtual'
+  link_reuniao: string | null
+  local: string | null
+  status: 'agendada' | 'confirmada' | 'cancelada' | 'realizada'
+  notas: string | null
+  pacientes?: { id: string; nome: string | null; telefone: string }
+  profissionais?: { id: string; nome: string }
 }
 
 export interface Conversa {

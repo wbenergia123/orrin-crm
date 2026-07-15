@@ -16,6 +16,7 @@ interface Tenant {
   ativo: boolean
   created_at: string
   studio_3d_ativo: boolean
+  vertical: string
 }
 
 export function Admin() {
@@ -26,6 +27,7 @@ export function Admin() {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
+  const [vertical, setVertical] = useState<'clinica' | 'agro'>('clinica')
   const [criado, setCriado] = useState<{ url: string; email: string; senha: string } | null>(null)
   const [confirmandoId, setConfirmandoId] = useState<string | null>(null)
   const [confirmTexto, setConfirmTexto] = useState('')
@@ -79,6 +81,7 @@ export function Admin() {
         admin_senha: senha || undefined,
         uazapi_url: uazapiUrlCriacao || undefined,
         uazapi_token: uazapiTokenCriacao || undefined,
+        vertical,
       })).data,
     onSuccess: (data) => {
       setCriado({ url: data.url, email: data.admin_email, senha: data.admin_senha })
@@ -86,6 +89,7 @@ export function Admin() {
       setNome('')
       setEmail('')
       setSenha('')
+      setVertical('clinica')
       setUazapiUrlCriacao('')
       setUazapiTokenCriacao('')
       qc.invalidateQueries({ queryKey: ['admin-tenants'] })
@@ -207,6 +211,18 @@ export function Admin() {
                 placeholder="padrão: senha123"
               />
             </div>
+            <div className="space-y-1">
+              <Label htmlFor="vertical">Vertical</Label>
+              <select
+                id="vertical"
+                value={vertical}
+                onChange={(e) => setVertical(e.target.value as 'clinica' | 'agro')}
+                className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="clinica">Clínica</option>
+                <option value="agro">Agro</option>
+              </select>
+            </div>
             <div className="space-y-1 md:col-span-2">
               <Label htmlFor="uazapi-url">URL da instância UAZAPI (opcional)</Label>
               <Input
@@ -259,7 +275,12 @@ export function Admin() {
                 <div key={t.id} className="py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-medium text-gray-800">{t.nome}</p>
+                    <p className="font-medium text-gray-800 flex items-center gap-2">
+                      {t.nome}
+                      {t.vertical === 'agro' && (
+                        <span className="text-[10px] font-semibold uppercase bg-green-100 text-green-700 rounded px-1.5 py-0.5">Agro</span>
+                      )}
+                    </p>
                     <p className="text-xs text-gray-400">
                       {t.slug}.orrin.com.br · {parseUtcTimestamp(t.created_at).toLocaleDateString('pt-BR')}
                     </p>

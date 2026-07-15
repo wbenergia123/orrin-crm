@@ -14,6 +14,11 @@ const stepOrder: Record<StatusPaciente, number> = {
   consulta_agendada: 2,
   cliente: 3,
   frio: -1,
+  reuniao_agendada: -1,
+  orcamento_enviado: -1,
+  negociacao: -1,
+  fechado: -1,
+  perdido: -1,
 }
 
 interface Props {

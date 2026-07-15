@@ -251,4 +251,32 @@ router.get('/por-profissional', async (req, res) => {
   res.json([...map.values()].sort((a, b) => b.receita - a.receita))
 })
 
+router.get('/agro', requireAdminOuSuperAdmin, async (req: Request, res: Response) => {
+  const inicio = (req.query.inicio as string) || agoraComoTextoLocal().slice(0, 8) + '01'
+  const fim = (req.query.fim as string) || agoraComoTextoLocal().slice(0, 10)
+
+  const { data, error } = await supabaseAdmin
+    .from('pacientes')
+    .select('id, nome, telefone, valor_fechado, data_fechamento, produto_interesse_id, produtos:produto_interesse_id(nome)')
+    .eq('tenant_id', req.user!.tenant_id)
+    .eq('status', 'fechado')
+    .gte('data_fechamento', inicio)
+    .lte('data_fechamento', fim)
+    .order('data_fechamento', { ascending: false })
+  if (error) return res.status(500).json({ error: error.message })
+
+  const fechamentos = (data ?? []).map((p) => ({
+    id: p.id,
+    nome: p.nome ?? p.telefone,
+    valor_fechado: Number(p.valor_fechado ?? 0),
+    data_fechamento: p.data_fechamento,
+    produto: (p.produtos as unknown as { nome: string } | null)?.nome ?? null,
+  }))
+
+  res.json({
+    totalReceitas: fechamentos.reduce((s, f) => s + f.valor_fechado, 0),
+    fechamentos,
+  })
+})
+
 export default router

@@ -10,6 +10,11 @@ const STATUS_LABELS: Record<StatusPaciente, string> = {
   consulta_agendada: 'Agendado',
   cliente: 'Cliente',
   frio: 'Frio',
+  reuniao_agendada: 'Reunião Agendada',
+  orcamento_enviado: 'Orçamento Enviado',
+  negociacao: 'Negociação',
+  fechado: 'Fechado',
+  perdido: 'Perdido',
 }
 
 const STATUS_ACTIVE_CLASS: Record<StatusPaciente, string> = {
@@ -18,6 +23,11 @@ const STATUS_ACTIVE_CLASS: Record<StatusPaciente, string> = {
   consulta_agendada: 'bg-blue-600 text-white',
   cliente: 'bg-emerald-600 text-white',
   frio: 'bg-gray-500 text-white',
+  reuniao_agendada: 'bg-blue-600 text-white',
+  orcamento_enviado: 'bg-amber-500 text-white',
+  negociacao: 'bg-indigo-600 text-white',
+  fechado: 'bg-emerald-600 text-white',
+  perdido: 'bg-gray-500 text-white',
 }
 
 interface StatusPillsProps {

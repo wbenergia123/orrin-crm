@@ -7,19 +7,40 @@ import type { Paciente, StatusPaciente } from '../types'
 import { PatientCard } from '../components/PatientCard'
 import { ConversaPanel } from '../components/ConversaPanel'
 import { NovoPacienteModal } from '../components/NovoPacienteModal'
+import { useAuth } from '../hooks/useAuth'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
-const COLUMNS: { id: StatusPaciente; label: string; color: string }[] = [
-  { id: 'novo',               label: 'Novo',        color: '#8b5cf6' },
-  { id: 'em_conversa',        label: 'Em Conversa', color: '#f59e0b' },
-  { id: 'consulta_agendada',  label: 'Agendado',    color: '#3b82f6' },
-  { id: 'cliente',            label: 'Cliente',     color: '#10b981' },
-  { id: 'frio',               label: 'Frio',        color: '#9ca3af' },
+const COLUMNS_CLINICA: { id: StatusPaciente; label: string; color: string }[] = [
+  { id: 'novo',              label: 'Novo',        color: '#8b5cf6' },
+  { id: 'em_conversa',       label: 'Em Conversa', color: '#f59e0b' },
+  { id: 'consulta_agendada', label: 'Agendado',    color: '#3b82f6' },
+  { id: 'cliente',           label: 'Cliente',     color: '#10b981' },
+  { id: 'frio',              label: 'Frio',        color: '#9ca3af' },
+]
+const COLUMNS_AGRO: { id: StatusPaciente; label: string; color: string }[] = [
+  { id: 'novo',              label: 'Novo',            color: '#8b5cf6' },
+  { id: 'em_conversa',       label: 'Em Conversa',     color: '#f59e0b' },
+  { id: 'reuniao_agendada',  label: 'Reunião Marcada', color: '#3b82f6' },
+  { id: 'orcamento_enviado', label: 'Orçamento',       color: '#06b6d4' },
+  { id: 'negociacao',        label: 'Negociação',      color: '#f97316' },
+  { id: 'fechado',           label: 'Fechado',         color: '#10b981' },
+  { id: 'perdido',           label: 'Perdido',         color: '#9ca3af' },
 ]
 
 export function Pacientes() {
   const qc = useQueryClient()
+  const { usuario } = useAuth()
+  const vertical = usuario?.vertical ?? 'clinica'
+  const COLUMNS = vertical === 'agro' ? COLUMNS_AGRO : COLUMNS_CLINICA
   const [selecionado, setSelecionado] = useState<Paciente | null>(null)
   const [modalNovoPaciente, setModalNovoPaciente] = useState(false)
+  const [fechando, setFechando] = useState<{ id: string; nome: string | null } | null>(null)
+  const [valorFechado, setValorFechado] = useState('')
 
   const { data: pacientes = [] } = useQuery<Paciente[]>({
     queryKey: ['pacientes-kanban'],
@@ -45,6 +66,11 @@ export function Pacientes() {
 
     const paciente = pacientes.find((p) => p.id === pacienteId)
     if (!paciente || paciente.status === novoStatus) return
+
+    if (novoStatus === 'fechado') {
+      setFechando({ id: pacienteId, nome: paciente.nome ?? null })
+      return
+    }
 
     // Atualização otimista
     qc.setQueryData<Paciente[]>(['pacientes-kanban'], (prev = []) =>
@@ -84,7 +110,7 @@ export function Pacientes() {
             onClick={() => setModalNovoPaciente(true)}
             className="flex items-center gap-1.5 bg-violet-600 text-white px-3.5 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors"
           >
-            <Plus size={15} /> Novo paciente
+            <Plus size={15} /> {vertical === 'agro' ? 'Novo cliente' : 'Novo paciente'}
           </button>
         </div>
 
@@ -167,6 +193,29 @@ export function Pacientes() {
         onClose={() => setModalNovoPaciente(false)}
         onSuccess={(p) => setSelecionado(p)}
       />
+
+      {fechando && (
+        <Dialog open onOpenChange={() => { setFechando(null); setValorFechado('') }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Fechar negócio — {fechando.nome ?? 'cliente'}</DialogTitle></DialogHeader>
+            <Label htmlFor="valor-fechado">Valor fechado (R$)</Label>
+            <Input id="valor-fechado" type="number" min="0" step="0.01" value={valorFechado} onChange={(e) => setValorFechado(e.target.value)} autoFocus />
+            <Button
+              disabled={!valorFechado || Number(valorFechado) <= 0}
+              onClick={async () => {
+                await api.patch(`/pacientes/${fechando.id}`, {
+                  valor_fechado: Number(valorFechado),
+                  data_fechamento: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }),
+                })
+                atualizarStatus({ id: fechando.id, status: 'fechado' })
+                qc.setQueryData<Paciente[]>(['pacientes-kanban'], (prev = []) =>
+                  prev.map((p) => p.id === fechando.id ? { ...p, status: 'fechado' } : p))
+                setFechando(null); setValorFechado('')
+              }}
+            >Confirmar fechamento</Button>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

@@ -8,6 +8,8 @@ import { api } from '../api/client'
 import type { Paciente, Conversa, StatusPaciente } from '../types'
 import { StatusPills } from './StatusPills'
 import { NovoAgendamentoModal } from './NovoAgendamentoModal'
+import { FichaAgro } from './FichaAgro'
+import { useAuth } from '../hooks/useAuth'
 import { parseUtcTimestamp } from '../lib/utils'
 
 interface ConversaPanelProps {
@@ -19,6 +21,7 @@ interface ConversaPanelProps {
 export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPanelProps) {
   const qc = useQueryClient()
   const navigate = useNavigate()
+  const { usuario } = useAuth()
   const chatEndRef = useRef<HTMLDivElement>(null)
   const [mensagem, setMensagem] = useState('')
   const [modalAgendamento, setModalAgendamento] = useState(false)
@@ -103,6 +106,8 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
       <div className="px-5 py-3 border-b border-gray-100 flex-shrink-0">
         <StatusPills status={paciente.status} onStatusChange={onStatusChange} />
       </div>
+
+      {usuario?.vertical === 'agro' && <FichaAgro paciente={paciente} />}
 
       {/* Chat history */}
       <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3">

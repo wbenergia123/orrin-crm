@@ -11,6 +11,7 @@ import authRouter from './routes/auth'
 import injetaveisRouter from './routes/injetaveis'
 import marcacoesRouter from './routes/marcacoes'
 import pacientesRouter from './routes/pacientes'
+import produtosRouter from './routes/produtos'
 import servicosRouter from './routes/servicos'
 import profissionaisRouter from './routes/profissionais'
 import agendamentosRouter from './routes/agendamentos'
@@ -23,6 +24,9 @@ import imagensReferenciaRouter from './routes/imagens-referencia'
 import financeiroRouter from './routes/financeiro'
 import bloqueiosRouter from './routes/bloqueios'
 import simulacoesRouter from './routes/simulacoes'
+import despesasRouter from './routes/despesas'
+import reunioesAgroRouter from './routes/reunioes-agro'
+import { requireAdminOuSuperAdmin } from './routes/financeiro'
 import { requireAuth, requireTenant, requireSuperAdmin, blockWritesWhenImpersonating, requireStudio3d } from './middleware/auth'
 
 if (!process.env.JWT_SECRET) {
@@ -60,6 +64,7 @@ export function createApp() {
 
   // Rotas da clínica (super_admin sem tenant recebe [] para não dar 500)
   app.use('/api/pacientes', requireAuth, blockWritesWhenImpersonating, requireTenant, pacientesRouter)
+  app.use('/api/produtos', requireAuth, blockWritesWhenImpersonating, requireTenant, produtosRouter)
   app.use('/api/servicos', requireAuth, blockWritesWhenImpersonating, requireTenant, servicosRouter)
   app.use('/api/profissionais', requireAuth, blockWritesWhenImpersonating, requireTenant, profissionaisRouter)
   app.use('/api/agendamentos', requireAuth, blockWritesWhenImpersonating, requireTenant, agendamentosRouter)
@@ -72,6 +77,8 @@ export function createApp() {
   app.use('/api/imagens-referencia', requireAuth, blockWritesWhenImpersonating, requireTenant, imagensReferenciaRouter)
   app.use('/api/bloqueios', requireAuth, blockWritesWhenImpersonating, requireTenant, bloqueiosRouter)
   app.use('/api/simulacoes', requireAuth, blockWritesWhenImpersonating, requireTenant, requireStudio3d, simulacoesRouter)
+  app.use('/api/despesas', requireAuth, blockWritesWhenImpersonating, requireTenant, requireAdminOuSuperAdmin, despesasRouter)
+  app.use('/api/reunioes-agro', requireAuth, blockWritesWhenImpersonating, requireTenant, reunioesAgroRouter)
 
   // Rotas super admin
   app.use('/api/admin', requireAuth, requireSuperAdmin, adminRouter)

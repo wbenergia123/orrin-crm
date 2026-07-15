@@ -6,6 +6,7 @@ import { supabaseAdmin } from '../services/supabase'
 import { validarSlug } from '../lib/slug'
 import { logAdminAction } from '../middleware/auth'
 import { invalidarCachePrompt } from '../lib/claude-agent'
+import { invalidarCacheVertical } from '../lib/vertical'
 import { desbloquearEmail, statusEmail } from '../lib/rate-limiter'
 
 const router = Router()
@@ -13,7 +14,7 @@ const router = Router()
 router.get('/tenants', async (req: Request, res: Response) => {
   const { data, error } = await supabaseAdmin
     .from('organizacoes')
-    .select('id, slug, nome, ativo, created_at, studio_3d_ativo, studio_3d_limite_creditos_mes')
+    .select('id, slug, nome, ativo, created_at, studio_3d_ativo, studio_3d_limite_creditos_mes, vertical')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
@@ -22,7 +23,7 @@ router.get('/tenants', async (req: Request, res: Response) => {
 })
 
 router.post('/tenants', async (req: Request, res: Response) => {
-  const { slug, nome, admin_email, admin_senha, uazapi_url, uazapi_token } = req.body
+  const { slug, nome, admin_email, admin_senha, uazapi_url, uazapi_token, vertical } = req.body
 
   if (!slug || !nome || !admin_email) {
     return res.status(400).json({ error: 'slug, nome e admin_email são obrigatórios' })
@@ -34,13 +35,18 @@ router.post('/tenants', async (req: Request, res: Response) => {
     return res.status(400).json({ error: err.message })
   }
 
+  const verticalFinal = vertical ?? 'clinica'
+  if (!['clinica', 'agro'].includes(verticalFinal)) {
+    return res.status(400).json({ error: "vertical deve ser 'clinica' ou 'agro'" })
+  }
+
   const senha = typeof admin_senha === 'string' && admin_senha.trim()
     ? admin_senha.trim()
     : 'senha123'
 
   const { data: org, error: orgError } = await supabaseAdmin
     .from('organizacoes')
-    .insert({ slug: slug.toLowerCase(), nome })
+    .insert({ slug: slug.toLowerCase(), nome, vertical: verticalFinal })
     .select()
     .single()
 
@@ -92,7 +98,7 @@ router.post('/tenants', async (req: Request, res: Response) => {
   await logAdminAction(req.user!.id, 'create_org', org.id, { slug, nome, admin_email })
 
   res.status(201).json({
-    org: { id: org.id, slug: org.slug, nome: org.nome },
+    org: { id: org.id, slug: org.slug, nome: org.nome, vertical: org.vertical },
     url: `https://${slug}.orrin.com.br`,
     admin_email: admin_email.toLowerCase().trim(),
     admin_senha: senha,
@@ -101,7 +107,7 @@ router.post('/tenants', async (req: Request, res: Response) => {
 
 router.patch('/tenants/:id', async (req: Request, res: Response) => {
   const { id } = req.params
-  const { ativo, studio_3d_ativo, studio_3d_limite_creditos_mes } = req.body
+  const { ativo, studio_3d_ativo, studio_3d_limite_creditos_mes, vertical } = req.body
 
   const updates: Record<string, unknown> = {}
   if (typeof ativo === 'boolean') updates.ativo = ativo
@@ -109,6 +115,7 @@ router.patch('/tenants/:id', async (req: Request, res: Response) => {
   if (Number.isInteger(studio_3d_limite_creditos_mes) && studio_3d_limite_creditos_mes >= 0) {
     updates.studio_3d_limite_creditos_mes = studio_3d_limite_creditos_mes
   }
+  if (vertical === 'clinica' || vertical === 'agro') updates.vertical = vertical
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: 'Nenhum campo válido para atualizar' })
   }
@@ -121,6 +128,8 @@ router.patch('/tenants/:id', async (req: Request, res: Response) => {
     .single()
 
   if (error) return res.status(400).json({ error: error.message })
+
+  if (updates.vertical) invalidarCacheVertical(id)
 
   await logAdminAction(req.user!.id, 'update_org', id, updates)
 
