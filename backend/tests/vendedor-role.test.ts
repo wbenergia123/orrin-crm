@@ -138,4 +138,33 @@ describe('vendedor — acesso bloqueado', () => {
     const res = await asVendedor(request(app).get('/api/despesas'))
     expect(res.status).toBe(403)
   })
+
+  // Brechas encontradas na auditoria de 2026-07-16 — cada uma vira asserção permanente.
+  it('não conecta nem desconecta o WhatsApp do tenant (mas lê contact-photo)', async () => {
+    const conectar = await asVendedor(request(app).post('/api/whatsapp/connect'))
+    expect(conectar.status).toBe(403)
+    const desconectar = await asVendedor(request(app).post('/api/whatsapp/disconnect'))
+    expect(desconectar.status).toBe(403)
+    const foto = await asVendedor(request(app).get('/api/whatsapp/contact-photo?phone=5545999990000'))
+    expect(foto.status).toBe(200)
+  })
+
+  it('não lê nem edita regras de follow-up', async () => {
+    const res = await asVendedor(request(app).get('/api/followup/regras'))
+    expect(res.status).toBe(403)
+  })
+
+  it('não acessa Serviços nem Agendamentos (rotas de clínica)', async () => {
+    const servicos = await asVendedor(request(app).get('/api/servicos'))
+    expect(servicos.status).toBe(403)
+    const agendamentos = await asVendedor(request(app).get('/api/agendamentos'))
+    expect(agendamentos.status).toBe(403)
+  })
+
+  it('não acessa imagens-referencia, injetáveis nem rotas legadas', async () => {
+    for (const rota of ['/api/imagens-referencia', '/api/injetaveis', '/api/clientes', '/api/reunioes']) {
+      const res = await asVendedor(request(app).get(rota))
+      expect(res.status, rota).toBe(403)
+    }
+  })
 })
