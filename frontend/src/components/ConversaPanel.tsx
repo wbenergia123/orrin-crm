@@ -70,13 +70,15 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
             Conversa
           </span>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate(`/pacientes/${paciente.id}`)}
-              className="text-gray-400 hover:text-gray-600"
-              title="Ver ficha completa"
-            >
-              <ExternalLink size={14} />
-            </button>
+            {usuario?.vertical !== 'agro' && (
+              <button
+                onClick={() => navigate(`/pacientes/${paciente.id}`)}
+                className="text-gray-400 hover:text-gray-600"
+                title="Ver ficha completa"
+              >
+                <ExternalLink size={14} />
+              </button>
+            )}
             <button
               onClick={() => setModalAgendamento(true)}
               className="text-gray-400 hover:text-gray-600"

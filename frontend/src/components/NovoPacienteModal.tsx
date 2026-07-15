@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useAuth } from '../hooks/useAuth'
 import type { Paciente } from '../types'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -17,6 +18,8 @@ interface NovoPacienteModalProps {
 
 export function NovoPacienteModal({ open, onClose, onSuccess }: NovoPacienteModalProps) {
   const qc = useQueryClient()
+  const { usuario } = useAuth()
+  const termo = usuario?.vertical === 'agro' ? 'Cliente' : 'Paciente'
   const [nome, setNome] = useState('')
   const [telefone, setTelefone] = useState('')
   const [cpf, setCpf] = useState('')
@@ -55,7 +58,7 @@ export function NovoPacienteModal({ open, onClose, onSuccess }: NovoPacienteModa
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Novo Paciente</DialogTitle>
+          <DialogTitle>Novo {termo}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-1">
           <div className="space-y-1">

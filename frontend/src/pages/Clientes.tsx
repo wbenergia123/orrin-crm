@@ -67,6 +67,8 @@ export function Clientes() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { usuario } = useAuth()
+  const isAgro = usuario?.vertical === 'agro'
+  const termo = isAgro ? 'cliente' : 'paciente'
   const [busca, setBusca] = useState('')
   const [buscaAtiva, setBuscaAtiva] = useState('')
   const [novoOpen, setNovoOpen] = useState(false)
@@ -102,13 +104,13 @@ export function Clientes() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">Clientes</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{pacientes.length} pacientes cadastrados</p>
+          <p className="text-sm text-gray-400 mt-0.5">{pacientes.length} {termo}s cadastrados</p>
         </div>
         <button
           onClick={() => setNovoOpen(true)}
           className="flex items-center gap-1.5 bg-violet-600 text-white px-3.5 py-2 rounded-lg text-sm font-medium hover:bg-violet-700 transition-colors"
         >
-          <UserPlus size={15} /> Novo paciente
+          <UserPlus size={15} /> Novo {termo}
         </button>
       </div>
 
@@ -160,7 +162,7 @@ export function Clientes() {
             <div className="min-w-[640px]">
               {/* Table header */}
               <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 border-b border-gray-100 bg-gray-50">
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Paciente</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{isAgro ? 'Cliente' : 'Paciente'}</span>
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Telefone</span>
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">CPF</span>
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</span>
@@ -250,7 +252,7 @@ export function Clientes() {
         ) : (
           <div className="py-16 flex flex-col items-center gap-2 text-gray-400">
             <Search size={28} className="opacity-40" />
-            <p className="text-sm">Nenhum paciente encontrado</p>
+            <p className="text-sm">Nenhum {termo} encontrado</p>
             {buscaAtiva && (
               <button
                 onClick={() => handleBusca('')}
