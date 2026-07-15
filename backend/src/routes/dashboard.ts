@@ -43,33 +43,112 @@ function limitesDoMes() {
 async function metricasAgro(req: Request, res: Response) {
   const tenant = req.user!.tenant_id!
   const { local, utc } = limitesDoMes()
+  const agora = agoraComoTextoLocal()
 
-  const hoje = new Date(agoraComoTextoLocal())
+  const hoje = new Date(agora)
   const diaSemana = (hoje.getDay() + 6) % 7
   const segunda = new Date(hoje); segunda.setDate(hoje.getDate() - diaSemana)
   const domingo = new Date(segunda); domingo.setDate(segunda.getDate() + 6)
+  const segAnt = new Date(segunda); segAnt.setDate(segunda.getDate() - 7)
+  const domAnt = new Date(segAnt); domAnt.setDate(segAnt.getDate() + 6)
   const pad = (n: number) => String(n).padStart(2, '0')
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
-  const [leads, reunioes, fechados] = await Promise.all([
-    supabaseAdmin.from('pacientes').select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenant).gte('created_at', utc.inicioMes).lte('created_at', utc.fimMes),
-    supabaseAdmin.from('reunioes_agro').select('id')
-      .eq('tenant_id', tenant).neq('status', 'cancelada')
-      .gte('data_hora', `${fmt(segunda)}T00:00:00`).lte('data_hora', `${fmt(domingo)}T23:59:59`),
-    supabaseAdmin.from('pacientes').select('valor_fechado')
-      .eq('tenant_id', tenant).eq('status', 'fechado')
-      .gte('data_fechamento', local.inicioMes.slice(0, 10)).lte('data_fechamento', local.fimMes.slice(0, 10)),
-  ])
+  const ABERTOS = ['reuniao_agendada', 'orcamento_enviado', 'negociacao']
 
-  const valorFechadoMes = (fechados.data ?? []).reduce((s, p) => s + Number(p.valor_fechado ?? 0), 0)
+  const [todosPacientes, leadsMes, leadsMesAnt, reunSemana, reunSemanaAnt, fechadosMes, fechadosMesAnt, proximas] =
+    await Promise.all([
+      supabaseAdmin.from('pacientes').select('status, valor_estimado').eq('tenant_id', tenant),
+      supabaseAdmin.from('pacientes').select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant).gte('created_at', utc.inicioMes).lte('created_at', utc.fimMes),
+      supabaseAdmin.from('pacientes').select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant).gte('created_at', utc.inicioMesAnt).lte('created_at', utc.fimMesAnt),
+      supabaseAdmin.from('reunioes_agro').select('id').eq('tenant_id', tenant).neq('status', 'cancelada')
+        .gte('data_hora', `${fmt(segunda)}T00:00:00`).lte('data_hora', `${fmt(domingo)}T23:59:59`),
+      supabaseAdmin.from('reunioes_agro').select('id').eq('tenant_id', tenant).neq('status', 'cancelada')
+        .gte('data_hora', `${fmt(segAnt)}T00:00:00`).lte('data_hora', `${fmt(domAnt)}T23:59:59`),
+      supabaseAdmin.from('pacientes').select('id, valor_fechado').eq('tenant_id', tenant).eq('status', 'fechado')
+        .gte('data_fechamento', local.inicioMes.slice(0, 10)).lte('data_fechamento', local.fimMes.slice(0, 10)),
+      supabaseAdmin.from('pacientes').select('valor_fechado').eq('tenant_id', tenant).eq('status', 'fechado')
+        .gte('data_fechamento', local.inicioMesAnt.slice(0, 10)).lte('data_fechamento', local.fimMesAnt.slice(0, 10)),
+      supabaseAdmin.from('reunioes_agro')
+        .select('id, data_hora, tipo, pacientes(nome, telefone), profissionais(nome)')
+        .eq('tenant_id', tenant).in('status', ['agendada', 'confirmada'])
+        .gte('data_hora', agora).order('data_hora', { ascending: true }).limit(5),
+    ])
+
+  const delta = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 100) : null)
+
+  // Funil + valor em negociação (snapshot atual do pipeline)
+  const ETAPAS = [
+    { status: 'novo', nome: 'Novo' },
+    { status: 'em_conversa', nome: 'Em conversa' },
+    { status: 'reuniao_agendada', nome: 'Reunião marcada' },
+    { status: 'orcamento_enviado', nome: 'Orçamento enviado' },
+    { status: 'negociacao', nome: 'Negociação' },
+    { status: 'fechado', nome: 'Fechado' },
+  ]
+  const pacientes = todosPacientes.data ?? []
+  const funil = ETAPAS.map((e) => ({ nome: e.nome, qtd: pacientes.filter((p) => p.status === e.status).length }))
+  const valorEmNegociacao = pacientes
+    .filter((p) => ABERTOS.includes(p.status))
+    .reduce((s, p) => s + Number(p.valor_estimado ?? 0), 0)
+
+  const valorFechadoMes = (fechadosMes.data ?? []).reduce((s, p) => s + Number(p.valor_fechado ?? 0), 0)
+  const valorFechadoMesAnt = (fechadosMesAnt.data ?? []).reduce((s, p) => s + Number(p.valor_fechado ?? 0), 0)
+  const negociosFechadosMes = (fechadosMes.data ?? []).length
+
+  // Ranking: atribui cada negócio fechado ao vendedor da reunião mais recente do cliente
+  const idsFechados = (fechadosMes.data ?? []).map((p) => p.id)
+  let ranking: { nome: string; valor: number; negocios: number }[] = []
+  if (idsFechados.length > 0) {
+    const { data: reunioesFechados } = await supabaseAdmin
+      .from('reunioes_agro').select('paciente_id, profissionais(nome)')
+      .eq('tenant_id', tenant).in('paciente_id', idsFechados)
+      .order('data_hora', { ascending: false })
+    const vendedorDoPaciente = new Map<string, string>()
+    for (const r of reunioesFechados ?? []) {
+      const nome = (r.profissionais as unknown as { nome: string } | null)?.nome
+      if (nome && !vendedorDoPaciente.has(r.paciente_id)) vendedorDoPaciente.set(r.paciente_id, nome)
+    }
+    const porVendedor = new Map<string, { valor: number; negocios: number }>()
+    for (const p of fechadosMes.data ?? []) {
+      const nome = vendedorDoPaciente.get(p.id) ?? 'Sem vendedor'
+      const cur = porVendedor.get(nome) ?? { valor: 0, negocios: 0 }
+      cur.valor += Number(p.valor_fechado ?? 0)
+      cur.negocios += 1
+      porVendedor.set(nome, cur)
+    }
+    ranking = [...porVendedor.entries()].map(([nome, v]) => ({ nome, ...v })).sort((a, b) => b.valor - a.valor)
+  }
+
+  const proximasReunioes = (proximas.data ?? []).map((r) => {
+    const pac = r.pacientes as unknown as { nome: string | null; telefone: string } | null
+    return {
+      id: r.id,
+      data_hora: r.data_hora,
+      tipo: r.tipo,
+      cliente: pac?.nome ?? pac?.telefone ?? 'Cliente',
+      vendedor: (r.profissionais as unknown as { nome: string } | null)?.nome ?? null,
+    }
+  })
 
   res.json({
     vertical: 'agro',
-    leadsNovosMes: leads.count ?? 0,
-    reunioesSemana: (reunioes.data ?? []).length,
-    negociosFechadosMes: (fechados.data ?? []).length,
+    leadsNovosMes: leadsMes.count ?? 0,
+    reunioesSemana: (reunSemana.data ?? []).length,
+    negociosFechadosMes,
     valorFechadoMes,
+    valorEmNegociacao,
+    deltas: {
+      leads: delta(leadsMes.count ?? 0, leadsMesAnt.count ?? 0),
+      reunioes: delta((reunSemana.data ?? []).length, (reunSemanaAnt.data ?? []).length),
+      negocios: delta(negociosFechadosMes, (fechadosMesAnt.data ?? []).length),
+      valorFechado: delta(valorFechadoMes, valorFechadoMesAnt),
+    },
+    funil,
+    proximasReunioes,
+    ranking,
   })
 }
 

@@ -2,7 +2,10 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TrendingUp, Calendar, UserPlus, TrendingDown } from 'lucide-react'
+import {
+  TrendingUp, Calendar, UserPlus, TrendingDown,
+  Users, CalendarDays, BadgeCheck, DollarSign, BarChart3, Video, MapPin, ArrowUp, ArrowDown,
+} from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, BarChart, Bar, Cell, PieChart, Pie,
@@ -15,17 +18,37 @@ interface Metricas {
   agendamentosMes: number
   leadsNovos: number
   taxaConversao: number
-  deltas: { faturamento: number | null; agendamentos: number | null; leads: number | null }
+  deltas: {
+    faturamento?: number | null; agendamentos?: number | null; leads?: number | null
+    reunioes?: number | null; negocios?: number | null; valorFechado?: number | null
+  }
   // agro
   vertical?: 'agro'
   leadsNovosMes?: number
   reunioesSemana?: number
   negociosFechadosMes?: number
   valorFechadoMes?: number
+  valorEmNegociacao?: number
+  funil?: { nome: string; qtd: number }[]
+  proximasReunioes?: { id: string; data_hora: string; tipo: 'presencial' | 'virtual'; cliente: string; vendedor: string | null }[]
+  ranking?: { nome: string; valor: number; negocios: number }[]
 }
 
 const brl = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
+
+function AgroDelta({ value }: { value: number | null }) {
+  if (value === null) return null
+  const up = value >= 0
+  const color = up ? '#16a34a' : '#dc2626'
+  const Icon = up ? ArrowUp : ArrowDown
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 8, fontSize: 12, fontWeight: 600, color }}>
+      <Icon size={11} />
+      {up ? '+' : ''}{value}% <span style={{ color: '#9ca3af', fontWeight: 400 }}>vs mês anterior</span>
+    </div>
+  )
+}
 
 interface PontoDiario { data: string; agendamentos: number; mensagens: number }
 interface StatusItem { status: string; nome: string; count: number; percentual: number; cor: string }
@@ -132,32 +155,111 @@ export function Dashboard() {
   const topStatus = statusData?.itens[0]
 
   if (data?.vertical === 'agro') {
-    const agroCards = [
-      { title: 'Leads novos (mês)', value: String(data.leadsNovosMes ?? 0) },
-      { title: 'Reuniões da semana', value: String(data.reunioesSemana ?? 0) },
-      { title: 'Negócios fechados (mês)', value: String(data.negociosFechadosMes ?? 0) },
-      { title: 'Valor fechado (mês)', value: brl(data.valorFechadoMes ?? 0) },
+    const d = data
+    const funil = d.funil ?? []
+    const maxFunil = Math.max(1, ...funil.map((e) => e.qtd))
+    const ranking = d.ranking ?? []
+    const maxRank = Math.max(1, ...ranking.map((v) => v.valor))
+    const reunioes = d.proximasReunioes ?? []
+    const fmtDataHora = (s: string) => {
+      const [dia, hora] = s.split('T')
+      const [, m, day] = dia.split('-')
+      return `${day}/${m} · ${(hora ?? '').slice(0, 5)}`
+    }
+    const card = { background: '#fff', borderRadius: 16, boxShadow: '0 8px 24px rgba(31,41,55,0.07)' } as const
+    const kpis = [
+      { label: 'Leads novos (mês)', value: String(d.leadsNovosMes ?? 0), delta: d.deltas?.leads ?? null, Icon: Users },
+      { label: 'Reuniões da semana', value: String(d.reunioesSemana ?? 0), delta: d.deltas?.reunioes ?? null, Icon: CalendarDays },
+      { label: 'Negócios fechados (mês)', value: String(d.negociosFechadosMes ?? 0), delta: d.deltas?.negocios ?? null, Icon: BadgeCheck },
+      { label: 'Valor fechado (mês)', value: brl(d.valorFechadoMes ?? 0), delta: d.deltas?.valorFechado ?? null, Icon: DollarSign, small: true },
     ]
     return (
-      <div className="space-y-5">
-        <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 min-w-0">
-          {agroCards.map((card) => (
-            <Card key={card.title} className="border-0 shadow-sm overflow-hidden min-w-0">
-              <CardHeader className="pb-1 pt-4 px-5">
-                <CardTitle className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                  {card.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-5 pb-4">
-                <p className="text-2xl font-bold text-gray-900">
-                  {isLoading
-                    ? <span className="inline-block w-24 h-7 bg-gray-100 animate-pulse rounded" />
-                    : card.value}
-                </p>
-              </CardContent>
-            </Card>
+      <div className="space-y-7">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Visão geral de vendas</p>
+        </div>
+
+        {/* KPIs */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 20 }}>
+          {kpis.map((k) => (
+            <div key={k.label} style={{ ...card, padding: '22px 22px 20px' }}>
+              <div style={{ width: 34, height: 34, borderRadius: 10, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                <k.Icon size={16} color="#7c3aed" />
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7280' }}>{k.label}</div>
+              <div style={{ fontSize: k.small ? 24 : 30, fontWeight: 700, marginTop: k.small ? 6 : 4, color: '#1f2937' }}>{k.value}</div>
+              <AgroDelta value={k.delta} />
+            </div>
           ))}
+          <div style={{ ...card, padding: '22px 22px 20px', boxShadow: '0 14px 34px rgba(124,58,237,0.18)', border: '1px solid #ede9fe', position: 'relative' }}>
+            <div style={{ position: 'absolute', top: 0, left: 22, right: 22, height: 3, borderRadius: '0 0 3px 3px', background: '#7c3aed' }} />
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+              <BarChart3 size={16} color="#fff" />
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#7c3aed' }}>Valor em negociação</div>
+            <div style={{ fontSize: 24, fontWeight: 700, marginTop: 6, color: '#5b21b6' }}>{brl(d.valorEmNegociacao ?? 0)}</div>
+          </div>
+        </div>
+
+        {/* Funil + Próximas reuniões */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(340px,1fr))', gap: 20 }}>
+          <div style={{ ...card, padding: '26px 28px' }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: '#1f2937' }}>Funil de vendas</h2>
+            <p style={{ margin: '0 0 22px', fontSize: 12, color: '#9ca3af' }}>Negócios ativos por etapa</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {funil.map((e) => (
+                <div key={e.nome}>
+                  <div style={{ fontSize: 11, fontWeight: 500, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6b7280', marginBottom: 5 }}>{e.nome}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div title={`${e.nome}: ${e.qtd}`} style={{ height: 14, borderRadius: 99, background: '#7c3aed', width: `${Math.round((e.qtd / maxFunil) * 100)}%`, minWidth: 14, transition: 'width .4s ease' }} />
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1f2937' }}>{e.qtd}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ ...card, padding: '26px 28px' }}>
+            <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: '#1f2937' }}>Próximas reuniões</h2>
+            <p style={{ margin: '0 0 14px', fontSize: 12, color: '#9ca3af' }}>Agenda da equipe</p>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {reunioes.map((r, i) => (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 0', borderBottom: i < reunioes.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.cliente}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280' }}>{r.vendedor ? `Vend. ${r.vendedor}` : 'Sem vendedor'}</div>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{fmtDataHora(r.data_hora)}</div>
+                  {r.tipo === 'virtual' ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#7c3aed', background: '#f5f3ff', borderRadius: 99, padding: '4px 10px' }}><Video size={12} /> Virtual</span>
+                  ) : (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: '#374151', background: '#f3f4f6', borderRadius: 99, padding: '4px 10px' }}><MapPin size={12} /> Presencial</span>
+                  )}
+                </div>
+              ))}
+              {reunioes.length === 0 && <p style={{ fontSize: 13, color: '#9ca3af' }}>Nenhuma reunião futura.</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Ranking */}
+        <div style={{ ...card, padding: '26px 28px' }}>
+          <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: '#1f2937' }}>Ranking de vendedores</h2>
+          <p style={{ margin: '0 0 22px', fontSize: 12, color: '#9ca3af' }}>Valor fechado no mês, do maior para o menor</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {ranking.map((v) => (
+              <div key={v.nome} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#ede9fe', color: '#6d28d9', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{v.nome[0]}</div>
+                <div style={{ width: 110, fontSize: 13, fontWeight: 500, flexShrink: 0, color: '#1f2937' }}>{v.nome}</div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div title={`${v.nome}: ${brl(v.valor)} · ${v.negocios} negócio(s)`} style={{ height: 14, borderRadius: 99, background: '#7c3aed', width: `${Math.round((v.valor / maxRank) * 100)}%`, minWidth: 14, transition: 'width .4s ease' }} />
+                  <div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', color: '#1f2937' }}>{brl(v.valor)}</div>
+                </div>
+              </div>
+            ))}
+            {ranking.length === 0 && <p style={{ fontSize: 13, color: '#9ca3af' }}>Nenhum negócio fechado no mês.</p>}
+          </div>
         </div>
       </div>
     )
