@@ -105,7 +105,7 @@ export function Dashboard() {
       value: data
         ? `R$ ${Number(data.faturamentoMes).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
         : '—',
-      delta: data?.deltas.faturamento ?? null,
+      delta: data?.deltas?.faturamento ?? null,
       icon: TrendingUp,
       color: '#7c3aed',
       spark: sparkline.map((d) => ({ v: d.agendamentos })),
@@ -113,7 +113,7 @@ export function Dashboard() {
     {
       title: 'Agendamentos',
       value: data ? String(data.agendamentosMes) : '—',
-      delta: data?.deltas.agendamentos ?? null,
+      delta: data?.deltas?.agendamentos ?? null,
       icon: Calendar,
       color: '#0891b2',
       spark: sparkline.map((d) => ({ v: d.agendamentos })),
@@ -121,7 +121,7 @@ export function Dashboard() {
     {
       title: 'Pacientes Novos',
       value: data ? String(data.leadsNovos) : '—',
-      delta: data?.deltas.leads ?? null,
+      delta: data?.deltas?.leads ?? null,
       icon: UserPlus,
       color: '#059669',
       spark: sparkline.map((d) => ({ v: d.mensagens })),
