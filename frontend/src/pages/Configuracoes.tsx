@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { useAuth } from '../hooks/useAuth'
 import type { Injetavel, CategoriaInjetavel } from '../types'
 
 type Aba = 'whatsapp' | 'clinica' | 'followup' | 'injetaveis'
@@ -74,6 +75,8 @@ function getValor(configs: Configuracao[], chave: string): string {
 
 export function Configuracoes() {
   const [aba, setAba] = useState<Aba>('whatsapp')
+  const { usuario } = useAuth()
+  const isAgro = usuario?.vertical === 'agro'
   const qc = useQueryClient()
 
   const { data: configs = [] } = useConfiguracoes()
@@ -162,9 +165,9 @@ export function Configuracoes() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100">
         <div className="flex border-b border-gray-100 px-4">
           <button className={tabClass('whatsapp')} onClick={() => setAba('whatsapp')}>WhatsApp</button>
-          <button className={tabClass('clinica')} onClick={() => setAba('clinica')}>Clínica</button>
+          {!isAgro && <button className={tabClass('clinica')} onClick={() => setAba('clinica')}>Clínica</button>}
           <button className={tabClass('followup')} onClick={() => setAba('followup')}>Follow-up</button>
-          <button className={tabClass('injetaveis')} onClick={() => setAba('injetaveis')}>Injetáveis</button>
+          {!isAgro && <button className={tabClass('injetaveis')} onClick={() => setAba('injetaveis')}>Injetáveis</button>}
         </div>
 
         <div className="p-6">
