@@ -131,15 +131,25 @@ export function Configuracoes() {
   // Aba WhatsApp
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [qrExpirado, setQrExpirado] = useState(false)
+  const [erroWhatsapp, setErroWhatsapp] = useState<string | null>(null)
 
   const conectar = useMutation({
     mutationFn: async (): Promise<WhatsappConnectResponse> =>
       (await api.post('/whatsapp/connect')).data,
     onSuccess: (data) => {
+      setErroWhatsapp(null)
       const qr = data.qrcode ?? data.base64 ?? data.code ?? null
+      if (!qr) {
+        setErroWhatsapp('Não foi possível gerar o QR code. Verifique a configuração do WhatsApp no painel Admin.')
+        return
+      }
       setQrCode(qr)
       setQrExpirado(false)
       setTimeout(() => setQrExpirado(true), 2 * 60 * 1000)
+    },
+    onError: (err: unknown) => {
+      const mensagem = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      setErroWhatsapp(mensagem || 'Não foi possível conectar ao WhatsApp. Tente novamente.')
     },
   })
 
@@ -147,8 +157,10 @@ export function Configuracoes() {
     mutationFn: () => api.post('/whatsapp/disconnect'),
     onSuccess: () => {
       setQrCode(null)
+      setErroWhatsapp(null)
       qc.invalidateQueries({ queryKey: ['whatsapp-status'] })
     },
+    onError: () => setErroWhatsapp('Não foi possível desconectar. Tente novamente.'),
   })
 
   // Agente ativo (default true — valor não configurado nunca desativa quem já usa)
@@ -209,6 +221,8 @@ export function Configuracoes() {
                   <span className="text-sm text-gray-400">{wpStatus.phone}</span>
                 )}
               </div>
+
+              {erroWhatsapp && <p className="text-xs text-red-500">{erroWhatsapp}</p>}
 
               {wpStatus?.state === 'connected' && (
                 <button
