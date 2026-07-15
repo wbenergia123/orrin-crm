@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,6 +7,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { Pencil, Trash2 } from 'lucide-react'
 
 interface Fechamento {
   id: string
@@ -25,6 +26,7 @@ interface Despesa {
   categoria: string
   valor: number
   fixa: boolean
+  notas: string | null
 }
 
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -51,10 +53,28 @@ function periodoSemana() {
   return { inicio: formatDate(inicio), fim: formatDate(fim), label: 'Semana' }
 }
 
-function NovaDespesaModal({ de, ate, mes }: { de: string; ate: string; mes: string }) {
+const FORM_VAZIO = { descricao: '', categoria: '', valor: '', data: formatDate(new Date()), fixa: false, notas: '' }
+
+function NovaDespesaModal({
+  de, ate, mes, editando, onCloseEdicao,
+}: { de: string; ate: string; mes: string; editando: Despesa | null; onCloseEdicao: () => void }) {
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ descricao: '', categoria: '', valor: '', data: formatDate(new Date()), fixa: false, notas: '' })
+  const [form, setForm] = useState(FORM_VAZIO)
+  const isEditando = !!editando
+
+  useEffect(() => {
+    if (editando) {
+      setForm({
+        descricao: editando.descricao,
+        categoria: editando.categoria,
+        valor: String(editando.valor),
+        data: editando.data,
+        fixa: editando.fixa,
+        notas: editando.notas ?? '',
+      })
+    }
+  }, [editando])
 
   const { data: cats = [] } = useQuery<string[]>({
     queryKey: ['despesas-categorias'],
@@ -67,6 +87,12 @@ function NovaDespesaModal({ de, ate, mes }: { de: string; ate: string; mes: stri
     qc.invalidateQueries({ queryKey: ['despesas-categorias'] })
   }
 
+  function fechar() {
+    setOpen(false)
+    onCloseEdicao()
+    setForm(FORM_VAZIO)
+  }
+
   const criar = useMutation({
     mutationFn: async () =>
       (await api.post('/despesas', {
@@ -77,12 +103,24 @@ function NovaDespesaModal({ de, ate, mes }: { de: string; ate: string; mes: stri
         fixa: form.fixa,
         notas: form.notas || undefined,
       })).data,
-    onSuccess: () => {
-      invalidate()
-      setOpen(false)
-      setForm({ descricao: '', categoria: '', valor: '', data: formatDate(new Date()), fixa: false, notas: '' })
-    },
+    onSuccess: () => { invalidate(); fechar() },
   })
+
+  const atualizar = useMutation({
+    mutationFn: async () =>
+      (await api.patch(`/despesas/${editando!.id}`, {
+        descricao: form.descricao,
+        categoria: form.categoria,
+        valor: Number(form.valor),
+        data: form.data,
+        fixa: form.fixa,
+        notas: form.notas || undefined,
+      })).data,
+    onSuccess: () => { invalidate(); fechar() },
+  })
+
+  const salvando = criar.isPending || atualizar.isPending
+  const erroSalvar = criar.isError || atualizar.isError
 
   const copiarFixas = useMutation({
     mutationFn: async () => (await api.post('/despesas/copiar-fixas', { mes })).data,
@@ -101,14 +139,14 @@ function NovaDespesaModal({ de, ate, mes }: { de: string; ate: string; mes: stri
         Copiar fixas do mês anterior
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open || isEditando} onOpenChange={(o) => { if (!o) fechar() }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Nova despesa</DialogTitle>
+            <DialogTitle>{isEditando ? 'Editar despesa' : 'Nova despesa'}</DialogTitle>
           </DialogHeader>
           <form
             className="space-y-3"
-            onSubmit={(e) => { e.preventDefault(); criar.mutate() }}
+            onSubmit={(e) => { e.preventDefault(); isEditando ? atualizar.mutate() : criar.mutate() }}
           >
             <div>
               <label className="text-xs font-medium text-gray-500">Descrição</label>
@@ -141,9 +179,9 @@ function NovaDespesaModal({ de, ate, mes }: { de: string; ate: string; mes: stri
               <textarea value={form.notas} onChange={(e) => setForm((f) => ({ ...f, notas: e.target.value }))}
                 className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm" rows={2} />
             </div>
-            {criar.isError && <p className="text-xs text-red-500">Erro ao salvar. Verifique os campos.</p>}
+            {erroSalvar && <p className="text-xs text-red-500">Erro ao salvar. Verifique os campos.</p>}
             <DialogFooter>
-              <Button type="submit" disabled={criar.isPending}>Salvar</Button>
+              <Button type="submit" disabled={salvando}>Salvar</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -153,8 +191,10 @@ function NovaDespesaModal({ de, ate, mes }: { de: string; ate: string; mes: stri
 }
 
 export function FinanceiroAgro() {
+  const qc = useQueryClient()
   const [periodo, setPeriodo] = useState(periodoMes())
   const [catFiltro, setCatFiltro] = useState<string | null>(null)
+  const [editando, setEditando] = useState<Despesa | null>(null)
   const { inicio, fim } = periodo
   const mes = inicio.slice(0, 7)
 
@@ -170,6 +210,20 @@ export function FinanceiroAgro() {
     queryKey: ['despesas-list', inicio, fim],
     queryFn: async () => (await api.get('/despesas', { params: { de: inicio, ate: fim } })).data,
   })
+
+  const { mutate: removerDespesa } = useMutation({
+    mutationFn: (id: string) => api.delete(`/despesas/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['despesas-resumo', inicio, fim] })
+      qc.invalidateQueries({ queryKey: ['despesas-list', inicio, fim] })
+      qc.invalidateQueries({ queryKey: ['despesas-categorias'] })
+    },
+  })
+
+  function excluirDespesa(d: Despesa) {
+    if (!confirm(`Excluir a despesa "${d.descricao}" (${fmt(Number(d.valor))})?`)) return
+    removerDespesa(d.id)
+  }
 
   const receitas = fin?.totalReceitas ?? 0
   const totalDespesas = resumo?.total ?? 0
@@ -233,7 +287,7 @@ export function FinanceiroAgro() {
         <CardHeader className="pb-2 pt-4 px-5">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="text-sm font-semibold text-gray-800">Despesas</CardTitle>
-            <NovaDespesaModal de={inicio} ate={fim} mes={mes} />
+            <NovaDespesaModal de={inicio} ate={fim} mes={mes} editando={editando} onCloseEdicao={() => setEditando(null)} />
           </div>
         </CardHeader>
         <CardContent className="px-5 pb-4">
@@ -279,19 +333,30 @@ export function FinanceiroAgro() {
                     <th className="px-3 py-2 text-xs font-medium text-gray-400 uppercase">Categoria</th>
                     <th className="px-3 py-2 text-xs font-medium text-gray-400 uppercase">Valor</th>
                     <th className="px-3 py-2 text-xs font-medium text-gray-400 uppercase">Fixa</th>
+                    <th className="px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
                   {despesasFiltradas.length === 0 ? (
-                    <tr><td colSpan={5} className="px-3 py-3 text-gray-400">Nenhuma despesa</td></tr>
+                    <tr><td colSpan={6} className="px-3 py-3 text-gray-400">Nenhuma despesa</td></tr>
                   ) : (
                     despesasFiltradas.map((d) => (
-                      <tr key={d.id} className="border-b border-gray-50">
+                      <tr key={d.id} className="border-b border-gray-50 hover:bg-gray-50">
                         <td className="px-3 py-2 text-gray-600">{d.data}</td>
                         <td className="px-3 py-2 font-medium text-gray-800">{d.descricao}</td>
                         <td className="px-3 py-2 text-gray-600">{d.categoria}</td>
                         <td className="px-3 py-2 text-gray-600">{fmt(Number(d.valor))}</td>
                         <td className="px-3 py-2 text-gray-600">{d.fixa ? 'Sim' : '—'}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center justify-end gap-2">
+                            <button onClick={() => setEditando(d)} className="text-gray-400 hover:text-gray-700">
+                              <Pencil size={15} />
+                            </button>
+                            <button onClick={() => excluirDespesa(d)} className="text-gray-400 hover:text-red-500">
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}
