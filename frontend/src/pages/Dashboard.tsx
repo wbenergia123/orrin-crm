@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,7 +25,7 @@ interface Metricas {
   // agro
   vertical?: 'agro'
   leadsNovosMes?: number
-  reunioesSemana?: number
+  reunioesMes?: number
   negociosFechadosMes?: number
   valorFechadoMes?: number
   valorEmNegociacao?: number
@@ -95,9 +95,11 @@ function MainTooltip({ active, payload, label }: { active?: boolean; payload?: {
 }
 
 export function Dashboard() {
+  const mesAtual = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7)
+  const [mesAgro, setMesAgro] = useState(mesAtual)
   const { data, isLoading } = useQuery<Metricas>({
-    queryKey: ['dashboard-metricas'],
-    queryFn: async () => (await api.get('/dashboard/metricas')).data,
+    queryKey: ['dashboard-metricas', mesAgro],
+    queryFn: async () => (await api.get(`/dashboard/metricas?mes=${mesAgro}`)).data,
     refetchInterval: 30_000,
   })
 
@@ -156,6 +158,14 @@ export function Dashboard() {
 
   if (data?.vertical === 'agro') {
     const d = data
+    const [ay, am] = mesAtual.split('-').map(Number)
+    const meses = Array.from({ length: 12 }, (_, i) => {
+      let m = am - i, y = ay
+      while (m <= 0) { m += 12; y -= 1 }
+      const val = `${y}-${String(m).padStart(2, '0')}`
+      const label = new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      return { val, label }
+    })
     const funil = d.funil ?? []
     const maxFunil = Math.max(1, ...funil.map((e) => e.qtd))
     const ranking = d.ranking ?? []
@@ -169,15 +179,26 @@ export function Dashboard() {
     const card = { background: '#fff', borderRadius: 16, boxShadow: '0 8px 24px rgba(31,41,55,0.07)' } as const
     const kpis = [
       { label: 'Leads novos (mês)', value: String(d.leadsNovosMes ?? 0), delta: d.deltas?.leads ?? null, Icon: Users },
-      { label: 'Reuniões da semana', value: String(d.reunioesSemana ?? 0), delta: d.deltas?.reunioes ?? null, Icon: CalendarDays },
+      { label: 'Reuniões (mês)', value: String(d.reunioesMes ?? 0), delta: d.deltas?.reunioes ?? null, Icon: CalendarDays },
       { label: 'Negócios fechados (mês)', value: String(d.negociosFechadosMes ?? 0), delta: d.deltas?.negocios ?? null, Icon: BadgeCheck },
       { label: 'Valor fechado (mês)', value: brl(d.valorFechadoMes ?? 0), delta: d.deltas?.valorFechado ?? null, Icon: DollarSign, small: true },
     ]
     return (
       <div className="space-y-7">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Visão geral de vendas</p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
+            <p className="text-xs text-gray-400 mt-0.5">Visão geral de vendas</p>
+          </div>
+          <select
+            value={mesAgro}
+            onChange={(e) => setMesAgro(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 capitalize"
+          >
+            {meses.map((m) => (
+              <option key={m.val} value={m.val} className="capitalize">{m.label}</option>
+            ))}
+          </select>
         </div>
 
         {/* KPIs */}

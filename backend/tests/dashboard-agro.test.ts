@@ -49,6 +49,6 @@ describe('GET /api/dashboard/metricas (vertical agro)', () => {
     expect(res.body.leadsNovosMes).toBeGreaterThanOrEqual(3)
     expect(res.body.valorFechadoMes).toBe(45000)
     expect(res.body.negociosFechadosMes).toBe(1)
-    expect(typeof res.body.reunioesSemana).toBe('number')
+    expect(typeof res.body.reunioesMes).toBe('number')
   })
 })

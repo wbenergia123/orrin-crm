@@ -42,35 +42,44 @@ function limitesDoMes() {
 
 async function metricasAgro(req: Request, res: Response) {
   const tenant = req.user!.tenant_id!
-  const { local, utc } = limitesDoMes()
   const agora = agoraComoTextoLocal()
 
-  const hoje = new Date(agora)
-  const diaSemana = (hoje.getDay() + 6) % 7
-  const segunda = new Date(hoje); segunda.setDate(hoje.getDate() - diaSemana)
-  const domingo = new Date(segunda); domingo.setDate(segunda.getDate() + 6)
-  const segAnt = new Date(segunda); segAnt.setDate(segunda.getDate() - 7)
-  const domAnt = new Date(segAnt); domAnt.setDate(segAnt.getDate() + 6)
+  // Mês alvo (YYYY-MM via ?mes=) ou o mês atual
+  const mesParam = typeof req.query.mes === 'string' && /^\d{4}-\d{2}$/.test(req.query.mes)
+    ? req.query.mes
+    : agora.slice(0, 7)
+  const [anoAlvo, mesAlvo] = mesParam.split('-').map(Number)
   const pad = (n: number) => String(n).padStart(2, '0')
-  const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const ultimoDia = (a: number, m: number) => new Date(a, m, 0).getDate()
+  const janela = (a: number, m: number) => {
+    const ini = `${a}-${pad(m)}-01`
+    const fim = `${a}-${pad(m)}-${pad(ultimoDia(a, m))}`
+    return {
+      localIni: ini, localFim: fim,
+      utcIni: new Date(`${ini}T00:00:00-03:00`).toISOString(),
+      utcFim: new Date(`${fim}T23:59:59-03:00`).toISOString(),
+    }
+  }
+  const alvo = janela(anoAlvo, mesAlvo)
+  const ant = janela(mesAlvo === 1 ? anoAlvo - 1 : anoAlvo, mesAlvo === 1 ? 12 : mesAlvo - 1)
 
   const ABERTOS = ['reuniao_agendada', 'orcamento_enviado', 'negociacao']
 
-  const [todosPacientes, leadsMes, leadsMesAnt, reunSemana, reunSemanaAnt, fechadosMes, fechadosMesAnt, proximas] =
+  const [todosPacientes, leadsMes, leadsMesAnt, reunMes, reunMesAnt, fechadosMes, fechadosMesAnt, proximas] =
     await Promise.all([
       supabaseAdmin.from('pacientes').select('status, valor_estimado').eq('tenant_id', tenant),
       supabaseAdmin.from('pacientes').select('id', { count: 'exact', head: true })
-        .eq('tenant_id', tenant).gte('created_at', utc.inicioMes).lte('created_at', utc.fimMes),
+        .eq('tenant_id', tenant).gte('created_at', alvo.utcIni).lte('created_at', alvo.utcFim),
       supabaseAdmin.from('pacientes').select('id', { count: 'exact', head: true })
-        .eq('tenant_id', tenant).gte('created_at', utc.inicioMesAnt).lte('created_at', utc.fimMesAnt),
-      supabaseAdmin.from('reunioes_agro').select('id').eq('tenant_id', tenant).neq('status', 'cancelada')
-        .gte('data_hora', `${fmt(segunda)}T00:00:00`).lte('data_hora', `${fmt(domingo)}T23:59:59`),
-      supabaseAdmin.from('reunioes_agro').select('id').eq('tenant_id', tenant).neq('status', 'cancelada')
-        .gte('data_hora', `${fmt(segAnt)}T00:00:00`).lte('data_hora', `${fmt(domAnt)}T23:59:59`),
+        .eq('tenant_id', tenant).gte('created_at', ant.utcIni).lte('created_at', ant.utcFim),
+      supabaseAdmin.from('reunioes_agro').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant).neq('status', 'cancelada')
+        .gte('data_hora', `${alvo.localIni}T00:00:00`).lte('data_hora', `${alvo.localFim}T23:59:59`),
+      supabaseAdmin.from('reunioes_agro').select('id', { count: 'exact', head: true }).eq('tenant_id', tenant).neq('status', 'cancelada')
+        .gte('data_hora', `${ant.localIni}T00:00:00`).lte('data_hora', `${ant.localFim}T23:59:59`),
       supabaseAdmin.from('pacientes').select('id, valor_fechado').eq('tenant_id', tenant).eq('status', 'fechado')
-        .gte('data_fechamento', local.inicioMes.slice(0, 10)).lte('data_fechamento', local.fimMes.slice(0, 10)),
+        .gte('data_fechamento', alvo.localIni).lte('data_fechamento', alvo.localFim),
       supabaseAdmin.from('pacientes').select('valor_fechado').eq('tenant_id', tenant).eq('status', 'fechado')
-        .gte('data_fechamento', local.inicioMesAnt.slice(0, 10)).lte('data_fechamento', local.fimMesAnt.slice(0, 10)),
+        .gte('data_fechamento', ant.localIni).lte('data_fechamento', ant.localFim),
       supabaseAdmin.from('reunioes_agro')
         .select('id, data_hora, tipo, pacientes(nome, telefone), profissionais(nome)')
         .eq('tenant_id', tenant).in('status', ['agendada', 'confirmada'])
@@ -135,14 +144,15 @@ async function metricasAgro(req: Request, res: Response) {
 
   res.json({
     vertical: 'agro',
+    mes: mesParam,
     leadsNovosMes: leadsMes.count ?? 0,
-    reunioesSemana: (reunSemana.data ?? []).length,
+    reunioesMes: reunMes.count ?? 0,
     negociosFechadosMes,
     valorFechadoMes,
     valorEmNegociacao,
     deltas: {
       leads: delta(leadsMes.count ?? 0, leadsMesAnt.count ?? 0),
-      reunioes: delta((reunSemana.data ?? []).length, (reunSemanaAnt.data ?? []).length),
+      reunioes: delta(reunMes.count ?? 0, reunMesAnt.count ?? 0),
       negocios: delta(negociosFechadosMes, (fechadosMesAnt.data ?? []).length),
       valorFechado: delta(valorFechadoMes, valorFechadoMesAnt),
     },
