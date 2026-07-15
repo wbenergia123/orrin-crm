@@ -47,6 +47,11 @@ export function Admin() {
   const [usuarios, setUsuarios] = useState<{ id: string; email: string; role: string; ativo: boolean }[]>([])
   const [resetandoId, setResetandoId] = useState<string | null>(null)
   const [novaSenha, setNovaSenha] = useState('')
+  const [novoUsuarioAberto, setNovoUsuarioAberto] = useState(false)
+  const [novoUsuarioEmail, setNovoUsuarioEmail] = useState('')
+  const [novoUsuarioSenha, setNovoUsuarioSenha] = useState('')
+  const [novoUsuarioRole, setNovoUsuarioRole] = useState<'admin' | 'vendedor' | 'secretaria'>('vendedor')
+  const [usuarioCriado, setUsuarioCriado] = useState<{ email: string; senha: string } | null>(null)
   const [senhaResetada, setSenhaResetada] = useState<{ email: string; senha: string } | null>(null)
 
   const [emailBloqueio, setEmailBloqueio] = useState('')
@@ -154,6 +159,24 @@ export function Admin() {
       setNovaSenha('')
     },
     onError: () => alert('Não foi possível resetar a senha. Tente novamente.'),
+  })
+
+  const { mutate: criarUsuario, isPending: criandoUsuario } = useMutation({
+    mutationFn: async ({ tenantId, email, senha, role }: { tenantId: string; email: string; senha: string; role: string }) =>
+      (await api.post(`/admin/tenants/${tenantId}/usuarios`, { email, role, ...(senha ? { senha } : {}) })).data,
+    onSuccess: async (data, vars) => {
+      setUsuarioCriado({ email: data.email, senha: data.senha })
+      setNovoUsuarioAberto(false)
+      setNovoUsuarioEmail('')
+      setNovoUsuarioSenha('')
+      setNovoUsuarioRole('vendedor')
+      const { data: lista } = await api.get(`/admin/tenants/${vars.tenantId}/usuarios`)
+      setUsuarios(lista)
+    },
+    onError: (err: unknown) => {
+      const mensagem = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      alert(mensagem || 'Não foi possível criar o usuário. Tente novamente.')
+    },
   })
 
   const { mutate: impersonar, isPending: impersonando } = useMutation({
@@ -504,6 +527,60 @@ export function Admin() {
                 )}
                 {usuariosAbertoId === t.id && (
                   <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                    {novoUsuarioAberto ? (
+                      <div className="space-y-2 bg-gray-50 rounded-lg p-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                          <Input
+                            value={novoUsuarioEmail}
+                            onChange={(e) => setNovoUsuarioEmail(e.target.value)}
+                            placeholder="email@vendedor.com"
+                            className="text-xs"
+                          />
+                          <select
+                            value={novoUsuarioRole}
+                            onChange={(e) => setNovoUsuarioRole(e.target.value as typeof novoUsuarioRole)}
+                            className="border border-gray-200 rounded-md px-2 text-xs"
+                          >
+                            <option value="vendedor">Vendedor</option>
+                            <option value="secretaria">Secretária</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                          <Input
+                            value={novoUsuarioSenha}
+                            onChange={(e) => setNovoUsuarioSenha(e.target.value)}
+                            placeholder="Senha (em branco = senha123)"
+                            className="text-xs"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            disabled={criandoUsuario || !novoUsuarioEmail.trim()}
+                            onClick={() => criarUsuario({ tenantId: t.id, email: novoUsuarioEmail.trim(), senha: novoUsuarioSenha.trim(), role: novoUsuarioRole })}
+                          >
+                            {criandoUsuario ? 'Criando...' : 'Criar usuário'}
+                          </Button>
+                          <button
+                            onClick={() => setNovoUsuarioAberto(false)}
+                            className="text-xs text-gray-400 hover:text-gray-600"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setNovoUsuarioAberto(true); setUsuarioCriado(null) }}
+                        className="text-xs font-medium text-violet-600 hover:text-violet-700"
+                      >
+                        + Novo usuário
+                      </button>
+                    )}
+                    {usuarioCriado && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-xs text-emerald-800">
+                        Login criado: <strong>{usuarioCriado.email}</strong> · senha: <strong>{usuarioCriado.senha}</strong>
+                      </div>
+                    )}
                     {usuarios.length === 0 && (
                       <p className="text-xs text-gray-400">Nenhum usuário cadastrado nessa clínica.</p>
                     )}

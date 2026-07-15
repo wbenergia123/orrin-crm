@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { VerticalRoute } from './components/VerticalRoute'
+import { VendedorRoute } from './components/VendedorRoute'
 import { AppShell } from './components/AppShell'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
@@ -55,22 +56,26 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/pacientes" element={<Pacientes />} />
-              <Route element={<VerticalRoute vertical="clinica" />}>
-                <Route path="/pacientes/:id" element={<FichaPaciente />} />
-                <Route path="/servicos" element={<Servicos />} />
-                <Route path="/studio-3d" element={<Studio3D />} />
-              </Route>
-              <Route element={<VerticalRoute vertical="agro" />}>
-                <Route path="/produtos" element={<Produtos />} />
-              </Route>
-              <Route path="/profissionais" element={<Profissionais />} />
-              <Route path="/agenda" element={<AgendaPorVertical />} />
               <Route path="/atendimentos" element={<Atendimentos />} />
-              <Route path="/clientes" element={<Clientes />} />
-              <Route path="/financeiro" element={<FinanceiroPorVertical />} />
-              <Route path="/configuracoes" element={<Configuracoes />} />
+
+              <Route element={<VendedorRoute />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route element={<VerticalRoute vertical="clinica" />}>
+                  <Route path="/pacientes/:id" element={<FichaPaciente />} />
+                  <Route path="/servicos" element={<Servicos />} />
+                  <Route path="/studio-3d" element={<Studio3D />} />
+                </Route>
+                <Route element={<VerticalRoute vertical="agro" />}>
+                  <Route path="/produtos" element={<Produtos />} />
+                </Route>
+                <Route path="/profissionais" element={<Profissionais />} />
+                <Route path="/agenda" element={<AgendaPorVertical />} />
+                <Route path="/clientes" element={<Clientes />} />
+                <Route path="/financeiro" element={<FinanceiroPorVertical />} />
+                <Route path="/configuracoes" element={<Configuracoes />} />
+              </Route>
+
               <Route path="/admin" element={<Admin />} />
             </Route>
           </Route>

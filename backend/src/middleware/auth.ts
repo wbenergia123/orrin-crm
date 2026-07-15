@@ -148,3 +148,20 @@ export async function requireStudio3d(req: Request, res: Response, next: NextFun
   }
   next()
 }
+
+// Vendedor vê só Pipeline (pacientes) e Atendimentos — bloqueia o resto por completo.
+export function blockVendedor(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.role === 'vendedor') {
+    return res.status(403).json({ error: 'Acesso negado' })
+  }
+  next()
+}
+
+// Produtos: vendedor só lê (usa o catálogo pra registrar interesse do cliente),
+// não gerencia o cadastro — bloqueia apenas escrita.
+export function blockVendedorWrites(req: Request, res: Response, next: NextFunction) {
+  if (req.user?.role === 'vendedor' && req.method !== 'GET') {
+    return res.status(403).json({ error: 'Acesso negado' })
+  }
+  next()
+}

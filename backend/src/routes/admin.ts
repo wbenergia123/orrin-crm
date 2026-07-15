@@ -288,6 +288,45 @@ router.get('/tenants/:id/usuarios', async (req: Request, res: Response) => {
   res.json(data ?? [])
 })
 
+router.post('/tenants/:id/usuarios', async (req: Request, res: Response) => {
+  const { id } = req.params
+  const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : ''
+  const senhaInformada = typeof req.body?.senha === 'string' ? req.body.senha.trim() : ''
+  const role = req.body?.role
+
+  if (!email) return res.status(400).json({ error: 'email é obrigatório' })
+  if (!['admin', 'vendedor', 'secretaria'].includes(role)) {
+    return res.status(400).json({ error: "role deve ser 'admin', 'vendedor' ou 'secretaria'" })
+  }
+
+  const { data: org, error: orgError } = await supabaseAdmin
+    .from('organizacoes')
+    .select('id')
+    .eq('id', id)
+    .is('deleted_at', null)
+    .single()
+  if (orgError || !org) return res.status(404).json({ error: 'Clínica não encontrada' })
+
+  const senha = senhaInformada || 'senha123'
+  if (senha.length < 6) return res.status(400).json({ error: 'A senha deve ter ao menos 6 caracteres' })
+
+  const senha_hash = await bcrypt.hash(senha, 10)
+  const { data: usuario, error } = await supabaseAdmin
+    .from('usuarios')
+    .insert({ email, senha_hash, role, tenant_id: id, ativo: true })
+    .select('id, email, role, ativo, created_at')
+    .single()
+
+  if (error) {
+    if (error.code === '23505') return res.status(409).json({ error: 'E-mail já está em uso' })
+    return res.status(400).json({ error: error.message })
+  }
+
+  await logAdminAction(req.user!.id, 'create_usuario', id, { usuario_id: usuario.id, email, role })
+
+  res.status(201).json({ ...usuario, senha })
+})
+
 router.post('/tenants/:id/usuarios/:usuarioId/resetar-senha', async (req: Request, res: Response) => {
   const { id, usuarioId } = req.params
   const senhaInformada = typeof req.body?.senha === 'string' ? req.body.senha.trim() : ''

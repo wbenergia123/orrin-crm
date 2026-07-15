@@ -36,11 +36,17 @@ const navItems: NavItem[] = [
   { to: '/admin', icon: Building2, label: 'Admin', adminOnly: true },
 ]
 
+// Vendedor só vê Pipeline e Atendimentos — o resto (Dashboard, Clientes,
+// Produtos, Vendedores, Agenda, Financeiro, Configurações) é escondido aqui
+// e travado no backend (blockVendedor/blockVendedorWrites em app.ts).
+const VENDEDOR_ALLOWED = ['/pacientes', '/atendimentos']
+
 export function Sidebar() {
   const { logout, usuario } = useAuth()
 
   const meuVertical = usuario?.role === 'super_admin' ? 'clinica' : (usuario?.vertical ?? 'clinica')
   const visibleItems = navItems.filter((item) => {
+    if (usuario?.role === 'vendedor' && !VENDEDOR_ALLOWED.includes(item.to)) return false
     if (item.vertical && item.vertical !== meuVertical) return false
     if (item.adminOnly && usuario?.role !== 'super_admin') return false
     if (item.financeiroOnly) {
