@@ -261,3 +261,74 @@ describe('GET/PATCH /api/admin/tenants/:id/prompt', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('GET/POST /api/admin/tenants/:id/usuarios', () => {
+  let orgId: string
+  let orgSlug: string
+  let usuarioId: string
+  const email = 'admin.resetsenha@test.com'
+
+  beforeAll(async () => {
+    orgSlug = `reset-senha-test-${Date.now()}`
+    const { data: org } = await supabase
+      .from('organizacoes').insert({ slug: orgSlug, nome: 'Reset Senha Test' }).select('id').single()
+    orgId = org!.id
+    const senhaHash = await bcrypt.hash('senhaOriginal1', 10)
+    const { data: usuario } = await supabase
+      .from('usuarios').insert({ email, senha_hash: senhaHash, role: 'admin', tenant_id: orgId, ativo: true })
+      .select('id').single()
+    usuarioId = usuario!.id
+  })
+
+  afterAll(async () => {
+    await supabase.from('usuarios').delete().eq('tenant_id', orgId)
+    await supabase.from('organizacoes').delete().eq('id', orgId)
+  })
+
+  it('lista os usuários da clínica', async () => {
+    const res = await request(app)
+      .get(`/api/admin/tenants/${orgId}/usuarios`)
+      .set('Authorization', `Bearer ${superToken}`)
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveLength(1)
+    expect(res.body[0].email).toBe(email)
+  })
+
+  it('reseta a senha com valor customizado e permite login com ela', async () => {
+    const res = await request(app)
+      .post(`/api/admin/tenants/${orgId}/usuarios/${usuarioId}/resetar-senha`)
+      .set('Authorization', `Bearer ${superToken}`)
+      .send({ senha: 'novaSenha456' })
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ email, senha: 'novaSenha456' })
+
+    const login = await request(app).post('/api/auth/login').send({ email, senha: 'novaSenha456' })
+    expect(login.status).toBe(200)
+
+    const loginAntiga = await request(app).post('/api/auth/login').send({ email, senha: 'senhaOriginal1' })
+    expect(loginAntiga.status).toBe(401)
+  })
+
+  it('reseta pro padrão senha123 quando nenhuma senha é informada', async () => {
+    const res = await request(app)
+      .post(`/api/admin/tenants/${orgId}/usuarios/${usuarioId}/resetar-senha`)
+      .set('Authorization', `Bearer ${superToken}`)
+      .send({})
+    expect(res.status).toBe(200)
+    expect(res.body.senha).toBe('senha123')
+
+    const login = await request(app).post('/api/auth/login').send({ email, senha: 'senha123' })
+    expect(login.status).toBe(200)
+  })
+
+  it('não reseta senha de usuário de outra clínica (proteção cross-tenant)', async () => {
+    const { data: outraOrg } = await supabase
+      .from('organizacoes').insert({ slug: `outra-org-reset-${Date.now()}`, nome: 'Outra Org' }).select('id').single()
+    const res = await request(app)
+      .post(`/api/admin/tenants/${outraOrg!.id}/usuarios/${usuarioId}/resetar-senha`)
+      .set('Authorization', `Bearer ${superToken}`)
+      .send({ senha: 'naoDeveriaFuncionar1' })
+    expect(res.status).toBe(404)
+    await supabase.from('organizacoes').delete().eq('id', outraOrg!.id)
+  })
+})

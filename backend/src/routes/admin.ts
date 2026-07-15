@@ -275,6 +275,54 @@ router.patch('/tenants/:id/prompt', async (req: Request, res: Response) => {
   res.json({ success: true })
 })
 
+router.get('/tenants/:id/usuarios', async (req: Request, res: Response) => {
+  const { id } = req.params
+
+  const { data, error } = await supabaseAdmin
+    .from('usuarios')
+    .select('id, email, role, ativo, created_at')
+    .eq('tenant_id', id)
+    .order('created_at', { ascending: true })
+
+  if (error) return res.status(400).json({ error: error.message })
+  res.json(data ?? [])
+})
+
+router.post('/tenants/:id/usuarios/:usuarioId/resetar-senha', async (req: Request, res: Response) => {
+  const { id, usuarioId } = req.params
+  const senhaInformada = typeof req.body?.senha === 'string' ? req.body.senha.trim() : ''
+  const senha = senhaInformada || 'senha123'
+
+  if (senha.length < 6) {
+    return res.status(400).json({ error: 'A senha deve ter ao menos 6 caracteres' })
+  }
+
+  // Confirma que o usuário pertence a esse tenant antes de trocar a senha —
+  // evita reset cruzado se o usuarioId vier de outra clínica por engano.
+  const { data: usuario, error: buscaError } = await supabaseAdmin
+    .from('usuarios')
+    .select('id, email')
+    .eq('id', usuarioId)
+    .eq('tenant_id', id)
+    .single()
+
+  if (buscaError || !usuario) {
+    return res.status(404).json({ error: 'Usuário não encontrado nessa clínica' })
+  }
+
+  const senha_hash = await bcrypt.hash(senha, 10)
+  const { error } = await supabaseAdmin
+    .from('usuarios')
+    .update({ senha_hash })
+    .eq('id', usuarioId)
+
+  if (error) return res.status(400).json({ error: error.message })
+
+  await logAdminAction(req.user!.id, 'reset_senha_usuario', id, { usuario_id: usuarioId, email: usuario.email })
+
+  res.json({ email: usuario.email, senha })
+})
+
 router.post('/tenants/:id/impersonate', async (req: Request, res: Response) => {
   const { id } = req.params
 

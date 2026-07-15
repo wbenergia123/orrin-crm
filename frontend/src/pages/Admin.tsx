@@ -42,6 +42,13 @@ export function Admin() {
   const [anaModel, setAnaModel] = useState('')
   const [carregandoPromptId, setCarregandoPromptId] = useState<string | null>(null)
 
+  const [usuariosAbertoId, setUsuariosAbertoId] = useState<string | null>(null)
+  const [carregandoUsuariosId, setCarregandoUsuariosId] = useState<string | null>(null)
+  const [usuarios, setUsuarios] = useState<{ id: string; email: string; role: string; ativo: boolean }[]>([])
+  const [resetandoId, setResetandoId] = useState<string | null>(null)
+  const [novaSenha, setNovaSenha] = useState('')
+  const [senhaResetada, setSenhaResetada] = useState<{ email: string; senha: string } | null>(null)
+
   const [emailBloqueio, setEmailBloqueio] = useState('')
   const [statusBloqueio, setStatusBloqueio] = useState<{ tentativas: number; bloqueadoAte: string | null } | null>(null)
   const [carregandoBloqueio, setCarregandoBloqueio] = useState(false)
@@ -136,6 +143,17 @@ export function Admin() {
       setPromptAna('')
       setAnaModel('')
     },
+  })
+
+  const { mutate: resetarSenha, isPending: resetandoSenha } = useMutation({
+    mutationFn: async ({ tenantId, usuarioId, senha: novaSenhaEnviada }: { tenantId: string; usuarioId: string; senha: string }) =>
+      (await api.post(`/admin/tenants/${tenantId}/usuarios/${usuarioId}/resetar-senha`, novaSenhaEnviada ? { senha: novaSenhaEnviada } : {})).data,
+    onSuccess: (data) => {
+      setSenhaResetada({ email: data.email, senha: data.senha })
+      setResetandoId(null)
+      setNovaSenha('')
+    },
+    onError: () => alert('Não foi possível resetar a senha. Tente novamente.'),
   })
 
   const { mutate: impersonar, isPending: impersonando } = useMutation({
@@ -379,6 +397,26 @@ export function Admin() {
                               {carregandoPromptId === t.id ? 'Carregando...' : 'Editar Prompt'}
                             </button>
                             <button
+                              onClick={async () => {
+                                if (usuariosAbertoId === t.id) { setUsuariosAbertoId(null); return }
+                                setCarregandoUsuariosId(t.id)
+                                try {
+                                  const { data } = await api.get(`/admin/tenants/${t.id}/usuarios`)
+                                  setUsuarios(data)
+                                  setUsuariosAbertoId(t.id)
+                                  setSenhaResetada(null)
+                                } catch {
+                                  alert('Não foi possível carregar os logins.')
+                                } finally {
+                                  setCarregandoUsuariosId(null)
+                                }
+                              }}
+                              disabled={carregandoUsuariosId === t.id}
+                              className="text-xs font-medium text-emerald-600 hover:text-emerald-700 disabled:opacity-50"
+                            >
+                              {carregandoUsuariosId === t.id ? 'Carregando...' : usuariosAbertoId === t.id ? 'Ocultar logins' : 'Ver logins'}
+                            </button>
+                            <button
                               onClick={() => { setConfirmandoId(t.id); setConfirmTexto('') }}
                               className="text-red-400 hover:text-red-600"
                               title="Cancelar clínica"
@@ -462,6 +500,59 @@ export function Admin() {
                         Cancelar
                       </button>
                     </div>
+                  </div>
+                )}
+                {usuariosAbertoId === t.id && (
+                  <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                    {usuarios.length === 0 && (
+                      <p className="text-xs text-gray-400">Nenhum usuário cadastrado nessa clínica.</p>
+                    )}
+                    {usuarios.map((u) => (
+                      <div key={u.id} className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs">
+                            <span className="font-medium text-gray-700">{u.email}</span>
+                            <span className="text-gray-400"> · {u.role}{!u.ativo && ' · desativado'}</span>
+                          </div>
+                          {resetandoId === u.id ? null : (
+                            <button
+                              onClick={() => { setResetandoId(u.id); setNovaSenha(''); setSenhaResetada(null) }}
+                              className="text-xs font-medium text-amber-600 hover:text-amber-700"
+                            >
+                              Resetar senha
+                            </button>
+                          )}
+                        </div>
+                        {resetandoId === u.id && (
+                          <div className="flex items-center gap-2 pl-2">
+                            <Input
+                              value={novaSenha}
+                              onChange={(e) => setNovaSenha(e.target.value)}
+                              placeholder="Nova senha (em branco = senha123)"
+                              className="text-xs"
+                            />
+                            <Button
+                              size="sm"
+                              disabled={resetandoSenha}
+                              onClick={() => resetarSenha({ tenantId: t.id, usuarioId: u.id, senha: novaSenha })}
+                            >
+                              {resetandoSenha ? 'Salvando...' : 'Confirmar'}
+                            </Button>
+                            <button
+                              onClick={() => setResetandoId(null)}
+                              className="text-xs text-gray-400 hover:text-gray-600"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {senhaResetada && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-xs text-emerald-800">
+                        Senha de <strong>{senhaResetada.email}</strong> redefinida para: <strong>{senhaResetada.senha}</strong>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
