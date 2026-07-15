@@ -151,6 +151,13 @@ export function Configuracoes() {
     },
   })
 
+  // Agente ativo (default true — valor não configurado nunca desativa quem já usa)
+  const agenteAtivo = getValor(configs, 'agente_ativo') !== 'false'
+  const toggleAgenteAtivo = useMutation({
+    mutationFn: (ativo: boolean) => api.patch('/configuracoes/agente_ativo', { valor: String(ativo) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['configuracoes'] }),
+  })
+
   const tabClass = (t: Aba) =>
     `px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
       aba === t
@@ -173,6 +180,26 @@ export function Configuracoes() {
         <div className="p-6">
           {aba === 'whatsapp' && (
             <div className="space-y-6 max-w-md">
+              <div className="flex items-center justify-between gap-3 border border-gray-100 rounded-lg px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Agente automático</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {agenteAtivo
+                      ? 'Ativo — responde automaticamente às mensagens recebidas'
+                      : 'Desativado — mensagens são salvas, mas ninguém responde automaticamente'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => toggleAgenteAtivo.mutate(!agenteAtivo)}
+                  disabled={toggleAgenteAtivo.isPending}
+                  role="switch"
+                  aria-checked={agenteAtivo}
+                  className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${agenteAtivo ? 'bg-violet-600' : 'bg-gray-300'} disabled:opacity-50`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${agenteAtivo ? 'translate-x-5' : ''}`} />
+                </button>
+              </div>
+
               <div className="flex items-center gap-3">
                 <div className={`w-3 h-3 rounded-full ${wpStatus?.state === 'connected' ? 'bg-green-500' : 'bg-red-400'}`} />
                 <span className="text-sm font-medium text-gray-700">

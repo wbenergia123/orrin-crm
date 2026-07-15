@@ -193,6 +193,31 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       return res.json({ result: 'ok' })
     }
 
+    // Agente desativado nas configurações: só grava a conversa, não chama a Ana nem responde.
+    const { data: configAgente } = await supabaseAdmin
+      .from('configuracoes')
+      .select('valor')
+      .eq('tenant_id', tenantId)
+      .eq('chave', 'agente_ativo')
+      .single()
+    const agenteAtivo = configAgente?.valor !== 'false'
+
+    if (!agenteAtivo) {
+      await supabaseAdmin.from('conversas_pacientes').insert({
+        tenant_id: tenantId,
+        paciente_id: pacienteId,
+        mensagem_paciente: texto,
+        tipo_remetente: 'humano',
+        modo_humano: false,
+      })
+      await supabaseAdmin
+        .from('pacientes')
+        .update({ ultimo_contato_at: new Date().toISOString() })
+        .eq('id', pacienteId)
+      console.log(`[WEBHOOK] Agente desativado para tenant ${tenantId} — mensagem salva sem resposta automática`)
+      return res.json({ result: 'ok' })
+    }
+
     await supabaseAdmin.from('conversas_pacientes').insert({
       tenant_id: tenantId,
       paciente_id: pacienteId,
