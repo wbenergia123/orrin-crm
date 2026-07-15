@@ -193,7 +193,7 @@ export function Atendimentos() {
   })
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="flex h-[calc(100vh-64px)] bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(16,24,40,0.08)] border border-gray-100/80 overflow-hidden">
 
       {/* ── Lista esquerda ── */}
       <div className="w-full md:w-[320px] md:min-w-[280px] border-r border-gray-100 flex flex-col">

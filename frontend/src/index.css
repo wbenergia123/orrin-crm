@@ -85,4 +85,6 @@
   html {
     @apply font-sans;
   }
+  h1 { letter-spacing: -0.021em; }
+  h2, h3 { letter-spacing: -0.014em; }
 }

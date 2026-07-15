@@ -22,7 +22,7 @@ export function AppShell() {
             </a>
           </div>
         )}
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 bg-gradient-to-br from-slate-50 via-gray-50 to-violet-50/50">
           <Outlet />
         </main>
       </div>

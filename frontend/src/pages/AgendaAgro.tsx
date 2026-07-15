@@ -85,7 +85,7 @@ export function AgendaAgro() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" style={{ height: 680 }}>
+      <div className="bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(16,24,40,0.08)] border border-gray-100/80 overflow-hidden" style={{ height: 680 }}>
         <div className="h-full p-4">
           <Calendar
             localizer={localizer}

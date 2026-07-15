@@ -99,7 +99,7 @@ export function FichaPaciente() {
       </button>
 
       {/* ── Header card ── */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(16,24,40,0.08)] border border-gray-100/80 p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-4">
             <div
@@ -179,7 +179,7 @@ export function FichaPaciente() {
             bg: 'bg-blue-50',
           },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <div key={stat.label} className="bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(16,24,40,0.08)] border border-gray-100/80 p-4">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs text-gray-400 font-medium">{stat.label}</p>
               <div className={`p-1.5 rounded-lg ${stat.bg}`}>
@@ -222,7 +222,7 @@ export function FichaPaciente() {
       ) : (
         <div className="contents">
       {/* ── Agendamentos ── */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(16,24,40,0.08)] border border-gray-100/80 p-6">
         <h2 className="text-sm font-semibold text-gray-800 mb-4">
           Consultas <span className="text-gray-400 font-normal ml-1">{agendamentos.length}</span>
         </h2>
@@ -269,7 +269,7 @@ export function FichaPaciente() {
       </div>
 
       {/* ── Conversas (preview) ── */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(16,24,40,0.08)] border border-gray-100/80 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-gray-800">
             Conversas <span className="text-gray-400 font-normal ml-1">{conversas.length} mensagens</span>

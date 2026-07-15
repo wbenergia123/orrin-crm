@@ -162,7 +162,7 @@ export function Configuracoes() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-gray-800">Configurações</h1>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div className="bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(16,24,40,0.08)] border border-gray-100/80">
         <div className="flex border-b border-gray-100 px-4">
           <button className={tabClass('whatsapp')} onClick={() => setAba('whatsapp')}>WhatsApp</button>
           {!isAgro && <button className={tabClass('clinica')} onClick={() => setAba('clinica')}>Clínica</button>}

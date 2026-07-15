@@ -260,7 +260,7 @@ export function Agenda() {
       </div>
 
       {/* Calendário + painel */}
-      <div className="flex bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden" style={{ height: 680 }}>
+      <div className="flex bg-white rounded-2xl shadow-[0_2px_12px_-4px_rgba(16,24,40,0.08)] border border-gray-100/80 overflow-hidden" style={{ height: 680 }}>
         <div className={`flex-1 min-w-0 p-4 transition-all ${painelAberto ? 'pr-0' : ''}`}>
           {profissionalSelecionado ? (
             <Calendar
