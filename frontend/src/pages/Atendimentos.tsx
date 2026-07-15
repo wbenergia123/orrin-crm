@@ -326,7 +326,7 @@ export function Atendimentos() {
                   : 'bg-violet-600 text-white hover:bg-violet-700'
               }`}
             >
-              {selecionado.modo_humano ? 'Devolver para Ana' : 'Assumir'}
+              {selecionado.modo_humano ? 'Devolver para IA' : 'Assumir'}
             </button>
           </div>
 
@@ -346,7 +346,7 @@ export function Atendimentos() {
                   {isHandoff && (
                     <div className="flex justify-center py-2">
                       <span className="text-[11px] text-gray-500 bg-white/70 rounded-full px-3 py-1 shadow-sm">
-                        {c.modo_humano ? '🙋 Secretária assumiu o atendimento' : '🤖 Ana retomou o atendimento'}
+                        {c.modo_humano ? '🙋 Secretária assumiu o atendimento' : '🤖 IA retomou o atendimento'}
                       </span>
                     </div>
                   )}
@@ -378,7 +378,7 @@ export function Atendimentos() {
                               borderLeft: `8px solid ${bgColor}`, borderTop: '8px solid transparent',
                             }} />
                             <p className="text-[11px] font-semibold mb-0.5" style={{ color: isHumano ? '#065f46' : '#075e54' }}>
-                              {isHumano ? 'Você' : 'Ana ✨'}
+                              {isHumano ? 'Você' : 'IA ✨'}
                             </p>
                             <p className="text-[13.5px] text-gray-900 leading-relaxed">{c.mensagem_agente}</p>
                             <p className="text-[11px] text-gray-500 text-right mt-0.5 flex items-center justify-end gap-1">
