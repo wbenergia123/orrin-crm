@@ -123,6 +123,7 @@ export function Atendimentos() {
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<FiltroModo>('todos')
   const [texto, setTexto] = useState('')
+  const [erroEnvio, setErroEnvio] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
   const [searchParams] = useSearchParams()
   const pacienteIdParam = searchParams.get('paciente')
@@ -173,6 +174,10 @@ export function Atendimentos() {
     if (isAtBottom) el.scrollTop = el.scrollHeight
   }, [conversas])
 
+  useEffect(() => {
+    setErroEnvio(false)
+  }, [selecionado?.id])
+
   const { mutate: toggleHandoff } = useMutation({
     mutationFn: ({ pacienteId, modoHumano }: { pacienteId: string; modoHumano: boolean }) =>
       api.patch(`/atendimentos/${pacienteId}/handoff`, { modo_humano: modoHumano }),
@@ -185,8 +190,9 @@ export function Atendimentos() {
   const { mutate: enviar, isPending: enviando } = useMutation({
     mutationFn: () =>
       api.post(`/atendimentos/${selecionado!.id}/mensagem`, { texto }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setTexto('')
+      setErroEnvio(res.data.entregue === false)
       qc.invalidateQueries({ queryKey: ['conversas', selecionado?.id] })
       qc.invalidateQueries({ queryKey: ['atendimentos-resumo'] })
     },
@@ -400,6 +406,11 @@ export function Atendimentos() {
           </div>
 
           {/* Campo de envio */}
+          {erroEnvio && (
+            <p className="px-4 py-1.5 text-xs text-red-600 bg-red-50 border-t border-red-100">
+              Mensagem salva, mas não foi entregue pelo WhatsApp — verifique a conexão em Configurações.
+            </p>
+          )}
           <div className="px-4 py-2.5 bg-[#f0f2f5] flex gap-2 items-center">
             <input
               className="flex-1 bg-white border-0 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed shadow-sm"
