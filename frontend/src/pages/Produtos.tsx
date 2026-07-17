@@ -14,10 +14,11 @@ function ProdutoDialog({ produto, onClose }: { produto?: Produto; onClose: () =>
   const [categoria, setCategoria] = useState(produto?.categoria ?? '')
   const [descricao, setDescricao] = useState(produto?.descricao ?? '')
   const [fotoUrl, setFotoUrl] = useState(produto?.foto_url ?? '')
+  const [preco, setPreco] = useState(produto?.preco != null ? String(produto.preco) : '')
 
   const { mutate, isPending } = useMutation({
     mutationFn: () => {
-      const body = { nome, categoria, descricao, foto_url: fotoUrl }
+      const body = { nome, categoria, descricao, foto_url: fotoUrl, preco: preco ? Number(preco.replace(',', '.')) : null }
       return produto
         ? api.patch(`/produtos/${produto.id}`, body)
         : api.post('/produtos', body)
@@ -28,15 +29,27 @@ function ProdutoDialog({ produto, onClose }: { produto?: Produto; onClose: () =>
     },
   })
 
+  // input type="number" não aceita vírgula digitada (vira número errado) —
+  // usa texto livre e filtra só dígitos/vírgula/ponto.
+  const handlePrecoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPreco(e.target.value.replace(/[^0-9.,]/g, ''))
+  }
+
   return (
     <div className="space-y-4 pt-2">
       <div className="space-y-1">
         <Label>Nome do produto</Label>
         <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Ex: Colhedora" />
       </div>
-      <div className="space-y-1">
-        <Label>Categoria</Label>
-        <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Ex: Implementos" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label>Categoria</Label>
+          <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} placeholder="Ex: Implementos" />
+        </div>
+        <div className="space-y-1">
+          <Label>Preço (R$)</Label>
+          <Input type="text" inputMode="decimal" value={preco} onChange={handlePrecoChange} placeholder="23700" />
+        </div>
       </div>
       <div className="space-y-1">
         <Label>Descrição</Label>
@@ -110,18 +123,22 @@ export function Produtos() {
             <tr className="border-b border-gray-100">
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Nome</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Categoria</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Preço</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase">Descrição</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
             {isLoading && (
-              <tr><td colSpan={4} className="text-center py-8 text-gray-400">Carregando...</td></tr>
+              <tr><td colSpan={5} className="text-center py-8 text-gray-400">Carregando...</td></tr>
             )}
             {produtos.map((p) => (
               <tr key={p.id} className="border-b border-gray-50 hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-800">{p.nome}</td>
                 <td className="px-4 py-3 text-gray-500">{p.categoria ?? '—'}</td>
+                <td className="px-4 py-3 text-gray-700">
+                  {p.preco != null ? `R$ ${Number(p.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '—'}
+                </td>
                 <td className="px-4 py-3 text-gray-500">{p.descricao ?? '—'}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">

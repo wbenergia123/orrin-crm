@@ -20,6 +20,7 @@ const produtoSchema = z.object({
   categoria: z.string().optional(),
   descricao: z.string().optional(),
   foto_url: z.string().optional(),
+  preco: z.number().nonnegative().nullable().optional(),
 })
 
 router.post('/', async (req: Request, res: Response) => {

@@ -36,6 +36,7 @@ export interface Produto {
   categoria: string | null
   descricao: string | null
   foto_url: string | null
+  preco: number | null
   ativo: boolean
 }
 
