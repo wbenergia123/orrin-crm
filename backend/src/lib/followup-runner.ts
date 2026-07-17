@@ -9,6 +9,7 @@ const COOLDOWN_MINUTOS = 4 * 60
 
 interface TenantConfig {
   ativo: boolean
+  agenteAtivo: boolean
   timezone: string
   inicio: string
   fim: string
@@ -19,12 +20,13 @@ async function loadTenantConfig(tenantId: string): Promise<TenantConfig> {
     .from('configuracoes')
     .select('chave, valor')
     .eq('tenant_id', tenantId)
-    .in('chave', ['followup_ativo', 'followup_timezone', 'followup_horario_comercial_inicio', 'followup_horario_comercial_fim'])
+    .in('chave', ['followup_ativo', 'agente_ativo', 'followup_timezone', 'followup_horario_comercial_inicio', 'followup_horario_comercial_fim'])
 
   const map = Object.fromEntries((rows ?? []).map((r) => [r.chave, r.valor]))
 
   return {
     ativo: map['followup_ativo'] !== 'false',
+    agenteAtivo: map['agente_ativo'] !== 'false',
     timezone: map['followup_timezone'] || PADRAO_TIMEZONE,
     inicio: map['followup_horario_comercial_inicio'] || '08:00',
     fim: map['followup_horario_comercial_fim'] || '20:00',
@@ -399,6 +401,9 @@ export async function runFollowups(agora = new Date(), tenantId?: string) {
   for (const tenant of tenants ?? []) {
     const config = await loadTenantConfig(tenant.id)
     if (!config.ativo) continue
+    // Agente automático desligado (Configurações > WhatsApp) — nenhuma mensagem
+    // automática deve sair, nem follow-up. Mesmo guard do webhook.ts.
+    if (!config.agenteAtivo) continue
     if (!isBusinessHour(agora, config.timezone, config.inicio, config.fim)) continue
 
     const regras = await loadActiveRules(tenant.id)

@@ -405,6 +405,43 @@ describe('runFollowups', () => {
     await supabase.from('agendamentos').delete().eq('id', ag!.id)
   })
 
+  it('não envia nada quando o Agente automático está desligado (agente_ativo=false)', async () => {
+    receivedMessages = []
+
+    const baseTime = new Date('2026-06-24T10:00:00-03:00')
+    const dataHora = new Date(baseTime.getTime() + 24 * 60 * 60 * 1000)
+
+    const { data: ag } = await supabase
+      .from('agendamentos')
+      .insert({
+        tenant_id: testTenantId,
+        paciente_id: pacienteId,
+        servico_id: servicoId,
+        profissional_id: profissionalId,
+        data_hora: comoTextoLocal(dataHora),
+        status: 'confirmado',
+      })
+      .select('id')
+      .single()
+
+    await supabase.from('configuracoes').upsert({
+      tenant_id: testTenantId,
+      chave: 'agente_ativo',
+      valor: 'false',
+    }, { onConflict: 'tenant_id,chave' })
+
+    await runFollowups(baseTime, testTenantId)
+
+    expect(receivedMessages.length).toBe(0)
+
+    await supabase.from('configuracoes').upsert({
+      tenant_id: testTenantId,
+      chave: 'agente_ativo',
+      valor: 'true',
+    }, { onConflict: 'tenant_id,chave' })
+    await supabase.from('agendamentos').delete().eq('id', ag!.id)
+  })
+
   it('não envia mensagem fora do horário comercial', async () => {
     receivedMessages = []
 
