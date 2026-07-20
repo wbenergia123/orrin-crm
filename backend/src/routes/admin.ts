@@ -280,7 +280,7 @@ router.get('/tenants/:id/usuarios', async (req: Request, res: Response) => {
 
   const { data, error } = await supabaseAdmin
     .from('usuarios')
-    .select('id, email, role, ativo, created_at')
+    .select('id, email, nome, role, ativo, created_at')
     .eq('tenant_id', id)
     .order('created_at', { ascending: true })
 
@@ -291,6 +291,7 @@ router.get('/tenants/:id/usuarios', async (req: Request, res: Response) => {
 router.post('/tenants/:id/usuarios', async (req: Request, res: Response) => {
   const { id } = req.params
   const email = typeof req.body?.email === 'string' ? req.body.email.toLowerCase().trim() : ''
+  const nome = typeof req.body?.nome === 'string' && req.body.nome.trim() ? req.body.nome.trim() : null
   const senhaInformada = typeof req.body?.senha === 'string' ? req.body.senha.trim() : ''
   const role = req.body?.role
 
@@ -313,8 +314,8 @@ router.post('/tenants/:id/usuarios', async (req: Request, res: Response) => {
   const senha_hash = await bcrypt.hash(senha, 10)
   const { data: usuario, error } = await supabaseAdmin
     .from('usuarios')
-    .insert({ email, senha_hash, role, tenant_id: id, ativo: true })
-    .select('id, email, role, ativo, created_at')
+    .insert({ email, nome, senha_hash, role, tenant_id: id, ativo: true })
+    .select('id, email, nome, role, ativo, created_at')
     .single()
 
   if (error) {

@@ -49,7 +49,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   // Busca role e tenant_id atualizados no banco
   const { data: userData } = await supabaseAdmin
     .from('usuarios')
-    .select('role, tenant_id')
+    .select('role, tenant_id, nome')
     .eq('id', payload.sub)
     .single()
 
@@ -67,6 +67,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     email: payload.email,
     role: impersonating ? 'admin' : realRole,
     tenant_id: impersonating ? payload.impersonate_tenant_id! : realTenantId,
+    nome: userData?.nome ?? payload.nome ?? null,
     impersonating,
   }
 

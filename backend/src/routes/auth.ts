@@ -26,7 +26,7 @@ router.post('/login', async (req: Request, res: Response) => {
   // Busca usuário pelo email
   const { data: usuario, error } = await supabaseAdmin
     .from('usuarios')
-    .select('id, email, senha_hash, role, tenant_id, ativo')
+    .select('id, email, senha_hash, role, tenant_id, ativo, nome')
     .eq('email', emailNorm)
     .single()
 
@@ -64,7 +64,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
   // Gera JWT
   const token = jwt.sign(
-    { sub: usuario.id, email: usuario.email, role: usuario.role, tenant_id: usuario.tenant_id },
+    { sub: usuario.id, email: usuario.email, role: usuario.role, tenant_id: usuario.tenant_id, nome: usuario.nome },
     process.env.JWT_SECRET!,
     { expiresIn: '7d' }
   )
@@ -75,6 +75,7 @@ router.post('/login', async (req: Request, res: Response) => {
       id: usuario.id,
       email: usuario.email,
       role: usuario.role,
+      nome: usuario.nome,
       studio_3d_ativo: usuario.role === 'super_admin' ? true : (org?.studio_3d_ativo ?? false),
       vertical: usuario.role === 'super_admin' ? 'clinica' : (org?.vertical ?? 'clinica'),
     },

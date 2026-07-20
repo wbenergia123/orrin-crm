@@ -122,7 +122,7 @@ router.get('/:paciente_id/conversas', async (req, res) => {
   // que aconteceu depois (mesmo bug já corrigido no histórico usado pela Ana).
   const { data, error } = await supabaseAdmin
     .from('conversas_pacientes')
-    .select('id, mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, created_at')
+    .select('id, mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, remetente_nome, created_at')
     .eq('tenant_id', req.user!.tenant_id)
     .eq('paciente_id', req.params.paciente_id)
     .order('created_at', { ascending: false })
@@ -153,6 +153,7 @@ router.patch('/:paciente_id/handoff', async (req, res) => {
       tipo_remetente: 'humano',
       modo_humano,
       mensagem_agente: modo_humano ? '[HANDOFF: secretária assumiu]' : '[HANDOFF: agente retomou]',
+      remetente_nome: modo_humano ? req.user!.nome : null,
     })
     .select()
     .single()
@@ -210,6 +211,7 @@ router.post('/:paciente_id/mensagem', async (req, res) => {
       mensagem_agente: texto.trim(),
       tipo_remetente: 'humano',
       modo_humano: true,
+      remetente_nome: req.user!.nome,
     })
     .select()
     .single()

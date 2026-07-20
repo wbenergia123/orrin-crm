@@ -63,6 +63,7 @@ export interface JWTPayload {
   email: string
   role: RoleUsuario
   tenant_id: string | null
+  nome: string | null
 }
 
 export interface ConfiguracaoOrrin {

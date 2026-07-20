@@ -304,7 +304,7 @@ export function FichaPaciente() {
                   <div className="flex justify-end mb-1">
                     <div className="max-w-[75%]">
                       <p className="text-[10px] text-gray-400 mb-0.5 mr-1 text-right">
-                        {c.modo_humano ? 'Atendente' : 'IA'}
+                        {c.modo_humano ? (c.remetente_nome ?? 'Atendente') : 'IA'}
                       </p>
                       <div className="bg-violet-600 text-white text-sm px-3 py-2 rounded-2xl rounded-tr-sm">
                         {c.mensagem_agente}

@@ -94,6 +94,7 @@ export interface Conversa {
   mensagem_agente: string | null
   tipo_remetente: 'agente' | 'humano'
   modo_humano: boolean
+  remetente_nome: string | null
   created_at: string
 }
 

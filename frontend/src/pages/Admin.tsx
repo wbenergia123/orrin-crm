@@ -44,10 +44,11 @@ export function Admin() {
 
   const [usuariosAbertoId, setUsuariosAbertoId] = useState<string | null>(null)
   const [carregandoUsuariosId, setCarregandoUsuariosId] = useState<string | null>(null)
-  const [usuarios, setUsuarios] = useState<{ id: string; email: string; role: string; ativo: boolean }[]>([])
+  const [usuarios, setUsuarios] = useState<{ id: string; email: string; nome: string | null; role: string; ativo: boolean }[]>([])
   const [resetandoId, setResetandoId] = useState<string | null>(null)
   const [novaSenha, setNovaSenha] = useState('')
   const [novoUsuarioAberto, setNovoUsuarioAberto] = useState(false)
+  const [novoUsuarioNome, setNovoUsuarioNome] = useState('')
   const [novoUsuarioEmail, setNovoUsuarioEmail] = useState('')
   const [novoUsuarioSenha, setNovoUsuarioSenha] = useState('')
   const [novoUsuarioRole, setNovoUsuarioRole] = useState<'admin' | 'vendedor' | 'secretaria'>('vendedor')
@@ -162,11 +163,12 @@ export function Admin() {
   })
 
   const { mutate: criarUsuario, isPending: criandoUsuario } = useMutation({
-    mutationFn: async ({ tenantId, email, senha, role }: { tenantId: string; email: string; senha: string; role: string }) =>
-      (await api.post(`/admin/tenants/${tenantId}/usuarios`, { email, role, ...(senha ? { senha } : {}) })).data,
+    mutationFn: async ({ tenantId, nome, email, senha, role }: { tenantId: string; nome: string; email: string; senha: string; role: string }) =>
+      (await api.post(`/admin/tenants/${tenantId}/usuarios`, { nome, email, role, ...(senha ? { senha } : {}) })).data,
     onSuccess: async (data, vars) => {
       setUsuarioCriado({ email: data.email, senha: data.senha })
       setNovoUsuarioAberto(false)
+      setNovoUsuarioNome('')
       setNovoUsuarioEmail('')
       setNovoUsuarioSenha('')
       setNovoUsuarioRole('vendedor')
@@ -529,7 +531,13 @@ export function Admin() {
                   <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
                     {novoUsuarioAberto ? (
                       <div className="space-y-2 bg-gray-50 rounded-lg p-2">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                          <Input
+                            value={novoUsuarioNome}
+                            onChange={(e) => setNovoUsuarioNome(e.target.value)}
+                            placeholder="Nome"
+                            className="text-xs"
+                          />
                           <Input
                             value={novoUsuarioEmail}
                             onChange={(e) => setNovoUsuarioEmail(e.target.value)}
@@ -556,7 +564,7 @@ export function Admin() {
                           <Button
                             size="sm"
                             disabled={criandoUsuario || !novoUsuarioEmail.trim()}
-                            onClick={() => criarUsuario({ tenantId: t.id, email: novoUsuarioEmail.trim(), senha: novoUsuarioSenha.trim(), role: novoUsuarioRole })}
+                            onClick={() => criarUsuario({ tenantId: t.id, nome: novoUsuarioNome.trim(), email: novoUsuarioEmail.trim(), senha: novoUsuarioSenha.trim(), role: novoUsuarioRole })}
                           >
                             {criandoUsuario ? 'Criando...' : 'Criar usuário'}
                           </Button>
@@ -588,7 +596,7 @@ export function Admin() {
                       <div key={u.id} className="space-y-2">
                         <div className="flex items-center justify-between gap-2">
                           <div className="text-xs">
-                            <span className="font-medium text-gray-700">{u.email}</span>
+                            <span className="font-medium text-gray-700">{u.nome ? `${u.nome} · ` : ''}{u.email}</span>
                             <span className="text-gray-400"> · {u.role}{!u.ativo && ' · desativado'}</span>
                           </div>
                           {resetandoId === u.id ? null : (
