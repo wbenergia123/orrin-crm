@@ -4,6 +4,7 @@ import { supabaseAdmin } from '../services/supabase'
 import { processarComAgente } from '../lib/claude-agent'
 import { enviarMensagemViaUAZAPI, getUazapiConfig } from '../lib/uazapi-client'
 import { transcreverAudio } from '../lib/groq-transcriber'
+import { baixarMidiaUazapi, salvarMidiaConversa } from '../lib/conversa-midia'
 import type { WebhookPayload } from '../types/webhook'
 
 const router = Router()
@@ -91,8 +92,15 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       payload.message.messageType === 'ImageMessage' ||
       payload.message.mediaType === 'image'
 
+    const isVideo =
+      payload.message.messageType === 'VideoMessage' ||
+      payload.message.mediaType === 'video'
+
     if (isImage && !texto) {
       texto = '[Foto recebida]'
+    }
+    if (isVideo && !texto) {
+      texto = '[Vídeo recebido]'
     }
 
     if (!texto) {
@@ -123,6 +131,28 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
     }
 
     const pacienteId = paciente!.id
+
+    let midiaUrl: string | null = null
+    let midiaTipo: 'image' | 'video' | null = null
+
+    if (isImage || isVideo) {
+      const msgId = payload.message.id || payload.message.messageid
+      const baixada = await baixarMidiaUazapi(tenantId, msgId)
+      if (baixada) {
+        try {
+          midiaUrl = await salvarMidiaConversa({
+            tenantId,
+            pacienteId,
+            base64: baixada.base64,
+            mimeType: baixada.mimeType,
+            tipo: isImage ? 'image' : 'video',
+          })
+          midiaTipo = isImage ? 'image' : 'video'
+        } catch (err) {
+          console.error('[WEBHOOK] Falha ao salvar mídia:', err)
+        }
+      }
+    }
 
     // Mensagem enviada pelo próprio número da clínica direto no WhatsApp (não veio
     // da Ana nem da caixa de texto do CRM — as duas passam pela API e já são
@@ -224,6 +254,8 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
       mensagem_paciente: texto,
       tipo_remetente: 'humano',
       modo_humano: false,
+      midia_url: midiaUrl,
+      midia_tipo: midiaTipo,
     })
 
     await supabaseAdmin
