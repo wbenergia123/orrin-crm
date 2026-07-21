@@ -214,6 +214,8 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
         mensagem_paciente: texto,
         tipo_remetente: 'humano',
         modo_humano: true,
+        midia_url: midiaUrl,
+        midia_tipo: midiaTipo,
       })
       await supabaseAdmin
         .from('pacientes')
@@ -239,6 +241,8 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
         mensagem_paciente: texto,
         tipo_remetente: 'humano',
         modo_humano: false,
+        midia_url: midiaUrl,
+        midia_tipo: midiaTipo,
       })
       await supabaseAdmin
         .from('pacientes')
