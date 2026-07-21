@@ -361,6 +361,22 @@ ${servicosInfo}`
 
     const tools = vertical === 'agro' ? TOOLS_AGRO : TOOLS
 
+    const isGemini = modelo.startsWith('gemini-')
+
+    if (isGemini) {
+      const { processarComGemini } = await import('./gemini-agent')
+      return await processarComGemini({
+        tenantId,
+        pacienteId,
+        modelo,
+        systemPrompt,
+        tools,
+        historico,
+        mensagensDoUsuario,
+        executarToolDispatcher: vertical === 'agro' ? executarToolAgro : executarTool,
+      })
+    }
+
     for (let i = 0; i < MAX_ITERATIONS; i++) {
       const response = await client.messages.create({
         model: modelo,
