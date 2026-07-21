@@ -33,6 +33,11 @@ export async function salvarMidiaConversa({
   const path = `${tenantId}/${pacienteId}/conversa-${Date.now()}.${ext}`
   const buffer = Buffer.from(base64, 'base64')
 
+  const MAX_BUFFER_SIZE = 20 * 1024 * 1024 // 20 MB — WhatsApp media ceiling with margin
+  if (buffer.length > MAX_BUFFER_SIZE) {
+    throw new Error(`Arquivo muito grande (máx. 20MB, recebido ${Math.round(buffer.length / 1024 / 1024)}MB)`)
+  }
+
   const { error: uploadError } = await supabaseAdmin.storage
     .from(BUCKET)
     .upload(path, buffer, { contentType: mimeType })
@@ -54,19 +59,28 @@ export async function baixarMidiaUazapi(
   msgId: string
 ): Promise<MidiaBaixada | null> {
   const config = await getUazapiConfig(tenantId)
-  if (!config) return null
+  if (!config) {
+    console.warn(`[CONVERSA_MIDIA] Configuração UAZAPI não encontrada para tenant ${tenantId}`)
+    return null
+  }
 
   const res = await fetch(`${config.baseUrl}/message/download`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', token: config.token },
     body: JSON.stringify({ id: msgId, return_base64: true }),
   })
-  if (!res.ok) return null
+  if (!res.ok) {
+    console.warn(`[CONVERSA_MIDIA] HTTP ${res.status} ao baixar mídia da UAZAPI para tenant ${tenantId}`)
+    return null
+  }
 
   const body = (await res.json()) as Record<string, unknown>
   const base64 = (body.base64Data || body.base64) as string | undefined
   const mimeType = (body.mimetype || body.mimeType) as string | undefined
-  if (!base64 || !mimeType) return null
+  if (!base64 || !mimeType) {
+    console.warn(`[CONVERSA_MIDIA] Resposta UAZAPI sem base64 ou mimeType para tenant ${tenantId}`)
+    return null
+  }
 
   return { base64, mimeType }
 }
