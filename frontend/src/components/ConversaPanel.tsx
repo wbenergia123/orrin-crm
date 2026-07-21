@@ -121,6 +121,16 @@ export function ConversaPanel({ paciente, onClose, onStatusChange }: ConversaPan
             {c.mensagem_paciente && (
               <div className="flex flex-col items-start" style={{ maxWidth: '85%' }}>
                 <div className="bg-gray-100 text-gray-800 rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm leading-relaxed">
+                  {c.midia_url && c.midia_tipo === 'image' && (
+                    <img
+                      src={c.midia_url}
+                      alt="Foto enviada pelo cliente"
+                      className="rounded-lg max-w-full mb-1.5"
+                    />
+                  )}
+                  {c.midia_url && c.midia_tipo === 'video' && (
+                    <video src={c.midia_url} controls className="rounded-lg max-w-full mb-1.5" />
+                  )}
                   {c.mensagem_paciente}
                 </div>
                 <span className="text-[10px] text-gray-400 mt-0.5 px-1">

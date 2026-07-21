@@ -95,6 +95,8 @@ export interface Conversa {
   tipo_remetente: 'agente' | 'humano'
   modo_humano: boolean
   remetente_nome: string | null
+  midia_url: string | null
+  midia_tipo: 'image' | 'video' | null
   created_at: string
 }
 

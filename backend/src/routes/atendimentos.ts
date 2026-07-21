@@ -122,7 +122,7 @@ router.get('/:paciente_id/conversas', async (req, res) => {
   // que aconteceu depois (mesmo bug já corrigido no histórico usado pela Ana).
   const { data, error } = await supabaseAdmin
     .from('conversas_pacientes')
-    .select('id, mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, remetente_nome, created_at')
+    .select('id, mensagem_paciente, mensagem_agente, tipo_remetente, modo_humano, remetente_nome, midia_url, midia_tipo, created_at')
     .eq('tenant_id', req.user!.tenant_id)
     .eq('paciente_id', req.params.paciente_id)
     .order('created_at', { ascending: false })
