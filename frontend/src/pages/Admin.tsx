@@ -505,9 +505,15 @@ export function Admin() {
                         className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs"
                       >
                         <option value="">Padrão do sistema (Haiku — mais barato)</option>
-                        <option value="claude-haiku-4-5-20251001">Haiku 4.5 (mais barato)</option>
-                        <option value="claude-sonnet-4-6">Sonnet 4.6 (mais inteligente)</option>
-                        <option value="claude-opus-4-8">Opus 4.8 (mais caro e mais capaz)</option>
+                        <optgroup label="Claude">
+                          <option value="claude-haiku-4-5-20251001">Haiku 4.5 (mais barato)</option>
+                          <option value="claude-sonnet-4-6">Sonnet 4.6 (mais inteligente)</option>
+                          <option value="claude-opus-4-8">Opus 4.8 (mais caro e mais capaz)</option>
+                        </optgroup>
+                        <optgroup label="Gemini">
+                          <option value="gemini-3.1-flash-lite">Flash-Lite (mais barato, tier grátis maior)</option>
+                          <option value="gemini-3.5-flash">Flash (mais inteligente, pago)</option>
+                        </optgroup>
                       </select>
                     </div>
                     <div className="flex items-center gap-2">
