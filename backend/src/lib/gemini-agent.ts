@@ -90,27 +90,31 @@ export async function processarComGemini({
 
       contents.push({
         role: 'model',
-        parts: chamadas.map((c) => ({ functionCall: { name: c.name!, args: c.args ?? {} } })),
+        parts: chamadas.map((c) => ({ functionCall: { name: c.name ?? '', args: c.args ?? {} } })),
       })
 
       const respostasFuncao: GeminiContent['parts'] = []
 
       for (const chamada of chamadas) {
-        console.log(`[GEMINI] Tool chamada: ${chamada.name}`, chamada.args)
+        const nomeChamada = chamada.name
+        console.log(`[GEMINI] Tool chamada: ${nomeChamada}`, chamada.args)
         try {
+          if (!nomeChamada) {
+            throw new Error('Chamada de função sem nome retornada pelo Gemini')
+          }
           const resultado = await executarToolDispatcher(
             tenantId,
             pacienteId,
-            chamada.name!,
+            nomeChamada,
             (chamada.args ?? {}) as Record<string, unknown>
           )
           consecutiveToolFailures = 0
-          respostasFuncao.push({ functionResponse: { name: chamada.name!, response: { resultado } } })
+          respostasFuncao.push({ functionResponse: { name: nomeChamada, response: { resultado } } })
         } catch (err) {
           consecutiveToolFailures++
-          console.error(`[GEMINI] Tool ${chamada.name} falhou (${consecutiveToolFailures}):`, err)
+          console.error(`[GEMINI] Tool ${nomeChamada} falhou (${consecutiveToolFailures}):`, err)
           respostasFuncao.push({
-            functionResponse: { name: chamada.name!, response: { erro: 'Falha ao executar ferramenta', detalhes: String(err) } },
+            functionResponse: { name: nomeChamada ?? 'desconhecida', response: { erro: 'Falha ao executar ferramenta', detalhes: String(err) } },
           })
 
           if (consecutiveToolFailures >= 3) {
