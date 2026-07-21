@@ -50,7 +50,7 @@ export async function getModeloAna(tenantId: string): Promise<string> {
   return valor
 }
 
-interface ConversaHistorico {
+export interface ConversaHistorico {
   mensagem_paciente: string | null
   mensagem_agente: string | null
 }
@@ -157,7 +157,7 @@ export async function getAgendamentosPendentes(pacienteId: string, tenantId: str
 
 // Registra a falha na conversa (visível pra equipe acompanhar), mas não pausa
 // a Ana — a próxima mensagem do paciente continua sendo respondida automaticamente.
-async function registrarFalhaTecnica(pacienteId: string, tenantId: string): Promise<void> {
+export async function registrarFalhaTecnica(pacienteId: string, tenantId: string): Promise<void> {
   await supabase.from('conversas_pacientes').insert({
     tenant_id: tenantId,
     paciente_id: pacienteId,
