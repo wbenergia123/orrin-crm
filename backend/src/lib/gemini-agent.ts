@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
 import type Anthropic from '@anthropic-ai/sdk'
 import { converterToolsParaGemini } from './gemini-tools-convert'
-import { registrarFalhaTecnica, type ConversaHistorico } from './claude-agent'
+import { registrarFalhaTecnica, SEM_RESPOSTA, type ConversaHistorico } from './claude-agent'
 
 const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
@@ -88,7 +88,7 @@ export async function processarComGemini({
 
       if (chamadas.length === 0) {
         const texto = (response.text ?? '').trim()
-        if (!texto) return 'Desculpe, não consegui responder agora. Nossa equipe vai ajudar em breve.'
+        if (!texto) return SEM_RESPOSTA
         return texto
       }
 
@@ -130,7 +130,7 @@ export async function processarComGemini({
 
           if (consecutiveToolFailures >= 3) {
             await registrarFalhaTecnica(pacienteId, tenantId)
-            return 'Desculpe, estou com dificuldades técnicas agora. Nossa equipe vai entrar em contato em breve.'
+            return SEM_RESPOSTA
           }
         }
       }
@@ -140,10 +140,10 @@ export async function processarComGemini({
 
     console.warn(`[GEMINI] Máximo de ${MAX_ITERATIONS} iterações atingido para paciente ${pacienteId}`)
     await registrarFalhaTecnica(pacienteId, tenantId)
-    return 'Desculpe, não consegui processar sua mensagem agora. Nossa equipe vai te ajudar em breve.'
+    return SEM_RESPOSTA
   } catch (error) {
     console.error('[GEMINI] Erro irrecuperável no agentic loop:', error)
     await registrarFalhaTecnica(pacienteId, tenantId).catch(() => {})
-    return 'Desculpe, estou com dificuldades técnicas agora. Nossa equipe vai entrar em contato em breve.'
+    return SEM_RESPOSTA
   }
 }

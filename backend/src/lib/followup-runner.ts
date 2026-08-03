@@ -164,6 +164,10 @@ async function processarNaoRespondeu(tenantId: string, regra: FollowupRegra, ago
 
     const respostaAgente = (await processarComAgente(tenantId, paciente.id, [mensagemSistema])).trim()
 
+    // Agente falhou (sentinela vazia) — não manda follow-up e não marca o lead
+    // como frio; tenta de novo na próxima rodada.
+    if (!respostaAgente) continue
+
     if (respostaAgente.toLowerCase() === 'sem_resposta') {
       const { data: regrasPosteriores } = await supabase
         .from('followup_regras')

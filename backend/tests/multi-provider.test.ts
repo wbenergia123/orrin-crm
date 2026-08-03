@@ -49,9 +49,9 @@ describe('roteamento de provedor por prefixo do ana_model', () => {
   it('modelo "gemini-*" usa o branch do Gemini (erro de modelo inválido, não de auth Anthropic)', async () => {
     const resposta = await processarComAgente(tenantId, pacienteId, ['Oi'])
     // Não valida sucesso (não há chave real do Gemini no ambiente de teste) —
-    // só que o fluxo de erro genérico do agente foi acionado, provando que o
-    // branch Gemini rodou (não travou tentando falar com a Anthropic).
-    expect(typeof resposta).toBe('string')
-    expect(resposta.length).toBeGreaterThan(0)
+    // só que o fluxo de erro do agente foi acionado, provando que o branch
+    // Gemini rodou (não travou tentando falar com a Anthropic). No erro o
+    // agente devolve a sentinela vazia: ninguém manda mensagem pro paciente.
+    expect(resposta).toBe('')
   })
 })

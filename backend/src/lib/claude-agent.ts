@@ -155,6 +155,11 @@ export async function getAgendamentosPendentes(pacienteId: string, tenantId: str
   }))
 }
 
+// Sentinela de falha: a Ana não tem resposta pra dar. Quem chama simplesmente
+// não envia nada ao paciente (nada de mensagem de "dificuldades técnicas") —
+// a falha fica só registrada na conversa pra equipe assumir.
+export const SEM_RESPOSTA = ''
+
 // Registra a falha na conversa (visível pra equipe acompanhar), mas não pausa
 // a Ana — a próxima mensagem do paciente continua sendo respondida automaticamente.
 export async function registrarFalhaTecnica(pacienteId: string, tenantId: string): Promise<void> {
@@ -394,7 +399,7 @@ ${servicosInfo}`
           .map((b) => (b.type === 'text' ? b.text : ''))
           .join('\n')
           .trim()
-        if (!texto) return 'Desculpe, não consegui responder agora. Nossa equipe vai ajudar em breve.'
+        if (!texto) return SEM_RESPOSTA
         return texto
       }
 
@@ -432,7 +437,7 @@ ${servicosInfo}`
 
             if (consecutiveToolFailures >= 3) {
               await registrarFalhaTecnica(pacienteId, tenantId)
-              return 'Desculpe, estou com dificuldades técnicas agora. Nossa equipe vai entrar em contato em breve.'
+              return SEM_RESPOSTA
             }
           }
         }
@@ -447,10 +452,10 @@ ${servicosInfo}`
 
     console.warn(`[CLAUDE] Máximo de ${MAX_ITERATIONS} iterações atingido para paciente ${pacienteId}`)
     await registrarFalhaTecnica(pacienteId, tenantId)
-    return 'Desculpe, não consegui processar sua mensagem agora. Nossa equipe vai te ajudar em breve.'
+    return SEM_RESPOSTA
   } catch (error) {
     console.error('[CLAUDE] Erro irrecuperável no agentic loop:', error)
     await registrarFalhaTecnica(pacienteId, tenantId).catch(() => {})
-    return 'Desculpe, estou com dificuldades técnicas agora. Nossa equipe vai entrar em contato em breve.'
+    return SEM_RESPOSTA
   }
 }

@@ -269,6 +269,13 @@ router.post('/whatsapp/:tenantSlug', async (req: Request, res: Response) => {
 
     const respostaAgente = await processarComAgente(tenantId, pacienteId, [texto])
 
+    // Agente falhou: não manda nada pro paciente. A falha já ficou registrada
+    // na conversa pra equipe assumir.
+    if (!respostaAgente.trim()) {
+      console.warn(`[WEBHOOK] Agente sem resposta para ${telefone} — nada enviado`)
+      return res.json({ result: 'ok' })
+    }
+
     const { data: ultimaMsg } = await supabaseAdmin
       .from('conversas_pacientes')
       .select('id, modo_humano')
