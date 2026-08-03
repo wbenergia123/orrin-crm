@@ -11,6 +11,10 @@ interface GeminiContent {
   role: 'user' | 'model'
   parts: Array<{
     text?: string
+    // Gemini 3.x devolve uma assinatura de raciocínio junto do functionCall e
+    // exige ela de volta, intacta, no histórico — sem isso a rodada seguinte
+    // volta 400 INVALID_ARGUMENT ("missing a thought_signature").
+    thoughtSignature?: string
     functionCall?: { name: string; args: Record<string, unknown> }
     functionResponse?: { name: string; response: Record<string, unknown> }
   }>
@@ -88,9 +92,16 @@ export async function processarComGemini({
         return texto
       }
 
+      // Reaproveita as parts do próprio candidate (que carregam thoughtSignature)
+      // em vez de reconstruí-las a partir de `functionCalls`. Fallback só pra
+      // resposta sem candidates (modelos antigos / mocks).
+      const partesModelo = response.candidates?.[0]?.content?.parts as GeminiContent['parts'] | undefined
+
       contents.push({
         role: 'model',
-        parts: chamadas.map((c) => ({ functionCall: { name: c.name ?? '', args: c.args ?? {} } })),
+        parts: partesModelo?.length
+          ? partesModelo
+          : chamadas.map((c) => ({ functionCall: { name: c.name ?? '', args: c.args ?? {} } })),
       })
 
       const respostasFuncao: GeminiContent['parts'] = []

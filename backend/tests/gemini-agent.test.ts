@@ -61,4 +61,33 @@ describe('processarComGemini', () => {
     expect(executarToolDispatcher).toHaveBeenCalledWith('tenant-1', 'paciente-1', 'buscar_paciente', { id: '123' })
     expect(resultado).toBe('Encontrei seu cadastro, tudo certo!')
   })
+
+  it('devolve o thoughtSignature do functionCall no histórico da rodada seguinte', async () => {
+    const partsDoModelo = [
+      { thoughtSignature: 'assinatura-abc', functionCall: { name: 'atualizar_cliente', args: { nome: 'Willian' } } },
+    ]
+
+    generateContentMock.mockReset()
+    generateContentMock
+      .mockResolvedValueOnce({
+        functionCalls: [{ name: 'atualizar_cliente', args: { nome: 'Willian' } }],
+        candidates: [{ content: { role: 'model', parts: partsDoModelo } }],
+        text: undefined,
+      })
+      .mockResolvedValueOnce({ functionCalls: [], text: 'Prazer, Willian!' })
+
+    await processarComGemini({
+      tenantId: 'tenant-1',
+      pacienteId: 'paciente-1',
+      modelo: 'gemini-3.1-flash-lite',
+      systemPrompt: 'você é um agente',
+      tools: [],
+      historico: [],
+      mensagensDoUsuario: ['Willian'],
+      executarToolDispatcher: vi.fn().mockResolvedValue({ ok: true }),
+    })
+
+    const contentsDaSegundaRodada = generateContentMock.mock.calls[1][0].contents
+    expect(contentsDaSegundaRodada).toContainEqual({ role: 'model', parts: partsDoModelo })
+  })
 })
