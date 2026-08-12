@@ -221,8 +221,15 @@ const TOOL_ATUALIZAR_CLIENTE_REVEST: Anthropic.Tool = {
   },
 }
 
+// Loja de balcão não agenda: a consultora liga quando puder. Deixar as tools de
+// reunião disponíveis é convite pro modelo marcar horário que ninguém combinou —
+// ainda mais com vendedora sem agenda configurada.
+const TOOLS_DE_AGENDA = ['verificar_slots_vendedores', 'criar_reuniao', 'remarcar_reuniao', 'cancelar_reuniao']
+
 export function ajustarToolsParaRevest(tools: Anthropic.Tool[]): Anthropic.Tool[] {
-  return tools.map((t) => (t.name === TOOL_ATUALIZAR_CLIENTE_REVEST.name ? TOOL_ATUALIZAR_CLIENTE_REVEST : t))
+  return tools
+    .filter((t) => !TOOLS_DE_AGENDA.includes(t.name))
+    .map((t) => (t.name === TOOL_ATUALIZAR_CLIENTE_REVEST.name ? TOOL_ATUALIZAR_CLIENTE_REVEST : t))
 }
 
 export const TOOL_ENVIAR_FOTO_PRODUTO: Anthropic.Tool = {

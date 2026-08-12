@@ -204,6 +204,17 @@ export async function montarContextoAgro(tenantId: string, pacienteId: string): 
     ? 'Catálogo (use estes IDs nas ferramentas):'
     : 'Catálogo de implementos (use estes IDs nas ferramentas; NUNCA cite preço):'
 
+  // Loja de balcão não marca horário: a consultora liga quando puder. Perguntar
+  // dia e hora emperra a conversa e promete uma agenda que ninguém mantém.
+  const diretrizesHandoff = fechaOrcamento
+    ? `Quando precisar passar para uma consultora (cidade fora da área, teto/forro, parede acima de 2,90m, pedido grande ou dúvida que você não sabe responder):
+- Garanta que o cadastro tem nome e cidade (atualizar_cliente).
+- Diga que a consultora entra em contato em breve. NUNCA pergunte dia nem horário, NUNCA marque reunião e NUNCA prometa horário específico.
+- Exemplo: "Então tá, logo logo nossa consultora entra em contato com você 😊"`
+    : `Diretrizes para marcar reunião:
+- Colete antes: nome, cidade, atividade e máquina do cliente (atualizar_cliente) e o implemento de interesse (listar_produtos + registrar_interesse).
+- Use verificar_slots_vendedores para achar horário, pergunte se prefere presencial ou por vídeo, confirme explicitamente dia/hora, e SÓ ENTÃO chame criar_reuniao. Nunca diga que marcou sem ter chamado a ferramenta.`
+
   const produtosInfo = (produtos ?? []).length > 0
     ? (produtos ?? []).map((p) => `- ${p.nome} (id: ${p.id})${p.categoria ? ` | ${p.categoria}` : ''}${p.descricao ? ` — ${p.descricao}` : ''}`).join('\n')
     : '(catálogo vazio — colete o interesse do cliente em texto livre)'
@@ -239,9 +250,7 @@ REGRA CRÍTICA: Você só envia UMA mensagem por interação. NUNCA diga "já vo
 
 ${regraDePreco}
 
-Diretrizes para marcar reunião:
-- Colete antes: nome, cidade, atividade e máquina do cliente (atualizar_cliente) e o implemento de interesse (listar_produtos + registrar_interesse).
-- Use verificar_slots_vendedores para achar horário, pergunte se prefere presencial ou por vídeo, confirme explicitamente dia/hora, e SÓ ENTÃO chame criar_reuniao. Nunca diga que marcou sem ter chamado a ferramenta.
+${diretrizesHandoff}
 
 Vendedores ativos (use estes IDs nas ferramentas):
 ${vendedoresInfo}

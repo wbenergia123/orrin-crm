@@ -122,6 +122,16 @@ describe('TOOL_ENVIAR_FOTO_PRODUTO', () => {
     expect(TOOL_ENVIAR_FOTO_PRODUTO.description).toMatch(/mensagem separada/i)
   })
 
+  it('tira as tools de agenda: loja de balcão não marca horário', () => {
+    const agro = ['atualizar_cliente', 'listar_produtos', 'verificar_slots_vendedores',
+                  'criar_reuniao', 'remarcar_reuniao', 'cancelar_reuniao'].map((name) => ({
+      name, description: 'x', input_schema: { type: 'object' as const, properties: {}, required: [] },
+    }))
+    const nomes = ajustarToolsParaRevest(agro).map((t) => t.name)
+    expect(nomes).toEqual(['atualizar_cliente', 'listar_produtos'])
+    expect(agro).toHaveLength(6) // array da Agrokhan intacto
+  })
+
   it('entra no tool set só com a flag ligada', () => {
     const nomes = [...ajustarToolsParaRevest([]), TOOL_ENVIAR_FOTO_PRODUTO].map((t) => t.name)
     expect(nomes).toContain('enviar_foto_produto')
