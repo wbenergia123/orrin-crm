@@ -8,6 +8,7 @@
 import { supabase } from '../db/supabase'
 import type Anthropic from '@anthropic-ai/sdk'
 import { executarToolAgro } from './claude-tools-agro'
+import { enviarImagemViaUAZAPI } from './uazapi-client'
 
 // Tudo em centavos — 79.90 * 8 em float dá 639.2000000000001.
 const PRECO_PAINEL = 7990          // só material
@@ -18,8 +19,6 @@ const PAINEIS_POR_TUBO_PU = 1.5
 const LARGURA_PAINEL_M = 0.16
 const COMPRIMENTOS_M = [2.7, 2.8, 2.9] as const
 
-// Cliente escreve "Floripa", não "Florianópolis". Apelido que não bate vira
-// handoff pro vendedor — perde venda que a tabela sabia responder.
 // Cliente escreve "Floripa", não "Florianópolis". Apelido que não bate vira
 // handoff pro vendedor — perde venda que a tabela sabia responder.
 // Só apelido inequívoco entra aqui: na dúvida, handoff é melhor que frete errado.
@@ -181,6 +180,9 @@ export async function executarToolAgroOuOrcamento(
   name: string,
   input: Record<string, unknown>
 ): Promise<object> {
+  if (name === TOOL_ENVIAR_FOTO_PRODUTO.name) {
+    return enviarFotoProduto(tenantId, pacienteId, input)
+  }
   if (name === TOOL_ORCAMENTO_WPC.name) {
     return calcularOrcamentoWpc({
       largura_m: numero(input.largura_m),
@@ -221,6 +223,54 @@ const TOOL_ATUALIZAR_CLIENTE_REVEST: Anthropic.Tool = {
 
 export function ajustarToolsParaRevest(tools: Anthropic.Tool[]): Anthropic.Tool[] {
   return tools.map((t) => (t.name === TOOL_ATUALIZAR_CLIENTE_REVEST.name ? TOOL_ATUALIZAR_CLIENTE_REVEST : t))
+}
+
+export const TOOL_ENVIAR_FOTO_PRODUTO: Anthropic.Tool = {
+  name: 'enviar_foto_produto',
+  description:
+    'Envia a foto de um produto do catálogo pro WhatsApp do cliente. Use quando ele pedir pra ver as cores, o acabamento ou como o produto é. A foto vai numa mensagem separada — depois de chamar, escreva um texto curto comentando. Só funciona para produto que tem foto no catálogo.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      produto_id: { type: 'string', description: 'ID do produto no catálogo (a lista de IDs está no seu contexto)' },
+      legenda: { type: 'string', description: 'Legenda curta que acompanha a foto, ex: "Essas são as 10 cores do Painel Ripado WPC"' },
+    },
+    required: ['produto_id'],
+  },
+}
+
+// A tool envia a imagem por fora do fluxo de resposta: o agente devolve UMA
+// mensagem de texto por interação, então a foto não caberia no retorno dele.
+async function enviarFotoProduto(
+  tenantId: string,
+  pacienteId: string,
+  input: Record<string, unknown>
+): Promise<object> {
+  const produtoId = typeof input.produto_id === 'string' ? input.produto_id : ''
+  if (!produtoId) return { erro: 'produto_id é obrigatório' }
+
+  const [{ data: produto }, { data: paciente }] = await Promise.all([
+    supabase.from('produtos').select('nome, foto_url').eq('id', produtoId).eq('tenant_id', tenantId).maybeSingle(),
+    supabase.from('pacientes').select('telefone').eq('id', pacienteId).eq('tenant_id', tenantId).maybeSingle(),
+  ])
+
+  if (!produto) return { erro: 'Produto não encontrado no catálogo' }
+  if (!produto.foto_url) {
+    return { enviado: false, motivo: `${produto.nome} ainda não tem foto cadastrada. Ofereça chamar um vendedor.` }
+  }
+  if (!paciente?.telefone) return { erro: 'Cliente sem telefone' }
+
+  const legenda = typeof input.legenda === 'string' ? input.legenda : undefined
+  const enviado = await enviarImagemViaUAZAPI({
+    tenantId,
+    phone: paciente.telefone,
+    imagemUrl: produto.foto_url,
+    legenda,
+  })
+
+  return enviado
+    ? { enviado: true, produto: produto.nome, aviso: 'A foto já foi enviada. Agora escreva o texto que acompanha.' }
+    : { enviado: false, motivo: 'Falha ao enviar a foto. Ofereça chamar um vendedor.' }
 }
 
 export const TOOL_ORCAMENTO_WPC: Anthropic.Tool = {
