@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { supabase } from '../db/supabase'
 import { TOOLS, executarTool } from './claude-tools'
 import { TOOLS_AGRO, executarToolAgro } from './claude-tools-agro'
+import { TOOL_ORCAMENTO_WPC, executarToolAgroOuOrcamento, orcamentoWpcAtivo } from './orcamento-wpc'
 import { getVerticalDoTenant } from './vertical'
 import { agoraComoTextoLocal, somarMinutosTextoLocal, formatarTextoLocal } from './datetime-local'
 
@@ -185,6 +186,18 @@ export async function montarContextoAgro(tenantId: string, pacienteId: string): 
       .order('data_hora', { ascending: true }),
   ])
 
+  // Quem fecha orçamento na conversa precisa poder falar preço; quem vende por
+  // proposta de vendedor (Agrokhan) continua proibido.
+  const fechaOrcamento = await orcamentoWpcAtivo(tenantId)
+
+  const regraDePreco = fechaOrcamento
+    ? 'REGRA DE PREÇO: só informe valor que veio de calcular_orcamento_wpc ou do catálogo abaixo. NUNCA calcule de cabeça e NUNCA estime. Se não souber, diga que vai confirmar e passe para um vendedor.'
+    : 'REGRA DE PREÇO: NUNCA informe preço ou faixa de valor. Todo orçamento é personalizado e apresentado pelo vendedor na reunião. Se perguntarem preço, explique isso e ofereça marcar uma reunião.'
+
+  const tituloCatalogo = fechaOrcamento
+    ? 'Catálogo (use estes IDs nas ferramentas):'
+    : 'Catálogo de implementos (use estes IDs nas ferramentas; NUNCA cite preço):'
+
   const produtosInfo = (produtos ?? []).length > 0
     ? (produtos ?? []).map((p) => `- ${p.nome} (id: ${p.id})${p.categoria ? ` | ${p.categoria}` : ''}${p.descricao ? ` — ${p.descricao}` : ''}`).join('\n')
     : '(catálogo vazio — colete o interesse do cliente em texto livre)'
@@ -218,7 +231,7 @@ Diretriz geral: depois de usar qualquer ferramenta, sempre escreva uma mensagem 
 
 REGRA CRÍTICA: Você só envia UMA mensagem por interação. NUNCA diga "já volto" ou "vou verificar e te aviso" — chame a ferramenta agora e responda com o resultado completo na mesma mensagem.
 
-REGRA DE PREÇO: NUNCA informe preço ou faixa de valor. Todo orçamento é personalizado e apresentado pelo vendedor na reunião. Se perguntarem preço, explique isso e ofereça marcar uma reunião.
+${regraDePreco}
 
 Diretrizes para marcar reunião:
 - Colete antes: nome, cidade, atividade e máquina do cliente (atualizar_cliente) e o implemento de interesse (listar_produtos + registrar_interesse).
@@ -227,7 +240,7 @@ Diretrizes para marcar reunião:
 Vendedores ativos (use estes IDs nas ferramentas):
 ${vendedoresInfo}
 
-Catálogo de implementos (use estes IDs nas ferramentas; NUNCA cite preço):
+${tituloCatalogo}
 ${produtosInfo}`
 }
 
@@ -364,7 +377,21 @@ ${servicosInfo}`
     let consecutiveToolFailures = 0
     const MAX_ITERATIONS = 10
 
-    const tools = vertical === 'agro' ? TOOLS_AGRO : TOOLS
+    // Tenant com orçamento na ponta (Floripa Revest) ganha a tool de cálculo;
+    // sem a flag, o vertical agro segue exatamente como está.
+    const comOrcamentoWpc = vertical === 'agro' && (await orcamentoWpcAtivo(tenantId))
+
+    const tools = vertical !== 'agro'
+      ? TOOLS
+      : comOrcamentoWpc
+        ? [...TOOLS_AGRO, TOOL_ORCAMENTO_WPC]
+        : TOOLS_AGRO
+
+    const dispatcher = vertical !== 'agro'
+      ? executarTool
+      : comOrcamentoWpc
+        ? executarToolAgroOuOrcamento
+        : executarToolAgro
 
     const isGemini = modelo.startsWith('gemini-')
 
@@ -378,7 +405,7 @@ ${servicosInfo}`
         tools,
         historico,
         mensagensDoUsuario,
-        executarToolDispatcher: vertical === 'agro' ? executarToolAgro : executarTool,
+        executarToolDispatcher: dispatcher,
       })
     }
 
@@ -414,9 +441,7 @@ ${servicosInfo}`
           console.log(`[CLAUDE] Tool chamada: ${block.name}`, block.input)
 
           try {
-            const resultado = vertical === 'agro'
-              ? await executarToolAgro(tenantId, pacienteId, block.name, block.input as Record<string, unknown>)
-              : await executarTool(tenantId, pacienteId, block.name, block.input as Record<string, unknown>)
+            const resultado = await dispatcher(tenantId, pacienteId, block.name, block.input as Record<string, unknown>)
             console.log(`[CLAUDE] Tool ${block.name} OK:`, JSON.stringify(resultado).substring(0, 100))
             consecutiveToolFailures = 0
             toolResults.push({

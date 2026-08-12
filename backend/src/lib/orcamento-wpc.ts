@@ -1,0 +1,209 @@
+// Orçamento de painel ripado WPC (tenant Floripa Revest).
+//
+// Ligado por tenant pela config `orcamento_wpc` — a Agrokhan divide o vertical
+// agro e não pode ganhar nem a tool nem a liberação de preço.
+// A conta mora aqui, em código, e não no prompt: o modelo do vertical agro é um
+// flash-lite, e arredondamento + escolha de barra + frete é regra determinística.
+// Mesma decisão da Fase 1 do notificar-consultor.
+import { supabase } from '../db/supabase'
+import type Anthropic from '@anthropic-ai/sdk'
+import { executarToolAgro } from './claude-tools-agro'
+
+// Tudo em centavos — 79.90 * 8 em float dá 639.2000000000001.
+const PRECO_PAINEL = 7990          // só material
+const PRECO_PAINEL_INSTALADO = 10990 // material + mão de obra (parede); isenta frete
+const PRECO_TUBO_PU = 2000
+const PAINEIS_POR_TUBO_PU = 1.5
+
+const LARGURA_PAINEL_M = 0.16
+const COMPRIMENTOS_M = [2.7, 2.8, 2.9] as const
+
+const FRETE_POR_CIDADE: Record<string, number> = {
+  biguacu: 4000,
+  'sao jose': 3000,
+  palhoca: 4000,
+  florianopolis: 5000,
+}
+
+function normalizarCidade(cidade: string): string {
+  return cidade
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s*[-/]\s*sc$/, '')
+    .trim()
+}
+
+function reais(centavos: number): string {
+  return `R$ ${(centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function metros(m: number): string {
+  return `${m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}m`
+}
+
+export interface OrcamentoInput {
+  largura_m: number
+  altura_m: number
+  cidade?: string
+  com_instalacao?: boolean
+}
+
+export type OrcamentoResultado =
+  | { ok: false; motivo: 'medida_invalida' | 'altura_acima_do_padrao' | 'cidade_sem_frete'; mensagem: string }
+  | {
+      ok: true
+      paineis: number
+      comprimento_painel_m: number
+      pecas: number
+      pecas_por_painel: number
+      tubos_pu: number
+      com_instalacao: boolean
+      frete_centavos: number
+      total_centavos: number
+      mensagem: string
+    }
+
+export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado {
+  const { largura_m, altura_m } = input
+  const comInstalacao = input.com_instalacao === true
+
+  if (!(largura_m > 0) || !(altura_m > 0) || largura_m > 50 || altura_m > 50) {
+    return {
+      ok: false,
+      motivo: 'medida_invalida',
+      mensagem: 'Medida inválida. Peça ao cliente a largura e a altura da parede em metros, separadas.',
+    }
+  }
+
+  // Frete só entra em venda de material; com instalação a loja não cobra.
+  let frete = 0
+  if (!comInstalacao) {
+    if (!input.cidade?.trim()) {
+      return {
+        ok: false,
+        motivo: 'cidade_sem_frete',
+        mensagem: 'Falta a cidade da entrega para calcular o frete. Pergunte ao cliente.',
+      }
+    }
+    const encontrado = FRETE_POR_CIDADE[normalizarCidade(input.cidade)]
+    if (encontrado === undefined) {
+      return {
+        ok: false,
+        motivo: 'cidade_sem_frete',
+        mensagem: `Não atendemos ${input.cidade.trim()} com frete de tabela. Passe o atendimento para um vendedor combinar a entrega.`,
+      }
+    }
+    frete = encontrado
+  }
+
+  const pecas = Math.ceil(largura_m / LARGURA_PAINEL_M)
+
+  // Cada painel rende N peças da altura da parede — é daí que vem o
+  // "aproveitamento": parede baixa corta 2 peças de um painel só.
+  let melhor: { comprimento: number; paineis: number; porPainel: number } | null = null
+  for (const comprimento of COMPRIMENTOS_M) {
+    const porPainel = Math.floor(comprimento / altura_m)
+    if (porPainel < 1) continue
+    const paineis = Math.ceil(pecas / porPainel)
+    // Menos painéis ganha; empatou, leva o painel mais curto (menos sobra).
+    if (!melhor || paineis < melhor.paineis) melhor = { comprimento, paineis, porPainel }
+  }
+
+  if (!melhor) {
+    return {
+      ok: false,
+      motivo: 'altura_acima_do_padrao',
+      mensagem: `Parede de ${metros(altura_m)} passa do painel mais alto (2,90m). Precisa de emenda — passe para um vendedor avaliar.`,
+    }
+  }
+
+  const tubosPu = Math.ceil(melhor.paineis / PAINEIS_POR_TUBO_PU)
+  const precoUnitario = comInstalacao ? PRECO_PAINEL_INSTALADO : PRECO_PAINEL
+  const subtotalPaineis = melhor.paineis * precoUnitario
+  const subtotalPu = tubosPu * PRECO_TUBO_PU
+  const total = subtotalPaineis + subtotalPu + frete
+
+  const linhas = [
+    '💎 *Painel Ripado WPC*',
+    '',
+    `📐 Parede: ${metros(largura_m)} de largura x ${metros(altura_m)} de altura`,
+    `📏 Painel: ${metros(melhor.comprimento)} x 16cm`,
+    `📦 ${melhor.paineis} ${melhor.paineis === 1 ? 'painel' : 'painéis'}${melhor.porPainel > 1 ? ` *(cada um rende ${melhor.porPainel} peças — aproveitamento otimizado)*` : ''}`,
+    '',
+    comInstalacao
+      ? `🔨 ${melhor.paineis} x ${reais(PRECO_PAINEL_INSTALADO)} (painel instalado): ${reais(subtotalPaineis)}`
+      : `🧱 ${melhor.paineis} x ${reais(PRECO_PAINEL)}: ${reais(subtotalPaineis)}`,
+    `🧴 ${tubosPu} ${tubosPu === 1 ? 'tubo' : 'tubos'} de cola PU x ${reais(PRECO_TUBO_PU)}: ${reais(subtotalPu)}`,
+    comInstalacao ? '🚚 Frete: grátis *(incluso na instalação)*' : `🚚 Frete: ${reais(frete)}`,
+    '',
+    `💰 *Total: ${reais(total)} à vista*`,
+    '💳 Também parcelamos no cartão',
+    '',
+    '✨ WPC com acabamento moderno e sofisticado',
+    '📲 Quer ver as opções de cor?',
+  ]
+
+  return {
+    ok: true,
+    paineis: melhor.paineis,
+    comprimento_painel_m: melhor.comprimento,
+    pecas,
+    pecas_por_painel: melhor.porPainel,
+    tubos_pu: tubosPu,
+    com_instalacao: comInstalacao,
+    frete_centavos: frete,
+    total_centavos: total,
+    mensagem: linhas.join('\n'),
+  }
+}
+
+// Gemini às vezes manda número como string ("2,40"); não vale derrubar a conta por isso.
+function numero(v: unknown): number {
+  if (typeof v === 'number') return v
+  if (typeof v === 'string') return Number(v.replace(',', '.'))
+  return NaN
+}
+
+export async function executarToolAgroOuOrcamento(
+  tenantId: string,
+  pacienteId: string,
+  name: string,
+  input: Record<string, unknown>
+): Promise<object> {
+  if (name === TOOL_ORCAMENTO_WPC.name) {
+    return calcularOrcamentoWpc({
+      largura_m: numero(input.largura_m),
+      altura_m: numero(input.altura_m),
+      cidade: typeof input.cidade === 'string' ? input.cidade : undefined,
+      com_instalacao: input.com_instalacao === true || input.com_instalacao === 'true',
+    })
+  }
+  return executarToolAgro(tenantId, pacienteId, name, input)
+}
+
+export async function orcamentoWpcAtivo(tenantId: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('configuracoes')
+    .select('valor')
+    .eq('tenant_id', tenantId)
+    .eq('chave', 'orcamento_wpc')
+    .maybeSingle()
+  return data?.valor?.trim() === 'true'
+}
+
+export const TOOL_ORCAMENTO_WPC: Anthropic.Tool = {
+  name: 'calcular_orcamento_wpc',
+  description:
+    'Calcula o orçamento fechado de painel ripado WPC para uma parede. Use SEMPRE que tiver largura e altura — nunca faça a conta de cabeça. Devolve o texto pronto do orçamento no campo "mensagem": envie ele ao cliente como está. Só serve para PAREDE; forro/teto exige visita técnica.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      largura_m: { type: 'number', description: 'Largura da parede em metros (o lado horizontal). Confirme com o cliente qual medida é a largura antes de chamar.' },
+      altura_m: { type: 'number', description: 'Altura da parede em metros (do chão ao teto).' },
+      com_instalacao: { type: 'boolean', description: 'true se o cliente quer a instalação junto (nesse caso não há frete). false ou omitido = só material.' },
+      cidade: { type: 'string', description: 'Cidade da entrega. Obrigatória quando NÃO tem instalação, para calcular o frete.' },
+    },
+    required: ['largura_m', 'altura_m'],
+  },
+}
