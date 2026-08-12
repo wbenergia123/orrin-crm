@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularOrcamentoWpc } from '../src/lib/orcamento-wpc'
+import { calcularOrcamentoWpc, ajustarToolsParaRevest } from '../src/lib/orcamento-wpc'
 
 function ok(r: ReturnType<typeof calcularOrcamentoWpc>) {
   if (!r.ok) throw new Error(`esperava sucesso, veio ${r.motivo}`)
@@ -53,11 +53,32 @@ describe('calcularOrcamentoWpc', () => {
     expect(r.pecas).toBe(7) // 6,25 → 7
   })
 
-  it('cidade aceita acento, caixa e sufixo do estado', () => {
-    for (const cidade of ['Florianópolis', 'florianopolis', 'FLORIANÓPOLIS - SC', 'Florianópolis/SC']) {
+  it('cidade aceita acento, caixa, sufixo do estado e apelido', () => {
+    const capital = ['Florianópolis', 'florianopolis', 'FLORIANÓPOLIS - SC', 'Florianópolis/SC',
+      'Florianopolis SC', 'Floripa', 'floripa', 'Floripa - SC', 'FPolis']
+    for (const cidade of capital) {
       const r = ok(calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, cidade }))
       expect(r.frete_centavos, cidade).toBe(5000)
     }
+    for (const cidade of ['São José', 'sao jose sc', 'Biguaçu', 'biguacu/SC', 'Palhoça']) {
+      const r = ok(calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, cidade }))
+      expect([3000, 4000], cidade).toContain(r.frete_centavos)
+    }
+  })
+
+  it('ajustarToolsParaRevest tira o trator sem mexer nas outras tools', () => {
+    const original = [
+      { name: 'atualizar_cliente', description: 'atividade rural, trator/colheitadeira', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+      { name: 'listar_produtos', description: 'lista', input_schema: { type: 'object' as const, properties: {}, required: [] } },
+    ]
+    const ajustado = ajustarToolsParaRevest(original)
+    expect(ajustado).toHaveLength(2)
+    // O que importa é ela não ter onde GRAVAR trator — a descrição cita o termo
+    // de propósito, como proibição explícita ("NUNCA pergunte sobre... trator").
+    expect(Object.keys(ajustado[0].input_schema.properties!)).toEqual(['nome', 'cidade'])
+    expect(ajustado[0].description).toMatch(/NUNCA pergunte/)
+    expect(ajustado[1]).toBe(original[1]) // intocada
+    expect(original[0].description).toMatch(/trator/) // não mutou o array da Agrokhan
   })
 
   it('cidade fora da tabela vira handoff, não orçamento errado', () => {
