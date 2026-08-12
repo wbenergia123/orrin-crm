@@ -16,6 +16,9 @@ const PRECO_PAINEL_INSTALADO = 10990 // material + mão de obra (parede); isenta
 const PRECO_TUBO_PU = 2000
 const PAINEIS_POR_TUBO_PU = 1.5
 
+const DESCONTO_A_VISTA = 0.05
+const PARCELAS_MAX = 6
+
 const LARGURA_PAINEL_M = 0.16
 const COMPRIMENTOS_M = [2.7, 2.8, 2.9] as const
 
@@ -70,6 +73,8 @@ export type OrcamentoResultado =
       com_instalacao: boolean
       frete_centavos: number
       total_centavos: number
+      total_a_vista_centavos: number
+      parcela_centavos: number
       mensagem: string
     }
 
@@ -133,21 +138,29 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
   const subtotalPu = tubosPu * PRECO_TUBO_PU
   const total = subtotalPaineis + subtotalPu + frete
 
+  // Desconto sobre o total (frete incluso). Parcela sai do valor cheio, como é
+  // praxe: quem parcela não leva o desconto do à vista.
+  const aVista = Math.round(total * (1 - DESCONTO_A_VISTA))
+  // Arredonda a parcela pra cima: 6 parcelas nunca podem somar menos que o total.
+  const parcela = Math.ceil(total / PARCELAS_MAX)
+
+  const painelLinha = comInstalacao
+    ? `🔨 ${melhor.paineis} ${melhor.paineis === 1 ? 'painel instalado' : 'painéis instalados'}`
+    : `🧱 ${melhor.paineis} ${melhor.paineis === 1 ? 'painel' : 'painéis'}`
+
   const linhas = [
     '💎 *Painel Ripado WPC*',
     '',
     `📐 Parede: ${metros(largura_m)} de largura x ${metros(altura_m)} de altura`,
-    `📏 Painel: ${metros(melhor.comprimento)} x 16cm`,
-    `📦 ${melhor.paineis} ${melhor.paineis === 1 ? 'painel' : 'painéis'}${melhor.porPainel > 1 ? ` *(cada um rende ${melhor.porPainel} peças — aproveitamento otimizado)*` : ''}`,
+    `📏 Painel: ${metros(melhor.comprimento)} x 16cm${melhor.porPainel > 1 ? ` *(cada um rende ${melhor.porPainel} peças)*` : ''}`,
     '',
-    comInstalacao
-      ? `🔨 ${melhor.paineis} x ${reais(PRECO_PAINEL_INSTALADO)} (painel instalado): ${reais(subtotalPaineis)}`
-      : `🧱 ${melhor.paineis} x ${reais(PRECO_PAINEL)}: ${reais(subtotalPaineis)}`,
-    `🧴 ${tubosPu} ${tubosPu === 1 ? 'tubo' : 'tubos'} de cola PU x ${reais(PRECO_TUBO_PU)}: ${reais(subtotalPu)}`,
+    `${painelLinha}: ${reais(subtotalPaineis)}`,
+    `🧴 ${tubosPu} ${tubosPu === 1 ? 'tubo' : 'tubos'} de cola PU: ${reais(subtotalPu)}`,
     comInstalacao ? '🚚 Frete: grátis *(incluso na instalação)*' : `🚚 Frete: ${reais(frete)}`,
     '',
-    `💰 *Total: ${reais(total)} à vista*`,
-    '💳 Também parcelamos no cartão',
+    `💰 *Total: ${reais(total)}*`,
+    `✅ *À vista com 5% de desconto: ${reais(aVista)}*`,
+    `💳 Ou em até ${PARCELAS_MAX}x de ${reais(parcela)} sem juros`,
     '',
     '✨ WPC com acabamento moderno e sofisticado',
     '📲 Quer ver as opções de cor?',
@@ -163,6 +176,8 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
     com_instalacao: comInstalacao,
     frete_centavos: frete,
     total_centavos: total,
+    total_a_vista_centavos: aVista,
+    parcela_centavos: parcela,
     mensagem: linhas.join('\n'),
   }
 }
