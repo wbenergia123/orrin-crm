@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { supabase } from '../db/supabase'
 import { TOOLS, executarTool } from './claude-tools'
 import { TOOLS_AGRO, executarToolAgro } from './claude-tools-agro'
-import { TOOL_ORCAMENTO_WPC, ajustarToolsParaRevest, executarToolAgroOuOrcamento, orcamentoWpcAtivo } from './orcamento-wpc'
+import { TOOL_ORCAMENTO_WPC, TOOL_ENVIAR_FOTO_PRODUTO, ajustarToolsParaRevest, executarToolAgroOuOrcamento, orcamentoWpcAtivo } from './orcamento-wpc'
 import { getVerticalDoTenant } from './vertical'
 import { agoraComoTextoLocal, somarMinutosTextoLocal, formatarTextoLocal } from './datetime-local'
 
@@ -390,7 +390,7 @@ ${servicosInfo}`
     const tools = vertical !== 'agro'
       ? TOOLS
       : comOrcamentoWpc
-        ? [...ajustarToolsParaRevest(TOOLS_AGRO), TOOL_ORCAMENTO_WPC]
+        ? [...ajustarToolsParaRevest(TOOLS_AGRO), TOOL_ORCAMENTO_WPC, TOOL_ENVIAR_FOTO_PRODUTO]
         : TOOLS_AGRO
 
     const dispatcher = vertical !== 'agro'

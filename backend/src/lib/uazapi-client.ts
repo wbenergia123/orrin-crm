@@ -47,6 +47,51 @@ export async function enviarMensagemViaUAZAPI({
   return enviarMensagemComConfig(config, phone, text)
 }
 
+// Formato confirmado contra a instância: POST /send/media aceita a imagem por URL
+// pública (não precisa base64) e a legenda no campo `text`.
+export async function enviarImagemViaUAZAPI({
+  tenantId,
+  phone,
+  imagemUrl,
+  legenda,
+}: {
+  tenantId: string
+  phone: string
+  imagemUrl: string
+  legenda?: string
+}): Promise<boolean> {
+  const config = await getUazapiConfig(tenantId)
+  if (!config) {
+    console.error(`[UAZAPI] Configuração não encontrada para tenant ${tenantId}`)
+    return false
+  }
+
+  try {
+    const response = await fetch(`${config.baseUrl}/send/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', token: config.token },
+      body: JSON.stringify({
+        number: phone.replace(/\D/g, ''),
+        type: 'image',
+        file: imagemUrl,
+        text: legenda ?? '',
+      }),
+    })
+
+    if (!response.ok) {
+      const body = await response.text()
+      console.error(`[UAZAPI] Erro ao enviar imagem: ${response.status} — ${body}`)
+      return false
+    }
+
+    console.log(`[UAZAPI] Imagem enviada para ${phone}`)
+    return true
+  } catch (error) {
+    console.error('[UAZAPI] Erro ao enviar imagem:', error)
+    return false
+  }
+}
+
 export async function enviarMensagemComConfig(
   config: UazapiConfig,
   phone: string,

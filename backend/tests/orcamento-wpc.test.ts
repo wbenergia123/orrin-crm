@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularOrcamentoWpc, ajustarToolsParaRevest } from '../src/lib/orcamento-wpc'
+import { calcularOrcamentoWpc, ajustarToolsParaRevest, TOOL_ENVIAR_FOTO_PRODUTO } from '../src/lib/orcamento-wpc'
 
 function ok(r: ReturnType<typeof calcularOrcamentoWpc>) {
   if (!r.ok) throw new Error(`esperava sucesso, veio ${r.motivo}`)
@@ -109,5 +109,21 @@ describe('calcularOrcamentoWpc', () => {
     const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'Biguaçu' }))
     expect(r.mensagem).toContain('R$ 799,20')
     expect(Number.isInteger(r.total_centavos)).toBe(true)
+  })
+})
+
+describe('TOOL_ENVIAR_FOTO_PRODUTO', () => {
+  it('pede produto_id e legenda opcional, e avisa que a foto vai separada', () => {
+    const props = TOOL_ENVIAR_FOTO_PRODUTO.input_schema.properties!
+    expect(Object.keys(props).sort()).toEqual(['legenda', 'produto_id'])
+    expect(TOOL_ENVIAR_FOTO_PRODUTO.input_schema.required).toEqual(['produto_id'])
+    // A foto sai por fora da resposta do agente; se ele não souber disso,
+    // termina o turno sem texto nenhum pro cliente.
+    expect(TOOL_ENVIAR_FOTO_PRODUTO.description).toMatch(/mensagem separada/i)
+  })
+
+  it('entra no tool set só com a flag ligada', () => {
+    const nomes = [...ajustarToolsParaRevest([]), TOOL_ENVIAR_FOTO_PRODUTO].map((t) => t.name)
+    expect(nomes).toContain('enviar_foto_produto')
   })
 })
