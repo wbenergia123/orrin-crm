@@ -18,11 +18,18 @@ const PAINEIS_POR_TUBO_PU = 1.5
 const LARGURA_PAINEL_M = 0.16
 const COMPRIMENTOS_M = [2.7, 2.8, 2.9] as const
 
+// Cliente escreve "Floripa", não "Florianópolis". Apelido que não bate vira
+// handoff pro vendedor — perde venda que a tabela sabia responder.
+// Cliente escreve "Floripa", não "Florianópolis". Apelido que não bate vira
+// handoff pro vendedor — perde venda que a tabela sabia responder.
+// Só apelido inequívoco entra aqui: na dúvida, handoff é melhor que frete errado.
 const FRETE_POR_CIDADE: Record<string, number> = {
   biguacu: 4000,
   'sao jose': 3000,
   palhoca: 4000,
   florianopolis: 5000,
+  floripa: 5000,
+  fpolis: 5000,
 }
 
 function normalizarCidade(cidade: string): string {
@@ -30,7 +37,10 @@ function normalizarCidade(cidade: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/\s*[-/]\s*sc$/, '')
+    .trim()
+    // "Florianópolis - SC", "São José/SC", "Palhoça SC" → tira o estado
+    .replace(/[\s,]*[-/]?\s*sc$/, '')
+    .replace(/\s+/g, ' ')
     .trim()
 }
 
@@ -190,6 +200,27 @@ export async function orcamentoWpcAtivo(tenantId: string): Promise<boolean> {
     .eq('chave', 'orcamento_wpc')
     .maybeSingle()
   return data?.valor?.trim() === 'true'
+}
+
+// A `atualizar_cliente` do vertical agro pede atividade rural e trator — e a Ana
+// obedecia, perguntando de colheitadeira pra quem quer revestir a sala. A execução
+// é a mesma (executarToolAgro grava os campos que vierem); só a descrição e os
+// campos oferecidos mudam. A Agrokhan continua com a versão original.
+const TOOL_ATUALIZAR_CLIENTE_REVEST: Anthropic.Tool = {
+  name: 'atualizar_cliente',
+  description: 'Salva os dados do cliente no cadastro: nome, cidade e o que ele está procurando. Use assim que o cliente informar qualquer um desses dados. NUNCA pergunte sobre atividade rural, plantação, trator ou maquinário.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      nome: { type: 'string', description: 'Nome do cliente' },
+      cidade: { type: 'string', description: 'Cidade do cliente (usada também para o frete)' },
+    },
+    required: [],
+  },
+}
+
+export function ajustarToolsParaRevest(tools: Anthropic.Tool[]): Anthropic.Tool[] {
+  return tools.map((t) => (t.name === TOOL_ATUALIZAR_CLIENTE_REVEST.name ? TOOL_ATUALIZAR_CLIENTE_REVEST : t))
 }
 
 export const TOOL_ORCAMENTO_WPC: Anthropic.Tool = {
