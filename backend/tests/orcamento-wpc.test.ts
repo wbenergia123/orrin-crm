@@ -105,6 +105,32 @@ describe('calcularOrcamentoWpc', () => {
     expect(calcularOrcamentoWpc({ largura_m: 999, altura_m: 2.5, com_instalacao: true }).ok).toBe(false)
   })
 
+  it('desconto de 5% à vista e 6x sem juros sobre o valor cheio', () => {
+    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'Floripa' }))
+    // 8 x 79,90 + 6 tubos x 20,00 + frete 50,00 = 809,20
+    expect(r.total_centavos).toBe(80920)
+    expect(r.total_a_vista_centavos).toBe(76874)      // 809,20 - 5%
+    expect(r.parcela_centavos).toBe(Math.ceil(80920 / 6))
+    expect(r.mensagem).toContain('Total: R$ 809,20')
+    expect(r.mensagem).toContain('À vista com 5% de desconto: R$ 768,74')
+    expect(r.mensagem).toContain('6x de R$ 134,87 sem juros')
+  })
+
+  it('6 parcelas nunca somam menos que o total', () => {
+    for (const largura of [0.16, 1, 2.4, 3.7, 5.5, 9.3]) {
+      const r = ok(calcularOrcamentoWpc({ largura_m: largura, altura_m: 2.5, com_instalacao: true }))
+      expect(r.parcela_centavos * 6, `largura ${largura}`).toBeGreaterThanOrEqual(r.total_centavos)
+    }
+  })
+
+  it('não mostra preço unitário, só quantidade e total da linha', () => {
+    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'Floripa' }))
+    expect(r.mensagem).toContain('8 painéis: R$ 639,20')
+    expect(r.mensagem).toContain('6 tubos de cola PU: R$ 120,00')
+    expect(r.mensagem).not.toContain('x R$ 79,90')
+    expect(r.mensagem).not.toContain('x R$ 20,00')
+  })
+
   it('dinheiro não escorre em float', () => {
     const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'Biguaçu' }))
     expect(r.mensagem).toContain('R$ 799,20')
