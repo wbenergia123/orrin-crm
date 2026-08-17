@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularOrcamentoWpc, ajustarToolsParaRevest, TOOL_ENVIAR_FOTO_PRODUTO } from '../src/lib/orcamento-wpc'
+import { calcularOrcamentoWpc, ajustarToolsParaRevest, TOOL_ENVIAR_FOTO_PRODUTO, TOOL_ORCAMENTO_WPC } from '../src/lib/orcamento-wpc'
 
 function ok(r: ReturnType<typeof calcularOrcamentoWpc>) {
   if (!r.ok) throw new Error(`esperava sucesso, veio ${r.motivo}`)
@@ -9,7 +9,7 @@ function ok(r: ReturnType<typeof calcularOrcamentoWpc>) {
 describe('calcularOrcamentoWpc', () => {
   it('parede baixa e larga aproveita 2 peças por painel', () => {
     // 2,40 de largura = 15 peças; painel de 2,70 rende 2 peças de 1,10 → 8 painéis
-    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'São José' }))
+    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, fixacao: 'cola', cidade: 'São José' }))
     expect(r.pecas).toBe(15)
     expect(r.pecas_por_painel).toBe(2)
     expect(r.paineis).toBe(8)
@@ -21,7 +21,7 @@ describe('calcularOrcamentoWpc', () => {
 
   it('parede alta não aproveita: 1 peça por painel', () => {
     // mesma medida invertida — 1,10 de largura, 2,40 de altura
-    const r = ok(calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, cidade: 'São José' }))
+    const r = ok(calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', cidade: 'São José' }))
     expect(r.pecas).toBe(7)
     expect(r.pecas_por_painel).toBe(1)
     expect(r.paineis).toBe(7)
@@ -29,27 +29,27 @@ describe('calcularOrcamentoWpc', () => {
   })
 
   it('com instalação usa o preço instalado e zera o frete', () => {
-    const r = ok(calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, com_instalacao: true }))
+    const r = ok(calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', com_instalacao: true }))
     expect(r.frete_centavos).toBe(0)
     expect(r.total_centavos).toBe(7 * 10990 + 5 * 2000)
     expect(r.mensagem).toContain('Frete: grátis')
   })
 
   it('com instalação não exige cidade', () => {
-    expect(calcularOrcamentoWpc({ largura_m: 3, altura_m: 2.5, com_instalacao: true }).ok).toBe(true)
+    expect(calcularOrcamentoWpc({ largura_m: 3, altura_m: 2.5, fixacao: 'cola', com_instalacao: true }).ok).toBe(true)
   })
 
   it('cola PU: 1 tubo a cada 1,5 painel, arredondado pra cima', () => {
-    const um = ok(calcularOrcamentoWpc({ largura_m: 0.16, altura_m: 2.5, com_instalacao: true }))
+    const um = ok(calcularOrcamentoWpc({ largura_m: 0.16, altura_m: 2.5, fixacao: 'cola', com_instalacao: true }))
     expect(um.paineis).toBe(1)
     expect(um.tubos_pu).toBe(1)
-    const tres = ok(calcularOrcamentoWpc({ largura_m: 0.48, altura_m: 2.5, com_instalacao: true }))
+    const tres = ok(calcularOrcamentoWpc({ largura_m: 0.48, altura_m: 2.5, fixacao: 'cola', com_instalacao: true }))
     expect(tres.paineis).toBe(3)
     expect(tres.tubos_pu).toBe(2)
   })
 
   it('largura que não é múltiplo de 16cm arredonda pra cima', () => {
-    const r = ok(calcularOrcamentoWpc({ largura_m: 1.0, altura_m: 2.5, com_instalacao: true }))
+    const r = ok(calcularOrcamentoWpc({ largura_m: 1.0, altura_m: 2.5, fixacao: 'cola', com_instalacao: true }))
     expect(r.pecas).toBe(7) // 6,25 → 7
   })
 
@@ -57,11 +57,11 @@ describe('calcularOrcamentoWpc', () => {
     const capital = ['Florianópolis', 'florianopolis', 'FLORIANÓPOLIS - SC', 'Florianópolis/SC',
       'Florianopolis SC', 'Floripa', 'floripa', 'Floripa - SC', 'FPolis']
     for (const cidade of capital) {
-      const r = ok(calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, cidade }))
+      const r = ok(calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, fixacao: 'cola', cidade }))
       expect(r.frete_centavos, cidade).toBe(5000)
     }
     for (const cidade of ['São José', 'sao jose sc', 'Biguaçu', 'biguacu/SC', 'Palhoça']) {
-      const r = ok(calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, cidade }))
+      const r = ok(calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, fixacao: 'cola', cidade }))
       expect([3000, 4000], cidade).toContain(r.frete_centavos)
     }
   })
@@ -82,31 +82,31 @@ describe('calcularOrcamentoWpc', () => {
   })
 
   it('cidade fora da tabela vira handoff, não orçamento errado', () => {
-    const r = calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, cidade: 'Curitiba' })
+    const r = calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, fixacao: 'cola', cidade: 'Curitiba' })
     expect(r.ok).toBe(false)
     expect(r.ok === false && r.motivo).toBe('cidade_sem_frete')
   })
 
   it('sem instalação e sem cidade não inventa frete', () => {
-    const r = calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5 })
+    const r = calcularOrcamentoWpc({ largura_m: 1, altura_m: 2.5, fixacao: 'cola' })
     expect(r.ok).toBe(false)
     expect(r.ok === false && r.motivo).toBe('cidade_sem_frete')
   })
 
   it('parede mais alta que 2,90 não é orçada', () => {
-    const r = calcularOrcamentoWpc({ largura_m: 2, altura_m: 3.2, com_instalacao: true })
+    const r = calcularOrcamentoWpc({ largura_m: 2, altura_m: 3.2, fixacao: 'cola', com_instalacao: true })
     expect(r.ok).toBe(false)
     expect(r.ok === false && r.motivo).toBe('altura_acima_do_padrao')
   })
 
   it('medida zerada ou absurda é recusada', () => {
-    expect(calcularOrcamentoWpc({ largura_m: 0, altura_m: 2.5, com_instalacao: true }).ok).toBe(false)
+    expect(calcularOrcamentoWpc({ largura_m: 0, altura_m: 2.5, fixacao: 'cola', com_instalacao: true }).ok).toBe(false)
     expect(calcularOrcamentoWpc({ largura_m: 2, altura_m: -1, com_instalacao: true }).ok).toBe(false)
-    expect(calcularOrcamentoWpc({ largura_m: 999, altura_m: 2.5, com_instalacao: true }).ok).toBe(false)
+    expect(calcularOrcamentoWpc({ largura_m: 999, altura_m: 2.5, fixacao: 'cola', com_instalacao: true }).ok).toBe(false)
   })
 
   it('desconto de 5% à vista e 6x sem juros sobre o valor cheio', () => {
-    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'Floripa' }))
+    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, fixacao: 'cola', cidade: 'Floripa' }))
     // 8 x 79,90 + 6 tubos x 20,00 + frete 50,00 = 809,20
     expect(r.total_centavos).toBe(80920)
     expect(r.total_a_vista_centavos).toBe(76874)      // 809,20 - 5%
@@ -118,21 +118,51 @@ describe('calcularOrcamentoWpc', () => {
 
   it('6 parcelas nunca somam menos que o total', () => {
     for (const largura of [0.16, 1, 2.4, 3.7, 5.5, 9.3]) {
-      const r = ok(calcularOrcamentoWpc({ largura_m: largura, altura_m: 2.5, com_instalacao: true }))
+      const r = ok(calcularOrcamentoWpc({ largura_m: largura, altura_m: 2.5, fixacao: 'cola', com_instalacao: true }))
       expect(r.parcela_centavos * 6, `largura ${largura}`).toBeGreaterThanOrEqual(r.total_centavos)
     }
   })
 
   it('não mostra preço unitário, só quantidade e total da linha', () => {
-    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'Floripa' }))
+    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, fixacao: 'cola', cidade: 'Floripa' }))
     expect(r.mensagem).toContain('8 painéis: R$ 639,20')
     expect(r.mensagem).toContain('6 tubos de cola PU: R$ 120,00')
     expect(r.mensagem).not.toContain('x R$ 79,90')
     expect(r.mensagem).not.toContain('x R$ 20,00')
   })
 
+  it('presilha: 4 por painel a R$ 1,00, no lugar da cola', () => {
+    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, fixacao: 'presilha', cidade: 'Floripa' }))
+    expect(r.paineis).toBe(8)
+    expect(r.presilhas).toBe(32)
+    expect(r.tubos_pu).toBe(0)
+    expect(r.fixacao_centavos).toBe(3200)
+    // 8 x 79,90 + 32 x 1,00 + frete 50,00
+    expect(r.total_centavos).toBe(8 * 7990 + 3200 + 5000)
+    expect(r.mensagem).toContain('32 presilhas de fixação: R$ 32,00')
+    expect(r.mensagem).not.toContain('cola PU')
+  })
+
+  it('cola não cobra presilha e presilha não cobra cola', () => {
+    const cola = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, fixacao: 'cola', cidade: 'Floripa' }))
+    expect(cola.presilhas).toBe(0)
+    expect(cola.tubos_pu).toBe(6)
+    expect(cola.mensagem).not.toContain('presilha')
+  })
+
+  it('sem informar a fixação, manda perguntar em vez de escolher sozinho', () => {
+    const r = calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'Floripa' })
+    expect(r.ok).toBe(false)
+    expect(r.ok === false && r.motivo).toBe('fixacao_nao_informada')
+    expect(r.mensagem).toMatch(/cola PU ou presilha/)
+  })
+
+  it('a tool exige a fixação no schema', () => {
+    expect(TOOL_ORCAMENTO_WPC.input_schema.required).toContain('fixacao')
+  })
+
   it('dinheiro não escorre em float', () => {
-    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, cidade: 'Biguaçu' }))
+    const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, fixacao: 'cola', cidade: 'Biguaçu' }))
     expect(r.mensagem).toContain('R$ 799,20')
     expect(Number.isInteger(r.total_centavos)).toBe(true)
   })

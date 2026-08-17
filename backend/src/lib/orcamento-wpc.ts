@@ -15,6 +15,8 @@ const PRECO_PAINEL = 7990          // só material
 const PRECO_PAINEL_INSTALADO = 10990 // material + mão de obra (parede); isenta frete
 const PRECO_TUBO_PU = 2000
 const PAINEIS_POR_TUBO_PU = 1.5
+const PRECO_PRESILHA = 100
+const PRESILHAS_POR_PAINEL = 4
 
 const DESCONTO_A_VISTA = 0.05
 const PARCELAS_MAX = 6
@@ -54,22 +56,32 @@ function metros(m: number): string {
   return `${m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}m`
 }
 
+export type Fixacao = 'cola' | 'presilha'
+
 export interface OrcamentoInput {
   largura_m: number
   altura_m: number
+  fixacao?: Fixacao
   cidade?: string
   com_instalacao?: boolean
 }
 
 export type OrcamentoResultado =
-  | { ok: false; motivo: 'medida_invalida' | 'altura_acima_do_padrao' | 'cidade_sem_frete'; mensagem: string }
+  | {
+      ok: false
+      motivo: 'medida_invalida' | 'altura_acima_do_padrao' | 'cidade_sem_frete' | 'fixacao_nao_informada'
+      mensagem: string
+    }
   | {
       ok: true
       paineis: number
       comprimento_painel_m: number
       pecas: number
       pecas_por_painel: number
+      fixacao: Fixacao
       tubos_pu: number
+      presilhas: number
+      fixacao_centavos: number
       com_instalacao: boolean
       frete_centavos: number
       total_centavos: number
@@ -87,6 +99,15 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
       ok: false,
       motivo: 'medida_invalida',
       mensagem: 'Medida inválida. Peça ao cliente a largura e a altura da parede em metros, separadas.',
+    }
+  }
+
+  const fixacao = input.fixacao
+  if (fixacao !== 'cola' && fixacao !== 'presilha') {
+    return {
+      ok: false,
+      motivo: 'fixacao_nao_informada',
+      mensagem: 'Falta saber como o cliente vai fixar o painel. Pergunte se ele prefere cola PU ou presilha.',
     }
   }
 
@@ -132,11 +153,14 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
     }
   }
 
-  const tubosPu = Math.ceil(melhor.paineis / PAINEIS_POR_TUBO_PU)
+  // Cola: 1 tubo rende 1,5 painel. Presilha: 4 por painel, sempre.
+  const tubosPu = fixacao === 'cola' ? Math.ceil(melhor.paineis / PAINEIS_POR_TUBO_PU) : 0
+  const presilhas = fixacao === 'presilha' ? melhor.paineis * PRESILHAS_POR_PAINEL : 0
+  const subtotalFixacao = tubosPu * PRECO_TUBO_PU + presilhas * PRECO_PRESILHA
+
   const precoUnitario = comInstalacao ? PRECO_PAINEL_INSTALADO : PRECO_PAINEL
   const subtotalPaineis = melhor.paineis * precoUnitario
-  const subtotalPu = tubosPu * PRECO_TUBO_PU
-  const total = subtotalPaineis + subtotalPu + frete
+  const total = subtotalPaineis + subtotalFixacao + frete
 
   // Desconto sobre o total (frete incluso). Parcela sai do valor cheio, como é
   // praxe: quem parcela não leva o desconto do à vista.
@@ -155,7 +179,9 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
     `📏 Painel: ${metros(melhor.comprimento)} x 16cm${melhor.porPainel > 1 ? ` *(cada um rende ${melhor.porPainel} peças)*` : ''}`,
     '',
     `${painelLinha}: ${reais(subtotalPaineis)}`,
-    `🧴 ${tubosPu} ${tubosPu === 1 ? 'tubo' : 'tubos'} de cola PU: ${reais(subtotalPu)}`,
+    fixacao === 'cola'
+      ? `🧴 ${tubosPu} ${tubosPu === 1 ? 'tubo' : 'tubos'} de cola PU: ${reais(subtotalFixacao)}`
+      : `🔩 ${presilhas} presilhas de fixação: ${reais(subtotalFixacao)}`,
     comInstalacao ? '🚚 Frete: grátis *(incluso na instalação)*' : `🚚 Frete: ${reais(frete)}`,
     '',
     `💰 *Total: ${reais(total)}*`,
@@ -172,7 +198,10 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
     comprimento_painel_m: melhor.comprimento,
     pecas,
     pecas_por_painel: melhor.porPainel,
+    fixacao,
     tubos_pu: tubosPu,
+    presilhas,
+    fixacao_centavos: subtotalFixacao,
     com_instalacao: comInstalacao,
     frete_centavos: frete,
     total_centavos: total,
@@ -202,6 +231,7 @@ export async function executarToolAgroOuOrcamento(
     return calcularOrcamentoWpc({
       largura_m: numero(input.largura_m),
       altura_m: numero(input.altura_m),
+      fixacao: input.fixacao === 'cola' || input.fixacao === 'presilha' ? input.fixacao : undefined,
       cidade: typeof input.cidade === 'string' ? input.cidade : undefined,
       com_instalacao: input.com_instalacao === true || input.com_instalacao === 'true',
     })
@@ -304,9 +334,10 @@ export const TOOL_ORCAMENTO_WPC: Anthropic.Tool = {
     properties: {
       largura_m: { type: 'number', description: 'Largura da parede em metros (o lado horizontal). Confirme com o cliente qual medida é a largura antes de chamar.' },
       altura_m: { type: 'number', description: 'Altura da parede em metros (do chão ao teto).' },
+      fixacao: { type: 'string', enum: ['cola', 'presilha'], description: 'Como o cliente vai fixar o painel: "cola" (cola PU) ou "presilha". Pergunte antes de chamar — muda o preço.' },
       com_instalacao: { type: 'boolean', description: 'true se o cliente quer a instalação junto (nesse caso não há frete). false ou omitido = só material.' },
       cidade: { type: 'string', description: 'Cidade da entrega. Obrigatória quando NÃO tem instalação, para calcular o frete.' },
     },
-    required: ['largura_m', 'altura_m'],
+    required: ['largura_m', 'altura_m', 'fixacao'],
   },
 }
