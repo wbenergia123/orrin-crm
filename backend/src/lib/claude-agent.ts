@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { supabase } from '../db/supabase'
 import { TOOLS, executarTool } from './claude-tools'
 import { TOOLS_AGRO, executarToolAgro } from './claude-tools-agro'
-import { TOOL_ORCAMENTO_WPC, TOOL_ENVIAR_FOTO_PRODUTO, ajustarToolsParaRevest, executarToolAgroOuOrcamento, orcamentoWpcAtivo } from './orcamento-wpc'
+import { TOOL_ORCAMENTO_WPC, TOOL_ORCAMENTO_AUTOCOLANTE, TOOL_ENVIAR_FOTO_PRODUTO, ajustarToolsParaRevest, executarToolAgroOuOrcamento, orcamentoWpcAtivo } from './orcamento-wpc'
 import { getVerticalDoTenant } from './vertical'
 import { agoraComoTextoLocal, somarMinutosTextoLocal, formatarTextoLocal } from './datetime-local'
 
@@ -191,7 +191,7 @@ export async function montarContextoAgro(tenantId: string, pacienteId: string): 
   const fechaOrcamento = await orcamentoWpcAtivo(tenantId)
 
   const regraDePreco = fechaOrcamento
-    ? 'REGRA DE PREÇO: só informe valor que veio de calcular_orcamento_wpc ou do catálogo abaixo. NUNCA calcule de cabeça e NUNCA estime. Se não souber, diga que vai confirmar e passe para um vendedor.'
+    ? 'REGRA DE PREÇO: só informe valor que veio de calcular_orcamento_wpc, calcular_orcamento_autocolante ou do catálogo abaixo. NUNCA calcule de cabeça e NUNCA estime. Se não souber, diga que vai confirmar e passe para um vendedor.'
     : 'REGRA DE PREÇO: NUNCA informe preço ou faixa de valor. Todo orçamento é personalizado e apresentado pelo vendedor na reunião. Se perguntarem preço, explique isso e ofereça marcar uma reunião.'
 
   // Campo vazio na ficha é convite pra Ana preencher — e "Máquinas: —" fazia ela
@@ -399,7 +399,7 @@ ${servicosInfo}`
     const tools = vertical !== 'agro'
       ? TOOLS
       : comOrcamentoWpc
-        ? [...ajustarToolsParaRevest(TOOLS_AGRO), TOOL_ORCAMENTO_WPC, TOOL_ENVIAR_FOTO_PRODUTO]
+        ? [...ajustarToolsParaRevest(TOOLS_AGRO), TOOL_ORCAMENTO_WPC, TOOL_ORCAMENTO_AUTOCOLANTE, TOOL_ENVIAR_FOTO_PRODUTO]
         : TOOLS_AGRO
 
     const dispatcher = vertical !== 'agro'

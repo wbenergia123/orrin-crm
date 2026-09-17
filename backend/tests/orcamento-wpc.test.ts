@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calcularOrcamentoWpc, ajustarToolsParaRevest, TOOL_ENVIAR_FOTO_PRODUTO, TOOL_ORCAMENTO_WPC } from '../src/lib/orcamento-wpc'
+import { calcularOrcamentoWpc, calcularOrcamentoAutocolante, ajustarToolsParaRevest, TOOL_ENVIAR_FOTO_PRODUTO, TOOL_ORCAMENTO_WPC } from '../src/lib/orcamento-wpc'
 
 function ok(r: ReturnType<typeof calcularOrcamentoWpc>) {
   if (!r.ok) throw new Error(`esperava sucesso, veio ${r.motivo}`)
@@ -161,6 +161,13 @@ describe('calcularOrcamentoWpc', () => {
     expect(TOOL_ORCAMENTO_WPC.input_schema.required).toContain('fixacao')
   })
 
+  it('largura que é múltiplo exato de 16cm não cobra painel a mais por float', () => {
+    // 1,12 / 0,16 = 7.000000000000001 em float
+    const r = ok(calcularOrcamentoWpc({ largura_m: 1.12, altura_m: 2.5, fixacao: 'cola', com_instalacao: true }))
+    expect(r.pecas).toBe(7)
+    expect(r.paineis).toBe(7)
+  })
+
   it('dinheiro não escorre em float', () => {
     const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, fixacao: 'cola', cidade: 'Biguaçu' }))
     expect(r.mensagem).toContain('R$ 799,20')
@@ -191,5 +198,71 @@ describe('TOOL_ENVIAR_FOTO_PRODUTO', () => {
   it('entra no tool set só com a flag ligada', () => {
     const nomes = [...ajustarToolsParaRevest([]), TOOL_ENVIAR_FOTO_PRODUTO].map((t) => t.name)
     expect(nomes).toContain('enviar_foto_produto')
+  })
+})
+
+describe('calcularOrcamentoAutocolante', () => {
+  function okA(r: ReturnType<typeof calcularOrcamentoAutocolante>) {
+    if (!r.ok) throw new Error(`esperava sucesso, veio ${r.motivo}`)
+    return r
+  }
+
+  it('mistura rolo de 10m com de 2,50m quando sai mais barato', () => {
+    // 10 faixas de 2,40: rolo de 10m rende 4, de 2,50m rende 1.
+    // 2 longos + 2 curtos = 779,60 — mais barato que 3 longos (899,70) ou 10 curtos (899,00)
+    const r = okA(calcularOrcamentoAutocolante({ largura_m: 1, altura_m: 2.4, cidade: 'São José' }))
+    expect(r.faixas).toBe(10)
+    expect(r.rolos_10m).toBe(2)
+    expect(r.rolos_2_5m).toBe(2)
+    expect(r.total_centavos).toBe(2 * 29990 + 2 * 8990 + 3000)
+    expect(r.mensagem).toContain('R$ 599,80') // 2 rolos de 10m
+  })
+
+  it('parede baixa usa só rolo curto quando basta', () => {
+    // 3 faixas de 1,20: rolo de 2,50m rende 2 → 2 curtos (179,80) < 1 longo (299,90)
+    const r = okA(calcularOrcamentoAutocolante({ largura_m: 0.3, altura_m: 1.2, cidade: 'São José' }))
+    expect(r.rolos_10m).toBe(0)
+    expect(r.rolos_2_5m).toBe(2)
+    expect(r.mensagem).not.toContain('10m:')
+  })
+
+  it('parede acima de 2,50m só cabe no rolo de 10m', () => {
+    const r = okA(calcularOrcamentoAutocolante({ largura_m: 2, altura_m: 2.6, cidade: 'São José' }))
+    expect(r.faixas).toBe(20)
+    expect(r.rolos_2_5m).toBe(0)
+    expect(r.rolos_10m).toBe(7) // 3 faixas por rolo
+  })
+
+  it('é só material: cobra frete da tabela e não fala de instalação', () => {
+    const r = okA(calcularOrcamentoAutocolante({ largura_m: 1, altura_m: 2.4, cidade: 'Floripa' }))
+    expect(r.frete_centavos).toBe(5000)
+    expect(r.total_centavos).toBe(2 * 29990 + 2 * 8990 + 5000)
+    expect(r.mensagem).toContain('Frete: R$ 50,00')
+    expect(r.mensagem).not.toMatch(/instala/i)
+  })
+
+  it('sem cidade ou cidade fora da tabela não fecha orçamento', () => {
+    const sem = calcularOrcamentoAutocolante({ largura_m: 1, altura_m: 2.4 })
+    expect(sem.ok === false && sem.motivo).toBe('cidade_sem_frete')
+    const fora = calcularOrcamentoAutocolante({ largura_m: 1, altura_m: 2.4, cidade: 'Blumenau' })
+    expect(fora.ok === false && fora.motivo).toBe('cidade_sem_frete')
+  })
+
+  it('à vista 5% e 6x arredondado pra cima', () => {
+    const r = okA(calcularOrcamentoAutocolante({ largura_m: 1, altura_m: 2.4, cidade: 'São José' }))
+    // 779,60 de rolos + 30,00 de frete de São José
+    expect(r.total_a_vista_centavos).toBe(Math.round(80960 * 0.95))
+    expect(r.parcela_centavos * 6).toBeGreaterThanOrEqual(80960)
+  })
+
+  it('largura em múltiplo de 10cm não ganha faixa a mais por float', () => {
+    expect(okA(calcularOrcamentoAutocolante({ largura_m: 1.1, altura_m: 2, cidade: 'São José' })).faixas).toBe(11)
+  })
+
+  it('altura acima de 10m e medida inválida mandam pra consultora / perguntar', () => {
+    const alta = calcularOrcamentoAutocolante({ largura_m: 1, altura_m: 10.5, cidade: 'São José' })
+    expect(alta.ok === false && alta.motivo).toBe('altura_acima_do_rolo')
+    const zero = calcularOrcamentoAutocolante({ largura_m: 0, altura_m: 2, cidade: 'São José' })
+    expect(zero.ok === false && zero.motivo).toBe('medida_invalida')
   })
 })
