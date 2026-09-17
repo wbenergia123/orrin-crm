@@ -13,7 +13,7 @@ import { enviarImagemViaUAZAPI } from './uazapi-client'
 // Tudo em centavos — 79.90 * 8 em float dá 639.2000000000001.
 const PRECO_PAINEL = 7990          // só material
 const PRECO_PAINEL_INSTALADO = 10990 // material + mão de obra (parede); isenta frete
-const PRECO_TUBO_PU = 2000
+const PRECO_TUBO_PU = 2500
 const PAINEIS_POR_TUBO_PU = 1.5
 const PRECO_PRESILHA = 100
 const PRESILHAS_POR_PAINEL = 4
