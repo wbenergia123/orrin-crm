@@ -217,9 +217,12 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
 
 // ── Ripado autocolante ─────────────────────────────────────────────────────
 // Vendido só como material, sem instalação: cobra frete pela mesma tabela do
-// WPC e não tem cola/presilha (é autocolante). Rolo de 10cm
-// de largura em dois comprimentos; cada rolo rende floor(comprimento/altura)
-// faixas, a mesma regra de aproveitamento do painel WPC.
+// WPC e não tem cola/presilha (é autocolante). Rolo de 10cm de largura em dois
+// comprimentos.
+//
+// Diferente do painel WPC, aqui NÃO vale o aproveitamento por peça: a fita sai
+// do rolo cortada e pode emendar, então o que conta é o metro linear total
+// (faixas x altura). Parede de 5,00 x 2,80 = 140m = 14 rolos de 10m, não 17.
 const LARGURA_AUTOCOLANTE_M = 0.1
 const ROLOS_AUTOCOLANTE = [
   { comprimento: 10, preco: 29990 },
@@ -237,6 +240,7 @@ export type OrcamentoAutocolanteResultado =
   | {
       ok: true
       faixas: number
+      metros_lineares: number
       rolos_10m: number
       rolos_2_5m: number
       frete_centavos: number
@@ -260,9 +264,7 @@ export function calcularOrcamentoAutocolante(input: OrcamentoAutocolanteInput): 
   if (typeof frete === 'string') return { ok: false, motivo: 'cidade_sem_frete', mensagem: frete }
 
   const [longo, curto] = ROLOS_AUTOCOLANTE
-  const porLongo = pecasPorComprimento(longo.comprimento, altura_m)
-  const porCurto = pecasPorComprimento(curto.comprimento, altura_m)
-  if (porLongo < 1) {
+  if (altura_m > longo.comprimento) {
     return {
       ok: false,
       motivo: 'altura_acima_do_rolo',
@@ -271,14 +273,20 @@ export function calcularOrcamentoAutocolante(input: OrcamentoAutocolanteInput): 
   }
 
   const faixas = pecasNaLargura(largura_m, LARGURA_AUTOCOLANTE_M)
+  // Em milímetros pra não acumular erro de float somando alturas.
+  const metrosMm = faixas * Math.round(altura_m * 1000)
 
   // Testa toda mistura de rolo longo + curto e fica com a mais barata; empate
-  // leva a de menos rolos. Parede acima de 2,50m só cabe no rolo de 10m.
+  // leva a de menos rolos. Uma faixa nunca pode ser emendada de dois rolos, mas
+  // um rolo atende várias faixas, então basta cobrir o metro linear total.
+  const longoMm = longo.comprimento * 1000
+  const curtoMm = curto.comprimento * 1000
   let melhor = { longos: 0, curtos: 0, total: Infinity }
-  for (let longos = 0; longos <= Math.ceil(faixas / porLongo); longos++) {
-    const faltam = Math.max(0, faixas - longos * porLongo)
-    if (faltam > 0 && porCurto < 1) continue
-    const curtos = faltam > 0 ? Math.ceil(faltam / porCurto) : 0
+  for (let longos = 0; longos <= Math.ceil(metrosMm / longoMm); longos++) {
+    const faltamMm = Math.max(0, metrosMm - longos * longoMm)
+    // Rolo curto só serve se a faixa couber nele (parede até 2,50m).
+    if (faltamMm > 0 && altura_m > curto.comprimento) continue
+    const curtos = faltamMm > 0 ? Math.ceil(faltamMm / curtoMm) : 0
     const total = longos * longo.preco + curtos * curto.preco
     if (total < melhor.total || (total === melhor.total && longos + curtos < melhor.longos + melhor.curtos)) {
       melhor = { longos, curtos, total }
@@ -295,7 +303,7 @@ export function calcularOrcamentoAutocolante(input: OrcamentoAutocolanteInput): 
     '💎 *Painel Ripado Autocolante*',
     '',
     `📐 Parede: ${metros(largura_m)} de largura x ${metros(altura_m)} de altura`,
-    '📏 Rolo de 10cm de largura',
+    `📏 Rolo de 10cm: ${faixas} faixas de ${metros(altura_m)} = ${metros(metrosMm / 1000)} de fita`,
     '',
     ...(melhor.longos ? [rolo(melhor.longos, '10m', longo.preco)] : []),
     ...(melhor.curtos ? [rolo(melhor.curtos, '2,50m', curto.preco)] : []),
@@ -311,6 +319,7 @@ export function calcularOrcamentoAutocolante(input: OrcamentoAutocolanteInput): 
   return {
     ok: true,
     faixas,
+    metros_lineares: metrosMm / 1000,
     rolos_10m: melhor.longos,
     rolos_2_5m: melhor.curtos,
     frete_centavos: frete,
