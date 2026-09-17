@@ -48,12 +48,29 @@ function normalizarCidade(cidade: string): string {
     .trim()
 }
 
+// Devolve o frete em centavos ou, se não der pra calcular, a instrução pro agente.
+function freteDaCidade(cidade: string | undefined): number | string {
+  if (!cidade?.trim()) return 'Falta a cidade da entrega para calcular o frete. Pergunte ao cliente.'
+  const frete = FRETE_POR_CIDADE[normalizarCidade(cidade)]
+  return frete ?? `Não atendemos ${cidade.trim()} com frete de tabela. Passe o atendimento para um vendedor combinar a entrega.`
+}
+
 function reais(centavos: number): string {
   return `R$ ${(centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function metros(m: number): string {
   return `${m.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}m`
+}
+
+// Conta em milímetros inteiros: 1,12 / 0,16 dá 7.000000000000001 em float e o
+// ceil cobrava um painel a mais.
+function pecasNaLargura(largura_m: number, pecaM: number): number {
+  return Math.ceil(Math.round(largura_m * 1000) / Math.round(pecaM * 1000))
+}
+
+function pecasPorComprimento(comprimentoM: number, altura_m: number): number {
+  return Math.floor(Math.round(comprimentoM * 1000) / Math.round(altura_m * 1000))
 }
 
 export type Fixacao = 'cola' | 'presilha'
@@ -114,31 +131,18 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
   // Frete só entra em venda de material; com instalação a loja não cobra.
   let frete = 0
   if (!comInstalacao) {
-    if (!input.cidade?.trim()) {
-      return {
-        ok: false,
-        motivo: 'cidade_sem_frete',
-        mensagem: 'Falta a cidade da entrega para calcular o frete. Pergunte ao cliente.',
-      }
-    }
-    const encontrado = FRETE_POR_CIDADE[normalizarCidade(input.cidade)]
-    if (encontrado === undefined) {
-      return {
-        ok: false,
-        motivo: 'cidade_sem_frete',
-        mensagem: `Não atendemos ${input.cidade.trim()} com frete de tabela. Passe o atendimento para um vendedor combinar a entrega.`,
-      }
-    }
-    frete = encontrado
+    const f = freteDaCidade(input.cidade)
+    if (typeof f === 'string') return { ok: false, motivo: 'cidade_sem_frete', mensagem: f }
+    frete = f
   }
 
-  const pecas = Math.ceil(largura_m / LARGURA_PAINEL_M)
+  const pecas = pecasNaLargura(largura_m, LARGURA_PAINEL_M)
 
   // Cada painel rende N peças da altura da parede — é daí que vem o
   // "aproveitamento": parede baixa corta 2 peças de um painel só.
   let melhor: { comprimento: number; paineis: number; porPainel: number } | null = null
   for (const comprimento of COMPRIMENTOS_M) {
-    const porPainel = Math.floor(comprimento / altura_m)
+    const porPainel = pecasPorComprimento(comprimento, altura_m)
     if (porPainel < 1) continue
     const paineis = Math.ceil(pecas / porPainel)
     // Menos painéis ganha; empatou, leva o painel mais curto (menos sobra).
@@ -211,6 +215,112 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
   }
 }
 
+// ── Ripado autocolante ─────────────────────────────────────────────────────
+// Vendido só como material, sem instalação: cobra frete pela mesma tabela do
+// WPC e não tem cola/presilha (é autocolante). Rolo de 10cm
+// de largura em dois comprimentos; cada rolo rende floor(comprimento/altura)
+// faixas, a mesma regra de aproveitamento do painel WPC.
+const LARGURA_AUTOCOLANTE_M = 0.1
+const ROLOS_AUTOCOLANTE = [
+  { comprimento: 10, preco: 29990 },
+  { comprimento: 2.5, preco: 8990 },
+] as const
+
+export interface OrcamentoAutocolanteInput {
+  largura_m: number
+  altura_m: number
+  cidade?: string
+}
+
+export type OrcamentoAutocolanteResultado =
+  | { ok: false; motivo: 'medida_invalida' | 'altura_acima_do_rolo' | 'cidade_sem_frete'; mensagem: string }
+  | {
+      ok: true
+      faixas: number
+      rolos_10m: number
+      rolos_2_5m: number
+      frete_centavos: number
+      total_centavos: number
+      total_a_vista_centavos: number
+      parcela_centavos: number
+      mensagem: string
+    }
+
+export function calcularOrcamentoAutocolante(input: OrcamentoAutocolanteInput): OrcamentoAutocolanteResultado {
+  const { largura_m, altura_m } = input
+  if (!(largura_m > 0) || !(altura_m > 0) || largura_m > 50 || altura_m > 50) {
+    return {
+      ok: false,
+      motivo: 'medida_invalida',
+      mensagem: 'Medida inválida. Peça ao cliente a largura e a altura da parede em metros, separadas.',
+    }
+  }
+
+  const frete = freteDaCidade(input.cidade)
+  if (typeof frete === 'string') return { ok: false, motivo: 'cidade_sem_frete', mensagem: frete }
+
+  const [longo, curto] = ROLOS_AUTOCOLANTE
+  const porLongo = pecasPorComprimento(longo.comprimento, altura_m)
+  const porCurto = pecasPorComprimento(curto.comprimento, altura_m)
+  if (porLongo < 1) {
+    return {
+      ok: false,
+      motivo: 'altura_acima_do_rolo',
+      mensagem: `Parede de ${metros(altura_m)} passa do rolo mais comprido (10m). Passe para a consultora avaliar.`,
+    }
+  }
+
+  const faixas = pecasNaLargura(largura_m, LARGURA_AUTOCOLANTE_M)
+
+  // Testa toda mistura de rolo longo + curto e fica com a mais barata; empate
+  // leva a de menos rolos. Parede acima de 2,50m só cabe no rolo de 10m.
+  let melhor = { longos: 0, curtos: 0, total: Infinity }
+  for (let longos = 0; longos <= Math.ceil(faixas / porLongo); longos++) {
+    const faltam = Math.max(0, faixas - longos * porLongo)
+    if (faltam > 0 && porCurto < 1) continue
+    const curtos = faltam > 0 ? Math.ceil(faltam / porCurto) : 0
+    const total = longos * longo.preco + curtos * curto.preco
+    if (total < melhor.total || (total === melhor.total && longos + curtos < melhor.longos + melhor.curtos)) {
+      melhor = { longos, curtos, total }
+    }
+  }
+
+  const total = melhor.total + frete
+  const aVista = Math.round(total * (1 - DESCONTO_A_VISTA))
+  const parcela = Math.ceil(total / PARCELAS_MAX)
+  const rolo = (n: number, nome: string, preco: number) =>
+    `🎞️ ${n} ${n === 1 ? 'rolo' : 'rolos'} de ${nome}: ${reais(n * preco)}`
+
+  const linhas = [
+    '💎 *Painel Ripado Autocolante*',
+    '',
+    `📐 Parede: ${metros(largura_m)} de largura x ${metros(altura_m)} de altura`,
+    '📏 Rolo de 10cm de largura',
+    '',
+    ...(melhor.longos ? [rolo(melhor.longos, '10m', longo.preco)] : []),
+    ...(melhor.curtos ? [rolo(melhor.curtos, '2,50m', curto.preco)] : []),
+    `🚚 Frete: ${reais(frete)}`,
+    '',
+    `💰 *Total: ${reais(total)}*`,
+    `✅ *À vista com 5% de desconto: ${reais(aVista)}*`,
+    `💳 Ou em até ${PARCELAS_MAX}x de ${reais(parcela)} sem juros`,
+    '',
+    '📲 Quer ver as duas cores?',
+  ]
+
+  return {
+    ok: true,
+    faixas,
+    rolos_10m: melhor.longos,
+    rolos_2_5m: melhor.curtos,
+    frete_centavos: frete,
+    total_centavos: total,
+    total_a_vista_centavos: aVista,
+    parcela_centavos: parcela,
+    mensagem: linhas.join('\n'),
+  }
+}
+
 // Gemini às vezes manda número como string ("2,40"); não vale derrubar a conta por isso.
 function numero(v: unknown): number {
   if (typeof v === 'number') return v
@@ -226,6 +336,13 @@ export async function executarToolAgroOuOrcamento(
 ): Promise<object> {
   if (name === TOOL_ENVIAR_FOTO_PRODUTO.name) {
     return enviarFotoProduto(tenantId, pacienteId, input)
+  }
+  if (name === TOOL_ORCAMENTO_AUTOCOLANTE.name) {
+    return calcularOrcamentoAutocolante({
+      largura_m: numero(input.largura_m),
+      altura_m: numero(input.altura_m),
+      cidade: typeof input.cidade === 'string' ? input.cidade : undefined,
+    })
   }
   if (name === TOOL_ORCAMENTO_WPC.name) {
     return calcularOrcamentoWpc({
@@ -339,5 +456,20 @@ export const TOOL_ORCAMENTO_WPC: Anthropic.Tool = {
       cidade: { type: 'string', description: 'Cidade da entrega. Obrigatória quando NÃO tem instalação, para calcular o frete.' },
     },
     required: ['largura_m', 'altura_m', 'fixacao'],
+  },
+}
+
+export const TOOL_ORCAMENTO_AUTOCOLANTE: Anthropic.Tool = {
+  name: 'calcular_orcamento_autocolante',
+  description:
+    'Calcula o orçamento fechado de painel ripado AUTOCOLANTE (rolo de 10cm, só material, sem instalação) para uma parede. Use SEMPRE que o cliente escolheu o autocolante e você tem largura, altura e cidade da entrega — nunca faça a conta de cabeça. Devolve o texto pronto no campo "mensagem": envie ao cliente como está. Não serve para o ripado WPC normal nem para teto/forro.',
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      largura_m: { type: 'number', description: 'Largura da parede em metros (o lado horizontal).' },
+      altura_m: { type: 'number', description: 'Altura da parede em metros (do chão ao teto).' },
+      cidade: { type: 'string', description: 'Cidade da entrega, para calcular o frete.' },
+    },
+    required: ['largura_m', 'altura_m', 'cidade'],
   },
 }
