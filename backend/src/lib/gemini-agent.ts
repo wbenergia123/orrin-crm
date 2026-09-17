@@ -7,6 +7,27 @@ const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
 
 const MAX_ITERATIONS = 10
 
+// 503 "high demand" e 429 são sobrecarga passageira do Google — em 17/09 a
+// primeira mensagem da Floripa Revest morreu num 503 e o cliente ficou sem
+// resposta. Tenta de novo com espera antes de desistir; qualquer outro erro
+// (400, chave inválida) sobe na hora, porque repetir não resolve.
+const ESPERAS_RETRY_MS = [2000, 5000]
+const STATUS_PASSAGEIRO = [429, 500, 503]
+
+async function gerarComRetry(params: Parameters<typeof client.models.generateContent>[0]) {
+  for (let tentativa = 0; ; tentativa++) {
+    try {
+      return await client.models.generateContent(params)
+    } catch (err) {
+      const status = (err as { status?: number }).status
+      const espera = ESPERAS_RETRY_MS[tentativa]
+      if (espera === undefined || !STATUS_PASSAGEIRO.includes(status ?? 0)) throw err
+      console.warn(`[GEMINI] ${status} na tentativa ${tentativa + 1} — nova tentativa em ${espera}ms`)
+      await new Promise((r) => setTimeout(r, espera))
+    }
+  }
+}
+
 interface GeminiContent {
   role: 'user' | 'model'
   parts: Array<{
@@ -75,7 +96,7 @@ export async function processarComGemini({
     let consecutiveToolFailures = 0
 
     for (let i = 0; i < MAX_ITERATIONS; i++) {
-      const response = await client.models.generateContent({
+      const response = await gerarComRetry({
         model: modelo,
         contents,
         config: {
