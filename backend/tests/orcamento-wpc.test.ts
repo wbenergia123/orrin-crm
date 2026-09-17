@@ -207,30 +207,40 @@ describe('calcularOrcamentoAutocolante', () => {
     return r
   }
 
-  it('mistura rolo de 10m com de 2,50m quando sai mais barato', () => {
-    // 10 faixas de 2,40: rolo de 10m rende 4, de 2,50m rende 1.
-    // 2 longos + 2 curtos = 779,60 — mais barato que 3 longos (899,70) ou 10 curtos (899,00)
+  it('conta por metro linear, porque a fita pode ser cortada e emendada', () => {
+    // 5,00 de largura = 50 faixas de 2,80 = 140m exatos = 14 rolos de 10m
+    // (pela regra de peça inteira do WPC daria 17 — cada rolo só renderia 3 faixas)
+    const r = okA(calcularOrcamentoAutocolante({ largura_m: 5, altura_m: 2.8, cidade: 'Palhoça' }))
+    expect(r.faixas).toBe(50)
+    expect(r.metros_lineares).toBe(140)
+    expect(r.rolos_10m).toBe(14)
+    expect(r.rolos_2_5m).toBe(0)
+    expect(r.total_centavos).toBe(14 * 29990 + 4000)
+  })
+
+  it('mistura rolo curto quando sobra pouca fita e a faixa cabe nele', () => {
+    // 1,00 de largura = 10 faixas de 2,40 = 24m → 2 rolos de 10m + 2 de 2,50m
+    // (25m por 779,60) sai mais barato que 3 rolos de 10m (899,70)
     const r = okA(calcularOrcamentoAutocolante({ largura_m: 1, altura_m: 2.4, cidade: 'São José' }))
-    expect(r.faixas).toBe(10)
+    expect(r.metros_lineares).toBe(24)
     expect(r.rolos_10m).toBe(2)
     expect(r.rolos_2_5m).toBe(2)
     expect(r.total_centavos).toBe(2 * 29990 + 2 * 8990 + 3000)
-    expect(r.mensagem).toContain('R$ 599,80') // 2 rolos de 10m
+  })
+
+  it('parede acima de 2,50m não usa rolo curto: a faixa não caberia nele', () => {
+    // 2,00 de largura = 20 faixas de 2,60 = 52m → 6 rolos de 10m (60m)
+    const r = okA(calcularOrcamentoAutocolante({ largura_m: 2, altura_m: 2.6, cidade: 'São José' }))
+    expect(r.metros_lineares).toBe(52)
+    expect(r.rolos_10m).toBe(6)
+    expect(r.rolos_2_5m).toBe(0)
   })
 
   it('parede baixa usa só rolo curto quando basta', () => {
-    // 3 faixas de 1,20: rolo de 2,50m rende 2 → 2 curtos (179,80) < 1 longo (299,90)
+    // 3 faixas de 1,20 = 3,60m → 2 rolos de 2,50m (179,80) < 1 de 10m (299,90)
     const r = okA(calcularOrcamentoAutocolante({ largura_m: 0.3, altura_m: 1.2, cidade: 'São José' }))
     expect(r.rolos_10m).toBe(0)
     expect(r.rolos_2_5m).toBe(2)
-    expect(r.mensagem).not.toContain('10m:')
-  })
-
-  it('parede acima de 2,50m só cabe no rolo de 10m', () => {
-    const r = okA(calcularOrcamentoAutocolante({ largura_m: 2, altura_m: 2.6, cidade: 'São José' }))
-    expect(r.faixas).toBe(20)
-    expect(r.rolos_2_5m).toBe(0)
-    expect(r.rolos_10m).toBe(7) // 3 faixas por rolo
   })
 
   it('é só material: cobra frete da tabela e não fala de instalação', () => {
