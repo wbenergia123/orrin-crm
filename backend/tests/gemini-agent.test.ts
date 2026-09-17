@@ -90,4 +90,53 @@ describe('processarComGemini', () => {
     const contentsDaSegundaRodada = generateContentMock.mock.calls[1][0].contents
     expect(contentsDaSegundaRodada).toContainEqual({ role: 'model', parts: partsDoModelo })
   })
+
+  describe('sobrecarga do Google', () => {
+    const params = () => ({
+      tenantId: 'tenant-1',
+      pacienteId: 'paciente-1',
+      modelo: 'gemini-3.1-flash-lite',
+      systemPrompt: 'você é um agente',
+      tools: [],
+      historico: [],
+      mensagensDoUsuario: ['Ola'],
+      executarToolDispatcher: vi.fn(),
+    })
+    const erro = (status: number) => Object.assign(new Error(`status ${status}`), { status })
+
+    it('503 passageiro: espera, tenta de novo e responde', async () => {
+      vi.useFakeTimers()
+      generateContentMock.mockReset()
+      generateContentMock
+        .mockRejectedValueOnce(erro(503))
+        .mockRejectedValueOnce(erro(429))
+        .mockResolvedValueOnce({ functionCalls: [], text: 'Oi! Sou a Ana.' })
+
+      const p = processarComGemini(params())
+      await vi.runAllTimersAsync()
+      expect(await p).toBe('Oi! Sou a Ana.')
+      expect(generateContentMock).toHaveBeenCalledTimes(3)
+      vi.useRealTimers()
+    })
+
+    it('503 que não passa: desiste depois de 3 tentativas', async () => {
+      vi.useFakeTimers()
+      generateContentMock.mockReset()
+      generateContentMock.mockRejectedValue(erro(503))
+
+      const p = processarComGemini(params())
+      await vi.runAllTimersAsync()
+      expect(await p).toBe('')
+      expect(generateContentMock).toHaveBeenCalledTimes(3)
+      vi.useRealTimers()
+    })
+
+    it('erro que não é sobrecarga (400) não repete', async () => {
+      generateContentMock.mockReset()
+      generateContentMock.mockRejectedValue(erro(400))
+
+      expect(await processarComGemini(params())).toBe('')
+      expect(generateContentMock).toHaveBeenCalledTimes(1)
+    })
+  })
 })
