@@ -12,6 +12,16 @@ import { enviarImagemViaUAZAPI } from './uazapi-client'
 
 // Tudo em centavos — 79.90 * 8 em float dá 639.2000000000001.
 const PRECO_PAINEL = 7990          // só material
+
+// Promoção do painel (só material) — combinada com o Willian em 18/09/2026.
+// Vale até o fim do dia `ate` no horário de Brasília e volta sozinha pro preço
+// cheio depois, sem deploy. Encerrada, pode apagar este bloco.
+const PROMO_PAINEL = { preco: 5900, ate: '2026-09-26' }
+
+export function precoPainelMaterial(agora: Date = new Date()): number {
+  const hojeBrasilia = agora.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) // AAAA-MM-DD
+  return hojeBrasilia <= PROMO_PAINEL.ate ? PROMO_PAINEL.preco : PRECO_PAINEL
+}
 const PRECO_PAINEL_INSTALADO = 10990 // material + mão de obra (parede); isenta frete
 const PRECO_TUBO_PU = 2500
 const PAINEIS_POR_TUBO_PU = 1.5
@@ -81,6 +91,7 @@ export interface OrcamentoInput {
   fixacao?: Fixacao
   cidade?: string
   com_instalacao?: boolean
+  agora?: Date // só pra teste da promoção
 }
 
 export type OrcamentoResultado =
@@ -162,7 +173,7 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
   const presilhas = fixacao === 'presilha' ? melhor.paineis * PRESILHAS_POR_PAINEL : 0
   const subtotalFixacao = tubosPu * PRECO_TUBO_PU + presilhas * PRECO_PRESILHA
 
-  const precoUnitario = comInstalacao ? PRECO_PAINEL_INSTALADO : PRECO_PAINEL
+  const precoUnitario = comInstalacao ? PRECO_PAINEL_INSTALADO : precoPainelMaterial(input.agora)
   const subtotalPaineis = melhor.paineis * precoUnitario
   const total = subtotalPaineis + subtotalFixacao + frete
 

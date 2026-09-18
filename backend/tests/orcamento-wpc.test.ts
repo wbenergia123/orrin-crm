@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { calcularOrcamentoWpc, calcularOrcamentoAutocolante, ajustarToolsParaRevest, TOOL_ENVIAR_FOTO_PRODUTO, TOOL_ORCAMENTO_WPC } from '../src/lib/orcamento-wpc'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
+import { calcularOrcamentoWpc, calcularOrcamentoAutocolante, precoPainelMaterial, ajustarToolsParaRevest, TOOL_ENVIAR_FOTO_PRODUTO, TOOL_ORCAMENTO_WPC } from '../src/lib/orcamento-wpc'
 
 function ok(r: ReturnType<typeof calcularOrcamentoWpc>) {
   if (!r.ok) throw new Error(`esperava sucesso, veio ${r.motivo}`)
@@ -7,6 +7,10 @@ function ok(r: ReturnType<typeof calcularOrcamentoWpc>) {
 }
 
 describe('calcularOrcamentoWpc', () => {
+  // Preço cheio: os valores abaixo são do painel a R$ 79,90, fora da promoção.
+  beforeAll(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-01T12:00:00-03:00')) })
+  afterAll(() => { vi.useRealTimers() })
+
   it('parede baixa e larga aproveita 2 peças por painel', () => {
     // 2,40 de largura = 15 peças; painel de 2,70 rende 2 peças de 1,10 → 8 painéis
     const r = ok(calcularOrcamentoWpc({ largura_m: 2.4, altura_m: 1.1, fixacao: 'cola', cidade: 'São José' }))
@@ -274,5 +278,32 @@ describe('calcularOrcamentoAutocolante', () => {
     expect(alta.ok === false && alta.motivo).toBe('altura_acima_do_rolo')
     const zero = calcularOrcamentoAutocolante({ largura_m: 0, altura_m: 2, cidade: 'São José' })
     expect(zero.ok === false && zero.motivo).toBe('medida_invalida')
+  })
+})
+
+describe('promoção do painel WPC (R$ 59,00 até 26/09/2026)', () => {
+  const noDia = (iso: string) => new Date(iso)
+
+  it('vale no último dia até 23h59 de Brasília', () => {
+    expect(precoPainelMaterial(noDia('2026-09-18T10:00:00-03:00'))).toBe(5900)
+    expect(precoPainelMaterial(noDia('2026-09-26T23:59:00-03:00'))).toBe(5900)
+  })
+
+  it('volta sozinha pro preço cheio no dia 27 — mesmo que já seja dia 27 em UTC antes', () => {
+    // 26/09 22h em Brasília = 27/09 01h UTC: ainda é promoção
+    expect(precoPainelMaterial(noDia('2026-09-27T01:00:00Z'))).toBe(5900)
+    expect(precoPainelMaterial(noDia('2026-09-27T00:00:00-03:00'))).toBe(7990)
+  })
+
+  it('entra no orçamento só de material; o instalado não muda', () => {
+    const agora = noDia('2026-09-20T12:00:00-03:00')
+    const material = calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', cidade: 'São José', agora })
+    if (!material.ok) throw new Error('esperava ok')
+    expect(material.total_centavos).toBe(7 * 5900 + 5 * 2500 + 3000)
+    expect(material.mensagem).toContain('7 painéis: R$ 413,00')
+
+    const instalado = calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', com_instalacao: true, agora })
+    if (!instalado.ok) throw new Error('esperava ok')
+    expect(instalado.total_centavos).toBe(7 * 10990 + 5 * 2500)
   })
 })
