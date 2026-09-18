@@ -206,6 +206,10 @@ describe('TOOL_ENVIAR_FOTO_PRODUTO', () => {
 })
 
 describe('calcularOrcamentoAutocolante', () => {
+  // Fora da promoção: os valores abaixo contam com os 5% à vista.
+  beforeAll(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-01T12:00:00-03:00')) })
+  afterAll(() => { vi.useRealTimers() })
+
   function okA(r: ReturnType<typeof calcularOrcamentoAutocolante>) {
     if (!r.ok) throw new Error(`esperava sucesso, veio ${r.motivo}`)
     return r
@@ -315,11 +319,17 @@ describe('promoção do painel WPC (R$ 59,00 até 26/09/2026)', () => {
     expect(r.mensagem).toContain('6x de')
   })
 
-  it('o instalado (fora da promoção) mantém os 5% à vista', () => {
-    const r = calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', com_instalacao: true, agora: noDia('2026-09-20T12:00:00-03:00') })
-    if (!r.ok) throw new Error('esperava ok')
-    expect(r.total_a_vista_centavos).toBe(Math.round(r.total_centavos * 0.95))
-    expect(r.mensagem).toContain('À vista com 5% de desconto')
+  it('durante a promoção nem o instalado nem o autocolante têm desconto à vista', () => {
+    const agora = noDia('2026-09-20T12:00:00-03:00')
+    const inst = calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', com_instalacao: true, agora })
+    if (!inst.ok) throw new Error('esperava ok')
+    expect(inst.total_a_vista_centavos).toBe(inst.total_centavos)
+    expect(inst.mensagem).not.toMatch(/desconto/i)
+
+    const auto = calcularOrcamentoAutocolante({ largura_m: 1, altura_m: 2.4, cidade: 'São José', agora })
+    if (!auto.ok) throw new Error('esperava ok')
+    expect(auto.total_a_vista_centavos).toBe(auto.total_centavos)
+    expect(auto.mensagem).not.toMatch(/desconto/i)
   })
 
   it('no dia 27 o desconto à vista volta junto com o preço cheio', () => {
