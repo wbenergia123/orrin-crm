@@ -18,9 +18,13 @@ const PRECO_PAINEL = 7990          // só material
 // cheio depois, sem deploy. Encerrada, pode apagar este bloco.
 const PROMO_PAINEL = { preco: 5900, ate: '2026-09-26' }
 
-export function precoPainelMaterial(agora: Date = new Date()): number {
+function promoAtiva(agora: Date): boolean {
   const hojeBrasilia = agora.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) // AAAA-MM-DD
-  return hojeBrasilia <= PROMO_PAINEL.ate ? PROMO_PAINEL.preco : PRECO_PAINEL
+  return hojeBrasilia <= PROMO_PAINEL.ate
+}
+
+export function precoPainelMaterial(agora: Date = new Date()): number {
+  return promoAtiva(agora) ? PROMO_PAINEL.preco : PRECO_PAINEL
 }
 const PRECO_PAINEL_INSTALADO = 10990 // material + mão de obra (parede); isenta frete
 const PRECO_TUBO_PU = 2500
@@ -173,13 +177,16 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
   const presilhas = fixacao === 'presilha' ? melhor.paineis * PRESILHAS_POR_PAINEL : 0
   const subtotalFixacao = tubosPu * PRECO_TUBO_PU + presilhas * PRECO_PRESILHA
 
-  const precoUnitario = comInstalacao ? PRECO_PAINEL_INSTALADO : precoPainelMaterial(input.agora)
+  const agora = input.agora ?? new Date()
+  const precoUnitario = comInstalacao ? PRECO_PAINEL_INSTALADO : precoPainelMaterial(agora)
+  // Painel em promoção não acumula o desconto à vista (pedido do Willian, 18/09).
+  const temDescontoAVista = comInstalacao || !promoAtiva(agora)
   const subtotalPaineis = melhor.paineis * precoUnitario
   const total = subtotalPaineis + subtotalFixacao + frete
 
   // Desconto sobre o total (frete incluso). Parcela sai do valor cheio, como é
   // praxe: quem parcela não leva o desconto do à vista.
-  const aVista = Math.round(total * (1 - DESCONTO_A_VISTA))
+  const aVista = temDescontoAVista ? Math.round(total * (1 - DESCONTO_A_VISTA)) : total
   // Arredonda a parcela pra cima: 6 parcelas nunca podem somar menos que o total.
   const parcela = Math.ceil(total / PARCELAS_MAX)
 
@@ -200,7 +207,7 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
     comInstalacao ? '🚚 Frete: grátis *(incluso na instalação)*' : `🚚 Frete: ${reais(frete)}`,
     '',
     `💰 *Total: ${reais(total)}*`,
-    `✅ *À vista com 5% de desconto: ${reais(aVista)}*`,
+    ...(temDescontoAVista ? [`✅ *À vista com 5% de desconto: ${reais(aVista)}*`] : []),
     `💳 Ou em até ${PARCELAS_MAX}x de ${reais(parcela)} sem juros`,
     '',
     '✨ WPC com acabamento moderno e sofisticado',
