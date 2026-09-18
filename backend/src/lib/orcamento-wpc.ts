@@ -23,6 +23,12 @@ function promoAtiva(agora: Date): boolean {
   return hojeBrasilia <= PROMO_PAINEL.ate
 }
 
+// '2026-09-26' → '26/09'
+function dataCurta(iso: string): string {
+  const [, mes, dia] = iso.split('-')
+  return `${dia}/${mes}`
+}
+
 export function precoPainelMaterial(agora: Date = new Date()): number {
   return promoAtiva(agora) ? PROMO_PAINEL.preco : PRECO_PAINEL
 }
@@ -181,6 +187,7 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
   const precoUnitario = comInstalacao ? PRECO_PAINEL_INSTALADO : precoPainelMaterial(agora)
   // Durante a promoção nenhum orçamento dá desconto à vista (pedido do Willian, 18/09).
   const temDescontoAVista = !promoAtiva(agora)
+  const painelEmPromo = !comInstalacao && promoAtiva(agora)
   const subtotalPaineis = melhor.paineis * precoUnitario
   const total = subtotalPaineis + subtotalFixacao + frete
 
@@ -209,6 +216,7 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
     `💰 *Total: ${reais(total)}*`,
     ...(temDescontoAVista ? [`✅ *À vista com 5% de desconto: ${reais(aVista)}*`] : []),
     `💳 Ou em até ${PARCELAS_MAX}x de ${reais(parcela)} sem juros`,
+    ...(painelEmPromo ? ['', `🔥 *Preço promocional, válido até ${dataCurta(PROMO_PAINEL.ate)}*`] : []),
     '',
     '✨ WPC com acabamento moderno e sofisticado',
     '📲 Quer ver as opções de cor?',
