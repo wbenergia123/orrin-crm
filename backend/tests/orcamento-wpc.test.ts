@@ -332,9 +332,21 @@ describe('promoção do painel WPC (R$ 59,00 até 26/09/2026)', () => {
     expect(auto.mensagem).not.toMatch(/desconto/i)
   })
 
+  it('orçamento do painel em promoção avisa que o preço vale até 26/09', () => {
+    const agora = noDia('2026-09-20T12:00:00-03:00')
+    const r = calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', cidade: 'São José', agora })
+    if (!r.ok) throw new Error('esperava ok')
+    expect(r.mensagem).toContain('Preço promocional, válido até 26/09')
+    // instalado não está em promoção: não pode dizer que o preço é promocional
+    const inst = calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', com_instalacao: true, agora })
+    if (!inst.ok) throw new Error('esperava ok')
+    expect(inst.mensagem).not.toContain('promocional')
+  })
+
   it('no dia 27 o desconto à vista volta junto com o preço cheio', () => {
     const r = calcularOrcamentoWpc({ largura_m: 1.1, altura_m: 2.4, fixacao: 'cola', cidade: 'São José', agora: noDia('2026-09-27T09:00:00-03:00') })
     if (!r.ok) throw new Error('esperava ok')
     expect(r.mensagem).toContain('À vista com 5% de desconto')
+    expect(r.mensagem).not.toContain('promocional')
   })
 })
