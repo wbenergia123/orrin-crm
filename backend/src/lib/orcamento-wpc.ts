@@ -179,8 +179,8 @@ export function calcularOrcamentoWpc(input: OrcamentoInput): OrcamentoResultado 
 
   const agora = input.agora ?? new Date()
   const precoUnitario = comInstalacao ? PRECO_PAINEL_INSTALADO : precoPainelMaterial(agora)
-  // Painel em promoção não acumula o desconto à vista (pedido do Willian, 18/09).
-  const temDescontoAVista = comInstalacao || !promoAtiva(agora)
+  // Durante a promoção nenhum orçamento dá desconto à vista (pedido do Willian, 18/09).
+  const temDescontoAVista = !promoAtiva(agora)
   const subtotalPaineis = melhor.paineis * precoUnitario
   const total = subtotalPaineis + subtotalFixacao + frete
 
@@ -251,6 +251,7 @@ export interface OrcamentoAutocolanteInput {
   largura_m: number
   altura_m: number
   cidade?: string
+  agora?: Date // só pra teste da promoção
 }
 
 export type OrcamentoAutocolanteResultado =
@@ -312,7 +313,8 @@ export function calcularOrcamentoAutocolante(input: OrcamentoAutocolanteInput): 
   }
 
   const total = melhor.total + frete
-  const aVista = Math.round(total * (1 - DESCONTO_A_VISTA))
+  const temDescontoAVista = !promoAtiva(input.agora ?? new Date())
+  const aVista = temDescontoAVista ? Math.round(total * (1 - DESCONTO_A_VISTA)) : total
   const parcela = Math.ceil(total / PARCELAS_MAX)
   const rolo = (n: number, nome: string, preco: number) =>
     `🎞️ ${n} ${n === 1 ? 'rolo' : 'rolos'} de ${nome}: ${reais(n * preco)}`
@@ -328,7 +330,7 @@ export function calcularOrcamentoAutocolante(input: OrcamentoAutocolanteInput): 
     `🚚 Frete: ${reais(frete)}`,
     '',
     `💰 *Total: ${reais(total)}*`,
-    `✅ *À vista com 5% de desconto: ${reais(aVista)}*`,
+    ...(temDescontoAVista ? [`✅ *À vista com 5% de desconto: ${reais(aVista)}*`] : []),
     `💳 Ou em até ${PARCELAS_MAX}x de ${reais(parcela)} sem juros`,
     '',
     '📲 Quer ver as duas cores?',
