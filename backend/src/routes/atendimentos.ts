@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { supabaseAdmin } from '../services/supabase'
 import { enviarMensagemViaUAZAPI } from '../lib/uazapi-client'
+import { assinarFoto } from '../lib/storage-fotos'
 
 const router = Router()
 
@@ -129,7 +130,9 @@ router.get('/:paciente_id/conversas', async (req, res) => {
     .limit(100)
 
   if (error) { res.status(500).json({ error: error.message }); return }
-  res.json((data ?? []).reverse())
+  const comUrls = await Promise.all((data ?? []).map(async (c) =>
+    c.midia_url ? { ...c, midia_url: await assinarFoto(c.midia_url) } : c))
+  res.json(comUrls.reverse())
 })
 
 // ─── PATCH /:paciente_id/handoff ──────────────────────────────────────────────

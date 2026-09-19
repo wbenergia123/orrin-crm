@@ -110,6 +110,58 @@ describe('Marcação Digital', () => {
     })
   })
 
+  describe('segurança das fotos (bucket privado)', () => {
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0xff, 0xd9])
+
+    it('upload guarda caminho e devolve URL ASSINADA (não pública)', async () => {
+      const res = await request(app)
+        .post('/api/marcacoes/fotos/upload')
+        .set('Authorization', `Bearer ${token}`).set('Host', hostTenant)
+        .field('paciente_id', pacienteId).field('tipo', 'antes')
+        .attach('foto', jpeg, { filename: 't.jpg', contentType: 'image/jpeg' })
+      expect(res.status).toBe(201)
+      expect(res.body.url).toContain('/object/sign/fotos-pacientes/')
+      expect(res.body.url).toContain('token=')
+      expect(res.body.url).not.toContain('/object/public/')
+
+      // no banco fica o caminho, não a URL
+      const { data } = await supabase.from('fotos_paciente').select('url').eq('id', res.body.id).single()
+      expect(data!.url.startsWith(`${tenantId}/`)).toBe(true)
+      expect(data!.url).not.toContain('http')
+      await supabase.from('fotos_paciente').delete().eq('id', res.body.id)
+      await supabase.storage.from('fotos-pacientes').remove([data!.url])
+    })
+
+    it('excluir a foto apaga o arquivo do bucket', async () => {
+      const up = await request(app)
+        .post('/api/marcacoes/fotos/upload')
+        .set('Authorization', `Bearer ${token}`).set('Host', hostTenant)
+        .field('paciente_id', pacienteId)
+        .attach('foto', jpeg, { filename: 't.jpg', contentType: 'image/jpeg' })
+      const { data: row } = await supabase.from('fotos_paciente').select('url').eq('id', up.body.id).single()
+      const path = row!.url
+      // arquivo existe antes
+      const antes = await supabase.storage.from('fotos-pacientes').createSignedUrl(path, 60)
+      expect(antes.data?.signedUrl).toBeTruthy()
+
+      const del = await request(app).delete(`/api/marcacoes/fotos/${up.body.id}`)
+        .set('Authorization', `Bearer ${token}`).set('Host', hostTenant)
+      expect(del.status).toBe(200)
+      // baixar o arquivo agora falha
+      const depois = await supabase.storage.from('fotos-pacientes').download(path)
+      expect(depois.error).toBeTruthy()
+    })
+
+    it('não deixa anexar foto em paciente de outra clínica', async () => {
+      const res = await request(app)
+        .post('/api/marcacoes/fotos/upload')
+        .set('Authorization', `Bearer ${token}`).set('Host', hostTenant)
+        .field('paciente_id', '00000000-0000-0000-0000-000000000000')
+        .attach('foto', jpeg, { filename: 't.jpg', contentType: 'image/jpeg' })
+      expect(res.status).toBe(404)
+    })
+  })
+
   describe('PATCH /api/marcacoes/fotos/:id (anotações)', () => {
     let fotoId: string
     const anotacoes = {
