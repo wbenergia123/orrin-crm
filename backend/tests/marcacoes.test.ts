@@ -110,6 +110,78 @@ describe('Marcação Digital', () => {
     })
   })
 
+  describe('PATCH /api/marcacoes/fotos/:id (anotações)', () => {
+    let fotoId: string
+    const anotacoes = {
+      tracos: [{ cor: '#FF3B30', largura: 0.01, pontos: [[0.1, 0.2], [0.3, 0.4]] }],
+      rotulos: [{ texto: 'Mama E', cor: '#FFCC00', x: 0.3, y: 0.6 }],
+    }
+
+    beforeAll(async () => {
+      const { data } = await supabase
+        .from('fotos_paciente')
+        .insert({ tenant_id: tenantId, paciente_id: pacienteId, url: 'https://exemplo/foto.jpg', tipo: 'antes' })
+        .select('id')
+        .single()
+      fotoId = data!.id
+    })
+
+    afterAll(async () => {
+      await supabase.from('fotos_paciente').delete().eq('id', fotoId)
+    })
+
+    it('salva anotações e o GET devolve', async () => {
+      const res = await request(app)
+        .patch(`/api/marcacoes/fotos/${fotoId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .send({ anotacoes, legenda: 'Marcação pré' })
+      expect(res.status).toBe(200)
+      expect(res.body.anotacoes).toEqual(anotacoes)
+      expect(res.body.updated_at).toBeTruthy()
+
+      const lista = await request(app)
+        .get(`/api/marcacoes/fotos/${pacienteId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+      expect(lista.body.find((f: any) => f.id === fotoId).anotacoes).toEqual(anotacoes)
+    })
+
+    it('edita de novo (sobrescreve) e aceita limpar com null', async () => {
+      const res = await request(app)
+        .patch(`/api/marcacoes/fotos/${fotoId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .send({ anotacoes: null })
+      expect(res.status).toBe(200)
+      expect(res.body.anotacoes).toBeNull()
+      expect(res.body.legenda).toBe('Marcação pré')
+    })
+
+    it('rejeita coordenada fora de 0–1 e cor inválida', async () => {
+      for (const ruim of [
+        { tracos: [{ cor: '#FF3B30', largura: 0.01, pontos: [[1.5, 0.2]] }], rotulos: [] },
+        { tracos: [], rotulos: [{ texto: 'x', cor: 'red', x: 0.1, y: 0.1 }] },
+      ]) {
+        const res = await request(app)
+          .patch(`/api/marcacoes/fotos/${fotoId}`)
+          .set('Authorization', `Bearer ${token}`)
+          .set('Host', hostTenant)
+          .send({ anotacoes: ruim })
+        expect(res.status).toBe(400)
+      }
+    })
+
+    it('retorna 404 para foto inexistente ou de outra clínica', async () => {
+      const res = await request(app)
+        .patch('/api/marcacoes/fotos/00000000-0000-0000-0000-000000000000')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Host', hostTenant)
+        .send({ legenda: 'x' })
+      expect(res.status).toBe(404)
+    })
+  })
+
   describe('POST /api/marcacoes/fotos/upload', () => {
     let visitId: string
 

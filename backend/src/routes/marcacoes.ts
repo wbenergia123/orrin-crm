@@ -2,6 +2,7 @@
 // Rotas para Marcação Digital: atendimentos, markings e fotos do paciente
 import { Router, Request, Response } from 'express'
 import multer from 'multer'
+import { z } from 'zod'
 import { supabaseAdmin } from '../services/supabase'
 
 const router = Router()
@@ -345,6 +346,45 @@ router.post('/fotos/upload', (req: Request, res: Response, next) => {
 
   if (error) { res.status(400).json({ error: error.message }); return }
   res.status(201).json(data)
+})
+
+// Anotações livres editáveis (traços + rótulos), coordenadas normalizadas 0–1 na imagem
+const coord = z.number().min(0).max(1)
+const cor = z.string().regex(/^#[0-9a-fA-F]{6}$/)
+const anotacoesSchema = z.object({
+  tracos: z.array(z.object({
+    cor,
+    largura: z.number().positive().max(0.2),
+    pontos: z.array(z.tuple([coord, coord])).min(1).max(5000),
+  })).max(500),
+  rotulos: z.array(z.object({
+    texto: z.string().trim().min(1).max(60),
+    cor,
+    x: coord,
+    y: coord,
+  })).max(100),
+})
+const fotoPatchSchema = z.object({
+  anotacoes: anotacoesSchema.nullable().optional(),
+  legenda: z.string().max(255).nullable().optional(),
+  tipo: z.enum(['antes', 'depois', 'geral']).optional(),
+}).refine(b => Object.keys(b).length > 0, 'Nada para atualizar')
+
+// Atualizar foto (anotações, legenda, tipo) — a imagem em si não muda
+router.patch('/fotos/:id', async (req: Request, res: Response) => {
+  const parsed = fotoPatchSchema.safeParse(req.body)
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return }
+
+  const { data, error } = await supabaseAdmin
+    .from('fotos_paciente')
+    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .eq('id', req.params.id)
+    .eq('tenant_id', req.user!.tenant_id)
+    .select()
+    .maybeSingle()
+  if (error) { res.status(400).json({ error: error.message }); return }
+  if (!data) { res.status(404).json({ error: 'Foto não encontrada' }); return }
+  res.json(data)
 })
 
 // Excluir foto
