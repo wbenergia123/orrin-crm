@@ -46,11 +46,11 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(401).json({ error: 'Usuário desativado. Entre em contato com o suporte.' })
   }
 
-  let org: { ativo: boolean; studio_3d_ativo: boolean; vertical: string } | null = null
+  let org: { ativo: boolean; studio_3d_ativo: boolean; vertical: string; slug: string } | null = null
   if (usuario.role !== 'super_admin' && usuario.tenant_id) {
     const { data } = await supabaseAdmin
       .from('organizacoes')
-      .select('ativo, studio_3d_ativo, vertical')
+      .select('ativo, studio_3d_ativo, vertical, slug')
       .eq('id', usuario.tenant_id)
       .single()
     org = data
@@ -78,6 +78,8 @@ router.post('/login', async (req: Request, res: Response) => {
       nome: usuario.nome,
       studio_3d_ativo: usuario.role === 'super_admin' ? true : (org?.studio_3d_ativo ?? false),
       vertical: usuario.role === 'super_admin' ? 'clinica' : (org?.vertical ?? 'clinica'),
+      // subdomínio da clínica: clientes fora do navegador (app iOS) precisam dele pra chamar a API
+      slug: usuario.role === 'super_admin' ? 'admin' : (org?.slug ?? null),
     },
   })
 })
@@ -102,17 +104,19 @@ router.get('/me', async (req: Request, res: Response) => {
 
     let studio3d = usuario.role === 'super_admin'
     let vertical = 'clinica'
+    let slug: string | null = usuario.role === 'super_admin' ? 'admin' : null
     if (usuario.role !== 'super_admin' && usuario.tenant_id) {
       const { data: org } = await supabaseAdmin
         .from('organizacoes')
-        .select('studio_3d_ativo, vertical')
+        .select('studio_3d_ativo, vertical, slug')
         .eq('id', usuario.tenant_id)
         .single()
       studio3d = org?.studio_3d_ativo ?? false
       vertical = org?.vertical ?? 'clinica'
+      slug = org?.slug ?? null
     }
 
-    res.json({ usuario: { ...usuario, studio_3d_ativo: studio3d, vertical } })
+    res.json({ usuario: { ...usuario, studio_3d_ativo: studio3d, vertical, slug } })
   } catch {
     res.status(401).json({ error: 'Token inválido ou expirado' })
   }
