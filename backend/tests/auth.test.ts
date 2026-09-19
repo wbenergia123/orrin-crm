@@ -123,6 +123,19 @@ describe('POST /api/auth/login - studio_3d_ativo', () => {
     expect(typeof res.body.usuario.studio_3d_ativo).toBe('boolean')
     expect(res.body.usuario.studio_3d_ativo).toBe(true)
   })
+
+  it('login e /me devolvem o slug da clínica', async () => {
+    const login = await request(app)
+      .post('/api/auth/login')
+      .set('Host', host)
+      .send({ email: EMAIL, senha: 'senha123' })
+    expect(login.body.usuario.slug).toBe(host.split('.')[0])
+
+    const me = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${login.body.token}`)
+    expect(me.body.usuario.slug).toBe(host.split('.')[0])
+  })
 })
 
 describe('GET /api/auth/me', () => {
