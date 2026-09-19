@@ -2,6 +2,7 @@
 // Biblioteca de imagens de referência reutilizáveis por clínica
 import { Router, Request, Response } from 'express'
 import multer from 'multer'
+import { assinarFoto, removerFoto } from '../lib/storage-fotos'
 import { supabaseAdmin } from '../services/supabase'
 
 const router = Router()
@@ -16,7 +17,8 @@ router.get('/', async (req: Request, res: Response) => {
     .order('created_at', { ascending: false })
 
   if (error) return res.status(400).json({ error: error.message })
-  res.json(data)
+  const comUrls = await Promise.all((data ?? []).map(async (img) => ({ ...img, url: await assinarFoto(img.url) })))
+  res.json(comUrls)
 })
 
 const upload = multer({
@@ -57,24 +59,24 @@ router.post('/upload', (req: Request, res: Response, next) => {
     .upload(path, req.file.buffer, { contentType: req.file.mimetype })
   if (uploadError) { res.status(500).json({ error: uploadError.message }); return }
 
-  const { data: { publicUrl } } = supabaseAdmin.storage.from('fotos-pacientes').getPublicUrl(path)
-
   const { data, error } = await supabaseAdmin
     .from('imagens_referencia')
     .insert({
       tenant_id: req.user!.tenant_id,
       nome: nome.trim(),
-      url: publicUrl,
+      url: path, // guarda o caminho; a leitura assina
     })
     .select()
     .single()
 
   if (error) { res.status(400).json({ error: error.message }); return }
-  res.status(201).json(data)
+  res.status(201).json({ ...data, url: await assinarFoto(data.url) })
 })
 
 // Excluir imagem de referência
 router.delete('/:id', async (req: Request, res: Response) => {
+  const { data: img } = await supabaseAdmin
+    .from('imagens_referencia').select('url').eq('id', req.params.id).eq('tenant_id', req.user!.tenant_id).maybeSingle()
   const { error } = await supabaseAdmin
     .from('imagens_referencia')
     .delete()
@@ -82,6 +84,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     .eq('tenant_id', req.user!.tenant_id)
 
   if (error) return res.status(400).json({ error: error.message })
+  if (img) await removerFoto(img.url)
   res.json({ message: 'Imagem de referência removida' })
 })
 

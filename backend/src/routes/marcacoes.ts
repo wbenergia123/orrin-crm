@@ -4,6 +4,7 @@ import { Router, Request, Response } from 'express'
 import multer from 'multer'
 import { z } from 'zod'
 import { supabaseAdmin } from '../services/supabase'
+import { assinarFoto, removerFoto } from '../lib/storage-fotos'
 
 const router = Router()
 
@@ -291,7 +292,8 @@ router.get('/fotos/:paciente_id', async (req: Request, res: Response) => {
     .order('created_at', { ascending: false })
 
   if (error) return res.status(400).json({ error: error.message })
-  res.json(data)
+  const comUrls = await Promise.all((data ?? []).map(async (f) => ({ ...f, url: await assinarFoto(f.url) })))
+  res.json(comUrls)
 })
 
 const upload = multer({
@@ -321,6 +323,11 @@ router.post('/fotos/upload', (req: Request, res: Response, next) => {
   const { paciente_id, tipo, legenda, visit_id } = req.body
   if (!paciente_id) { res.status(400).json({ error: 'paciente_id é obrigatório' }); return }
 
+  // o paciente tem que ser desta clínica (senão dá pra anexar foto no paciente de outra)
+  const { data: dono } = await supabaseAdmin
+    .from('pacientes').select('id').eq('id', paciente_id).eq('tenant_id', req.user!.tenant_id).maybeSingle()
+  if (!dono) { res.status(404).json({ error: 'Paciente não encontrado' }); return }
+
   const ext = req.file.mimetype.split('/')[1]
   const path = `${req.user!.tenant_id}/${paciente_id}-${Date.now()}.${ext}`
 
@@ -329,13 +336,11 @@ router.post('/fotos/upload', (req: Request, res: Response, next) => {
     .upload(path, req.file.buffer, { contentType: req.file.mimetype })
   if (uploadError) { res.status(500).json({ error: uploadError.message }); return }
 
-  const { data: { publicUrl } } = supabaseAdmin.storage.from('fotos-pacientes').getPublicUrl(path)
-
   const { data, error } = await supabaseAdmin
     .from('fotos_paciente')
     .insert({
       paciente_id,
-      url: publicUrl,
+      url: path, // guarda o caminho; a leitura assina
       tipo: tipo || 'geral',
       legenda: legenda || null,
       visit_id: visit_id || null,
@@ -345,7 +350,7 @@ router.post('/fotos/upload', (req: Request, res: Response, next) => {
     .single()
 
   if (error) { res.status(400).json({ error: error.message }); return }
-  res.status(201).json(data)
+  res.status(201).json({ ...data, url: await assinarFoto(data.url) })
 })
 
 // Anotações livres editáveis (traços + rótulos), coordenadas normalizadas 0–1 na imagem
@@ -387,8 +392,10 @@ router.patch('/fotos/:id', async (req: Request, res: Response) => {
   res.json(data)
 })
 
-// Excluir foto
+// Excluir foto (apaga também o arquivo do bucket)
 router.delete('/fotos/:id', async (req: Request, res: Response) => {
+  const { data: foto } = await supabaseAdmin
+    .from('fotos_paciente').select('url').eq('id', req.params.id).eq('tenant_id', req.user!.tenant_id).maybeSingle()
   const { error } = await supabaseAdmin
     .from('fotos_paciente')
     .delete()
@@ -396,6 +403,7 @@ router.delete('/fotos/:id', async (req: Request, res: Response) => {
     .eq('tenant_id', req.user!.tenant_id)
 
   if (error) return res.status(400).json({ error: error.message })
+  if (foto) await removerFoto(foto.url)
   res.json({ message: 'Foto removida' })
 })
 
